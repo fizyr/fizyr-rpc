@@ -9,10 +9,62 @@ pub const HEADER_LEN: u32 = 12;
 /// Other (lower) limits may be enforced by the API or remote peers.
 pub const MAX_PAYLOAD_LEN: u32 = u32::MAX - HEADER_LEN;
 
+/// Trait for types that can be used as message body.
+pub trait Body {
+	/// Create a message body from an error message.
+	fn from_error(message: &str) -> Self;
+}
+
 /// Well-known service IDs.
 pub mod service_id {
 	/// The service ID used for error responses.
 	pub const ERROR: i32 = -1;
+}
+
+/// A complete RPC message, including header and body.
+pub struct Message<Body> {
+	/// The header of the message.
+	pub header: MessageHeader,
+
+	/// The body of the message.
+	pub body: Body,
+}
+
+impl<Body: crate::Body> Message<Body> {
+	/// Create a new message with a header and a body.
+	pub fn new(header: MessageHeader, body: Body) -> Self {
+		Self { header, body }
+	}
+
+	/// Create a new request message.
+	pub fn request(request_id: u32, service_id: i32, body: Body) -> Self {
+		Self::new(MessageHeader::request(request_id, service_id), body)
+	}
+
+	/// Create a new response message.
+	pub fn response(request_id: u32, service_id: i32, body: Body) -> Self {
+		Self::new(MessageHeader::response(request_id, service_id), body)
+	}
+
+	/// Create a new error response message.
+	pub fn error_response(request_id: u32, message: &str) -> Self {
+		Self::new(MessageHeader::response(request_id, service_id::ERROR), Body::from_error(message))
+	}
+
+	/// Create a new requester update message.
+	pub fn requester_update(request_id: u32, service_id: i32, body: Body) -> Self {
+		Self::new(MessageHeader::requester_update(request_id, service_id), body)
+	}
+
+	/// Create a new responder update message.
+	pub fn responder_update(request_id: u32, service_id: i32, body: Body) -> Self {
+		Self::new(MessageHeader::responder_update(request_id, service_id), body)
+	}
+
+	/// Create a new stream message.
+	pub fn stream(request_id: u32, service_id: i32, body: Body) -> Self {
+		Self::new(MessageHeader::stream(request_id, service_id), body)
+	}
 }
 
 /// The type of a message.

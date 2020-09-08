@@ -46,3 +46,35 @@ impl PayloadTooLarge {
 		}
 	}
 }
+
+/// The connection is closed.
+#[derive(Debug, Clone, Error)]
+#[error("the connection with the peer is closed")]
+pub struct ConnectionClosed;
+
+/// No free request ID was found.
+#[derive(Debug, Clone, Error)]
+#[error("no free request ID was found")]
+pub struct NoFreeRequestIdFound;
+
+/// The request ID is already in use.
+#[derive(Debug, Clone, Error)]
+#[error("duplicate request ID: request ID {request_id} is already associated with an open request")]
+pub struct DuplicateRequestId {
+	pub request_id: u32,
+}
+
+/// The request ID is already in use.
+#[derive(Debug, Clone, Error)]
+#[error("unknown request ID: request ID {request_id} is not associated with an open request")]
+pub struct UnknownRequestId {
+	pub request_id: u32,
+}
+
+/// An error occured while processing an incoming message.
+#[derive(Debug, Clone, Error)]
+#[error("{0}")]
+pub enum ProcessIncomingMessageError {
+	DuplicateRequestId(#[from] DuplicateRequestId),
+	UnknownRequestId(#[from] UnknownRequestId),
+}
