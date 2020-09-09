@@ -4,7 +4,7 @@ use crate::error;
 
 /// A bi-directional asynchronous channel.
 ///
-/// Implemented by wrapping a reciever and sender for two distinct channels.
+/// Implemented by wrapping a receiver and sender for two distinct channels.
 pub struct BidiChannel<T> {
 	rx: mpsc::UnboundedReceiver<T>,
 	tx: mpsc::UnboundedSender<T>,

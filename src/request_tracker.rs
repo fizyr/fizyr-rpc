@@ -262,7 +262,7 @@ mod test {
 		let (outgoing_tx, mut outgoing_rx) = mpsc::unbounded();
 		let mut tracker = RequestTracker::new(outgoing_tx);
 
-		// Simute an outgoing request.
+		// Simulate an outgoing request.
 		let_assert!(Ok(mut sent_request) = tracker.allocate_sent_request(3));
 
 		// Simulate and receive a responder update.

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-/// An error occured while reading a message.
+/// An error occurred while reading a message.
 #[derive(Debug, Error)]
 #[error("{0}")]
 pub enum ReadMessageError {
@@ -11,7 +11,7 @@ pub enum ReadMessageError {
 	PayloadTooLarge(#[from] PayloadTooLarge),
 }
 
-/// An error occured while writing a message.
+/// An error occurred while writing a message.
 #[derive(Debug, Error)]
 #[error("{0}")]
 pub enum WriteMessageError {
@@ -71,7 +71,7 @@ pub struct UnknownRequestId {
 	pub request_id: u32,
 }
 
-/// An error occured while processing an incoming message.
+/// An error occurred while processing an incoming message.
 #[derive(Debug, Clone, Error)]
 #[error("{0}")]
 pub enum ProcessIncomingMessageError {

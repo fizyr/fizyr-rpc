@@ -5,7 +5,7 @@ pub const HEADER_LEN: u32 = 12;
 
 /// The maximum length of a message body.
 ///
-/// This is the maxmimum possible length, limited by the 32 bit message length field and the presence of a message header.
+/// This is the maximum possible length, limited by the 32 bit message length field and the presence of a message header.
 /// Other (lower) limits may be enforced by the API or remote peers.
 pub const MAX_PAYLOAD_LEN: u32 = u32::MAX - HEADER_LEN;
 
@@ -133,7 +133,7 @@ impl MessageHeader {
 		}
 	}
 
-	/// Create a new reponse message header.
+	/// Create a new response message header.
 	pub fn response(request_id: u32, service_id: i32) -> Self {
 		Self {
 			message_type: MessageType::Response,
@@ -142,7 +142,7 @@ impl MessageHeader {
 		}
 	}
 
-	/// Create a new error reponse message header.
+	/// Create a new error response message header.
 	pub fn error_response(request_id: u32) -> Self {
 		Self::response(request_id, service_id::ERROR)
 	}
