@@ -1,4 +1,5 @@
 mod message;
+mod request;
 mod request_tracker;
 mod stream_peer;
 mod util;
@@ -11,7 +12,7 @@ pub use message::Message;
 pub use message::MessageHeader;
 pub use message::MessageType;
 pub use message::service_id;
-pub use request_tracker::ReceivedRequest;
+pub use request::ReceivedRequest;
+pub use request::SentRequest;
 pub use request_tracker::RequestTracker;
-pub use request_tracker::SentRequest;
 pub use stream_peer::StreamPeer;

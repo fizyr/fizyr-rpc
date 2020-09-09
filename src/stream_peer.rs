@@ -12,6 +12,7 @@ use crate::MessageType;
 use crate::error;
 
 /// The body of a stream message.
+#[derive(Debug, Clone)]
 pub struct StreamBody {
 	pub data: Box<[u8]>,
 }

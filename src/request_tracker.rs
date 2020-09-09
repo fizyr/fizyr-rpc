@@ -1,29 +1,24 @@
 use futures::channel::mpsc;
+use futures::sink::SinkExt;
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 
 use crate::Message;
 use crate::MessageType;
+use crate::ReceivedRequest;
+use crate::SentRequest;
 use crate::error;
 use crate::util::BidiChannel;
 
-/// A handle for a sent request.
+/// A message that was not fully processed by the request tracker.
 ///
-/// The handle can be used to receive updates and the response from the remote peer,
-/// and to send update messages to the remote peer.
-pub struct SentRequest<Body> {
-	request_id: u32,
-	service_id: i32,
-	channel: BidiChannel<Message<Body>>,
-}
-
-/// A handle for a received request.
+/// When you pass a message to `RequestTracker::process_incoming_message`,
+/// not all messages are fully handled internally by a request tracker.
 ///
-/// The handle can be used to receive updates from the remote peer,
-/// and to send updates and the response to the remote peer.
-pub struct ReceivedRequest<Body> {
-	request_id: u32,
-	service_id: i32,
-	channel: BidiChannel<Message<Body>>,
+/// Specifically, request and stream messages still need to be processed by the caller.
+pub enum UnhandledMessage<Body> {
+	ReceivedRequest(ReceivedRequest<Body>),
+	Stream(Message<Body>),
 }
 
 /// Tracker that manages open requests.
@@ -46,79 +41,6 @@ pub struct RequestTracker<Body> {
 	received_requests: BTreeMap<u32, mpsc::UnboundedSender<Message<Body>>>,
 }
 
-impl<Body: crate::Body> SentRequest<Body> {
-	/// Create a new sent request.
-	fn new(request_id: u32, service_id: i32, channel: BidiChannel<Message<Body>>) -> Self {
-		Self { request_id, service_id, channel }
-	}
-
-	/// Get the request ID of the sent request.
-	pub fn request_id(&self) -> u32 {
-		self.request_id
-	}
-
-	/// Get the service ID of the initial request message.
-	pub fn service_id(&self) -> i32 {
-		self.service_id
-	}
-
-	/// Read the next message from the request.
-	///
-	/// This could be an update message or a response message.
-	// TODO: change return type to eliminate impossible message types?
-	pub async fn read_message(&mut self) -> Result<Message<Body>, error::ConnectionClosed> {
-		self.channel.receive().await
-	}
-
-	/// Send an update for the request.
-	pub async fn send_update(&mut self, service_id: i32, body: Body) -> Result<(), error::ConnectionClosed> {
-		let message = Message::requester_update(self.request_id, service_id, body);
-		self.channel.send(message).await
-	}
-}
-
-impl<Body: crate::Body> ReceivedRequest<Body> {
-	/// Create a new received request.
-	fn new(request_id: u32, service_id: i32, channel: BidiChannel<Message<Body>>) -> Self {
-		Self { request_id, service_id, channel }
-	}
-
-	/// Get the request ID of the received request.
-	pub fn request_id(&self) -> u32 {
-		self.request_id
-	}
-
-	/// Get the service ID of the initial request message.
-	pub fn service_id(&self) -> i32 {
-		self.service_id
-	}
-
-	/// Read the next message from the request.
-	///
-	/// This can only be an update message.
-	// TODO: change return type to eliminate impossible message types?
-	pub async fn read_message(&mut self) -> Result<Message<Body>, error::ConnectionClosed> {
-		self.channel.receive().await
-	}
-
-	/// Send an update for the request.
-	pub async fn send_update(&mut self, service_id: i32, body: Body) -> Result<(), error::ConnectionClosed> {
-		let message = Message::responder_update(self.request_id, service_id, body);
-		self.channel.send(message).await
-	}
-
-	/// Send the final response.
-	pub async fn send_response(mut self, service_id: i32, body: Body) -> Result<(), error::ConnectionClosed> {
-		let message = Message::response(self.request_id, service_id, body);
-		self.channel.send(message).await
-	}
-
-	/// Send the final response with an error message.
-	pub async fn send_error_response(self, message: &str) -> Result<(), error::ConnectionClosed> {
-		self.send_response(crate::service_id::ERROR, Body::from_error(message)).await
-	}
-}
-
 impl<Body: crate::Body> RequestTracker<Body> {
 	/// Create a new request tracker.
 	///
@@ -135,8 +57,6 @@ impl<Body: crate::Body> RequestTracker<Body> {
 
 	/// Allocate a request ID and register a new sent request.
 	pub fn allocate_sent_request(&mut self, service_id: i32) -> Result<SentRequest<Body>, error::NoFreeRequestIdFound> {
-		use std::collections::btree_map::Entry;
-
 		// Try to find a free ID a bunch of times.
 		for _ in 0..100 {
 			let request_id = self.next_sent_request_id;
@@ -153,16 +73,37 @@ impl<Body: crate::Body> RequestTracker<Body> {
 		return Err(error::NoFreeRequestIdFound)
 	}
 
+	/// Remove a sent request from the tracker.
+	///
+	/// This should be called when a request is finished to make the ID available again.
+	/// Note that sent requests are also removed internally when they receive a response,
+	/// or when they would receive a message but the [`SentRequest`] was dropped.
+	pub fn remove_sent_request(&mut self, request_id: u32) -> Result<(), error::UnknownRequestId> {
+		self.sent_requests.remove(&request_id)
+			.ok_or_else(|| error::UnknownRequestId { request_id })?;
+		Ok(())
+	}
+
 	/// Register a new sent request.
 	///
 	/// Returns an error if the request ID is already in use.
 	pub fn register_received_request(&mut self, request_id: u32, service_id: i32) -> Result<ReceivedRequest<Body>, error::DuplicateRequestId> {
-		use std::collections::btree_map::Entry;
-
 		match self.received_requests.entry(request_id) {
-			Entry::Occupied(_) => {
-				Err(error::DuplicateRequestId { request_id })
+			Entry::Occupied(mut entry) => {
+				// If the existing entry has an open channel, the request ID is still in use.
+				if !entry.get().is_closed() {
+					Err(error::DuplicateRequestId { request_id })
+
+				// If the entry has a closed channel then received request has already been dropped.
+				// That means the request ID is no longer in use.
+				} else {
+					let (incoming_tx, request_channel) = make_message_channel(self.outgoing_tx.clone());
+					entry.insert(incoming_tx);
+					Ok(ReceivedRequest::new(request_id, service_id, request_channel))
+				}
 			}
+
+			// The request ID is available.
 			Entry::Vacant(entry) => {
 				let (incoming_tx, request_channel) = make_message_channel(self.outgoing_tx.clone());
 				entry.insert(incoming_tx);
@@ -171,34 +112,96 @@ impl<Body: crate::Body> RequestTracker<Body> {
 		}
 	}
 
-	/// Process an incoming request, update or response message.
+	/// Remove a received request from the tracker.
 	///
-	/// # Panics
-	/// This function panics if you pass it a stream message.
-	pub fn process_incoming_message(&mut self, message: Message<Body>) -> Result<Option<ReceivedRequest<Body>>, error::ProcessIncomingMessageError> {
+	/// This should be called when a request is finished to make the ID available again.
+	/// Note that received requests are also removed internally when they would receive a message but the [`ReceivedRequest`] was dropped.
+	pub fn remove_received_request(&mut self, request_id: u32) -> Result<(), error::UnknownRequestId> {
+		self.received_requests.remove(&request_id)
+			.ok_or_else(|| error::UnknownRequestId { request_id })?;
+		Ok(())
+	}
+
+	/// Process an incoming message.
+	///
+	/// This will pass the message on to an open request if any matches.
+	///
+	/// Returns an error
+	///  * if an incoming request message uses an already claimed request ID
+	///  * if an incoming update or response message does not match an open request
+	pub async fn process_incoming_message(&mut self, message: Message<Body>) -> Result<Option<UnhandledMessage<Body>>, error::ProcessIncomingMessageError> {
 		match message.header.message_type {
-			MessageType::Request => Ok(self.process_incoming_request(message).map(Some)?),
-			MessageType::Response => Ok(self.process_incoming_response(message).map(|_| None)?),
-			MessageType::RequesterUpdate => Ok(self.process_incoming_requester_update(message).map(|_| None)?),
-			MessageType::ResponderUpdate => Ok(self.process_incoming_responder_update(message).map(|_| None)?),
-			MessageType::Stream => panic!("stream message passed to process_incoming_message"),
+			MessageType::Request => {
+				let received_request = self.register_received_request(message.header.request_id, message.header.service_id)?;
+				Ok(Some(UnhandledMessage::ReceivedRequest(received_request)))
+			}
+			MessageType::Response => {
+				self.process_incoming_response(message).await?;
+				Ok(None)
+			}
+			MessageType::RequesterUpdate => {
+				self.process_incoming_requester_update(message).await?;
+				Ok(None)
+			}
+			MessageType::ResponderUpdate => {
+				self.process_incoming_responder_update(message).await?;
+				Ok(None)
+			}
+			MessageType::Stream => {
+				Ok(Some(UnhandledMessage::Stream(message)))
+			}
 		}
 	}
 
-	fn process_incoming_request(&mut self, message: Message<Body>) -> Result<ReceivedRequest<Body>, error::DuplicateRequestId> {
-		todo!();
+	async fn process_incoming_response(&mut self, message: Message<Body>) -> Result<(), error::UnknownRequestId> {
+		let request_id = message.header.request_id;
+		match self.sent_requests.entry(request_id) {
+			Entry::Vacant(_) => {
+				Err(error::UnknownRequestId { request_id })
+			}
+			Entry::Occupied(mut entry) => {
+				// Forward the message to the sent_request, then remove the entry.
+				let _ = entry.get_mut().send(message).await;
+				entry.remove();
+				Ok(())
+			}
+		}
 	}
 
-	fn process_incoming_response(&mut self, message: Message<Body>) -> Result<(), error::DuplicateRequestId> {
-		todo!();
+	async fn process_incoming_requester_update(&mut self, message: Message<Body>) -> Result<(), error::UnknownRequestId> {
+		let request_id = message.header.request_id;
+		match self.received_requests.entry(request_id) {
+			Entry::Vacant(_) => {
+				Err(error::UnknownRequestId { request_id })
+			}
+			Entry::Occupied(mut entry) => {
+				// If the received_request is dropped, clear the entry.
+				if let Err(_) = entry.get_mut().send(message).await {
+					entry.remove();
+					Err(error::UnknownRequestId { request_id })
+				} else {
+					Ok(())
+				}
+			}
+		}
 	}
 
-	fn process_incoming_requester_update(&mut self, message: Message<Body>) -> Result<(), error::UnknownRequestId> {
-		todo!();
-	}
-
-	fn process_incoming_responder_update(&mut self, message: Message<Body>) -> Result<(), error::UnknownRequestId> {
-		todo!();
+	async fn process_incoming_responder_update(&mut self, message: Message<Body>) -> Result<(), error::UnknownRequestId> {
+		let request_id = message.header.request_id;
+		match self.sent_requests.entry(request_id) {
+			Entry::Vacant(_) => {
+				Err(error::UnknownRequestId { request_id })
+			}
+			Entry::Occupied(mut entry) => {
+				// If the sent_request is dropped, clear the entry.
+				if let Err(_) = entry.get_mut().send(message).await {
+					entry.remove();
+					Err(error::UnknownRequestId { request_id })
+				} else {
+					Ok(())
+				}
+			}
+		}
 	}
 }
 
@@ -210,4 +213,94 @@ fn make_message_channel<Body>(outgoing_tx: mpsc::UnboundedSender<Message<Body>>)
 	let (incoming_tx, incoming_rx) = mpsc::unbounded();
 	let request_channel = BidiChannel::from_halves(outgoing_tx.clone(), incoming_rx);
 	(incoming_tx, request_channel)
+}
+
+#[cfg(test)]
+mod test {
+	use assert2::assert;
+	use assert2::let_assert;
+	use futures::stream::StreamExt;
+
+	use super::*;
+	use crate::MessageHeader;
+
+	struct Body;
+
+	impl crate::Body for Body {
+		fn from_error(_message: &str) -> Self {
+			Self
+		}
+	}
+
+	#[async_std::test]
+	async fn test_incoming_request() {
+		let (outgoing_tx, mut outgoing_rx) = mpsc::unbounded();
+		let mut tracker = RequestTracker::new(outgoing_tx);
+
+		// Simulate an incoming request and an update.
+		let_assert!(Ok(Some(UnhandledMessage::ReceivedRequest(mut received_request))) = tracker.process_incoming_message(Message::request(1, 2, Body)).await);
+		assert!(let Ok(None) = tracker.process_incoming_message(Message::requester_update(1, 10, Body)).await);
+
+		// Receive the update.
+		let_assert!(Ok(message) = received_request.read_message().await);
+		assert!(message.header == MessageHeader::requester_update(1, 10));
+
+		// Send and receive the response.
+		let_assert!(Ok(()) = received_request.send_response(3, Body).await);
+		let_assert!(Some(response) = outgoing_rx.next().await);
+		assert!(response.header.request_id == 1);
+		assert!(response.header.service_id == 3);
+
+		// The received request is now dropped, so lets check that new incoming message cause an error.
+		let_assert!(Err(error::ProcessIncomingMessageError::UnknownRequestId(e)) = tracker.process_incoming_message(Message::requester_update(1, 11, Body)).await);
+		eprintln!("{:?}", tracker.process_incoming_message(Message::requester_update(1, 11, Body)).await);
+		assert!(e.request_id == 1);
+	}
+
+	#[async_std::test]
+	async fn test_outgoing_request() {
+		let (outgoing_tx, mut outgoing_rx) = mpsc::unbounded();
+		let mut tracker = RequestTracker::new(outgoing_tx);
+
+		// Simute an outgoing request.
+		let_assert!(Ok(mut sent_request) = tracker.allocate_sent_request(3));
+
+		// Simulate and receive a responder update.
+		assert!(let Ok(None) = tracker.process_incoming_message(Message::responder_update(sent_request.request_id(), 12, Body)).await);
+		let_assert!(Ok(update) = sent_request.read_message().await);
+		assert!(update.header == MessageHeader::responder_update(sent_request.request_id(), 12));
+
+		// Send a response.
+		let_assert!(Ok(()) = sent_request.send_update(13, Body).await);
+		let_assert!(Some(update) = outgoing_rx.next().await);
+		assert!(update.header == MessageHeader::requester_update(sent_request.request_id(), 13));
+
+		// Simulate and receive a response update.
+		assert!(let Ok(None) = tracker.process_incoming_message(Message::response(sent_request.request_id(), 14, Body)).await);
+		let_assert!(Ok(update) = sent_request.read_message().await);
+		assert!(update.header == MessageHeader::response(sent_request.request_id(), 14));
+
+		// After receiving the response, the entry should be removed from the tracker.
+		// So no more incoming messages for the request should be accepted.
+		let_assert!(Err(error::ProcessIncomingMessageError::UnknownRequestId(e)) = tracker.process_incoming_message(Message::responder_update(sent_request.request_id(), 15, Body)).await);
+		assert!(e.request_id == sent_request.request_id());
+	}
+}
+
+impl<Body> std::fmt::Debug for UnhandledMessage<Body> {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		match self {
+			Self::ReceivedRequest(x) => {
+				write!(f, "ReceivedRequest(")?;
+				x.fmt(f)?;
+				write!(f, ")")?;
+			}
+			Self::Stream(x) => {
+				write!(f, "Stream(")?;
+				x.fmt(f)?;
+				write!(f, ")")?;
+			}
+		}
+		Ok(())
+	}
 }
