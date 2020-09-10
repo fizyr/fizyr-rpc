@@ -17,7 +17,6 @@ pub enum ReadMessageError {
 pub enum WriteMessageError {
 	Io(#[from] std::io::Error),
 
-	#[error("{0}")]
 	PayloadTooLarge(#[from] PayloadTooLarge),
 }
 
