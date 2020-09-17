@@ -3,23 +3,13 @@ use futures::sink::SinkExt;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 
+use crate::Incoming;
 use crate::Message;
 use crate::MessageType;
 use crate::ReceivedRequest;
 use crate::SentRequest;
 use crate::error;
-use crate::util::BidiChannel;
-
-/// A message that was not fully processed by the request tracker.
-///
-/// When you pass a message to `RequestTracker::process_incoming_message`,
-/// not all messages are fully handled internally by a request tracker.
-///
-/// Specifically, request and stream messages still need to be processed by the caller.
-pub enum UnhandledMessage<Body> {
-	ReceivedRequest(ReceivedRequest<Body>),
-	Stream(Message<Body>),
-}
+use crate::peer::Command;
 
 /// Tracker that manages open requests.
 ///
@@ -29,10 +19,10 @@ pub struct RequestTracker<Body> {
 	/// The next ID to use for sending a request.
 	next_sent_request_id: u32,
 
-	/// Sender of the channel for outgoing messages.
+	/// Sender of the channel for command messages.
 	///
 	/// It is kept around here to prevent the channel from closing and so that we can clone it.
-	outgoing_tx: mpsc::UnboundedSender<Message<Body>>,
+	command_tx: mpsc::UnboundedSender<Command<Body>>,
 
 	/// Map of channels for incoming messages for sent requests.
 	sent_requests: BTreeMap<u32, mpsc::UnboundedSender<Message<Body>>>,
@@ -41,15 +31,15 @@ pub struct RequestTracker<Body> {
 	received_requests: BTreeMap<u32, mpsc::UnboundedSender<Message<Body>>>,
 }
 
-impl<Body: crate::Body> RequestTracker<Body> {
+impl<Body> RequestTracker<Body> {
 	/// Create a new request tracker.
 	///
-	/// The `outgoing_tx` channel is used for outgoing messages.
+	/// The `command_tx` channel is used for command messages.
 	/// All messages on the channel should be sent to the remote peer by a task with the receiving end of the channel.
-	pub fn new(outgoing_tx: mpsc::UnboundedSender<Message<Body>>) -> Self {
+	pub fn new(command_tx: mpsc::UnboundedSender<Command<Body>>) -> Self {
 		Self {
 			next_sent_request_id: 0,
-			outgoing_tx,
+			command_tx,
 			sent_requests: BTreeMap::new(),
 			received_requests: BTreeMap::new(),
 		}
@@ -63,9 +53,9 @@ impl<Body: crate::Body> RequestTracker<Body> {
 			self.next_sent_request_id = self.next_sent_request_id.wrapping_add(1);
 
 			if let Entry::Vacant(entry) = self.sent_requests.entry(request_id) {
-				let (incoming_tx, request_channel) = make_message_channel(self.outgoing_tx.clone());
+				let (incoming_tx, incoming_rx) = mpsc::unbounded();
 				entry.insert(incoming_tx);
-				return Ok(SentRequest::new(request_id, service_id, request_channel));
+				return Ok(SentRequest::new(request_id, service_id, incoming_rx, self.command_tx.clone()));
 			}
 		}
 
@@ -97,17 +87,17 @@ impl<Body: crate::Body> RequestTracker<Body> {
 				// If the entry has a closed channel then received request has already been dropped.
 				// That means the request ID is no longer in use.
 				} else {
-					let (incoming_tx, request_channel) = make_message_channel(self.outgoing_tx.clone());
+					let (incoming_tx, incoming_rx) = mpsc::unbounded();
 					entry.insert(incoming_tx);
-					Ok(ReceivedRequest::new(request_id, service_id, request_channel))
+					Ok(ReceivedRequest::new(request_id, service_id, incoming_rx, self.command_tx.clone()))
 				}
 			}
 
 			// The request ID is available.
 			Entry::Vacant(entry) => {
-				let (incoming_tx, request_channel) = make_message_channel(self.outgoing_tx.clone());
+				let (incoming_tx, incoming_rx) = mpsc::unbounded();
 				entry.insert(incoming_tx);
-				Ok(ReceivedRequest::new(request_id, service_id, request_channel))
+				Ok(ReceivedRequest::new(request_id, service_id, incoming_rx, self.command_tx.clone()))
 			}
 		}
 	}
@@ -129,11 +119,11 @@ impl<Body: crate::Body> RequestTracker<Body> {
 	/// Returns an error
 	///  * if an incoming request message uses an already claimed request ID
 	///  * if an incoming update or response message does not match an open request
-	pub async fn process_incoming_message(&mut self, message: Message<Body>) -> Result<Option<UnhandledMessage<Body>>, error::ProcessIncomingMessageError> {
+	pub async fn process_incoming_message(&mut self, message: Message<Body>) -> Result<Option<Incoming<Body>>, error::ProcessIncomingMessageError> {
 		match message.header.message_type {
 			MessageType::Request => {
 				let received_request = self.register_received_request(message.header.request_id, message.header.service_id)?;
-				Ok(Some(UnhandledMessage::ReceivedRequest(received_request)))
+				Ok(Some(Incoming::Request(received_request)))
 			}
 			MessageType::Response => {
 				self.process_incoming_response(message).await?;
@@ -148,7 +138,7 @@ impl<Body: crate::Body> RequestTracker<Body> {
 				Ok(None)
 			}
 			MessageType::Stream => {
-				Ok(Some(UnhandledMessage::Stream(message)))
+				Ok(Some(Incoming::Stream(message)))
 			}
 		}
 	}
@@ -205,16 +195,6 @@ impl<Body: crate::Body> RequestTracker<Body> {
 	}
 }
 
-/// Create a new channel for incoming and outgoing messages.
-///
-/// This creates a new MPSC channel for incoming message,
-/// and combines it with the existing channel for outgoing messages.
-fn make_message_channel<Body>(outgoing_tx: mpsc::UnboundedSender<Message<Body>>) -> (mpsc::UnboundedSender<Message<Body>>, BidiChannel<Message<Body>>) {
-	let (incoming_tx, incoming_rx) = mpsc::unbounded();
-	let request_channel = BidiChannel::from_halves(outgoing_tx.clone(), incoming_rx);
-	(incoming_tx, request_channel)
-}
-
 #[cfg(test)]
 mod test {
 	use assert2::assert;
@@ -234,46 +214,70 @@ mod test {
 
 	#[async_std::test]
 	async fn test_incoming_request() {
-		let (outgoing_tx, mut outgoing_rx) = mpsc::unbounded();
-		let mut tracker = RequestTracker::new(outgoing_tx);
+		let (command_tx, mut command_rx) = mpsc::unbounded();
+		let mut tracker = RequestTracker::new(command_tx);
+
+		let command_task = async_std::task::spawn(async move {
+			// Check that we get the command to send an update.
+			let_assert!(Some(Command::SendRawMessage(command)) = command_rx.next().await);
+			assert!(command.message.header == MessageHeader::responder_update(1, 3));
+			assert!(let Ok(()) = command.result_tx.send(Ok(())));
+
+			// Check that we get the command to send a response.
+			let_assert!(Some(Command::SendRawMessage(command)) = command_rx.next().await);
+			assert!(command.message.header == MessageHeader::response(1, 4));
+			assert!(let Ok(()) = command.result_tx.send(Ok(())));
+		});
 
 		// Simulate an incoming request and an update.
-		let_assert!(Ok(Some(UnhandledMessage::ReceivedRequest(mut received_request))) = tracker.process_incoming_message(Message::request(1, 2, Body)).await);
+		let_assert!(Ok(Some(Incoming::Request(mut received_request))) = tracker.process_incoming_message(Message::request(1, 2, Body)).await);
 		assert!(let Ok(None) = tracker.process_incoming_message(Message::requester_update(1, 10, Body)).await);
 
 		// Receive the update.
 		let_assert!(Ok(message) = received_request.read_message().await);
 		assert!(message.header == MessageHeader::requester_update(1, 10));
 
-		// Send and receive the response.
-		let_assert!(Ok(()) = received_request.send_response(3, Body).await);
-		let_assert!(Some(response) = outgoing_rx.next().await);
-		assert!(response.header.request_id == 1);
-		assert!(response.header.service_id == 3);
+		// Send and update and response.
+		let_assert!(Ok(()) = received_request.send_update(3, Body).await);
+		let_assert!(Ok(()) = received_request.send_response(4, Body).await);
 
 		// The received request is now dropped, so lets check that new incoming message cause an error.
 		let_assert!(Err(error::ProcessIncomingMessageError::UnknownRequestId(e)) = tracker.process_incoming_message(Message::requester_update(1, 11, Body)).await);
 		eprintln!("{:?}", tracker.process_incoming_message(Message::requester_update(1, 11, Body)).await);
 		assert!(e.request_id == 1);
+
+		drop(tracker);
+		command_task.await;
 	}
 
 	#[async_std::test]
 	async fn test_outgoing_request() {
-		let (outgoing_tx, mut outgoing_rx) = mpsc::unbounded();
-		let mut tracker = RequestTracker::new(outgoing_tx);
+		let (command_tx, mut command_rx) = mpsc::unbounded();
+		let mut tracker = RequestTracker::new(command_tx);
 
-		// Simulate an outgoing request.
+		// Simulate an command request.
 		let_assert!(Ok(mut sent_request) = tracker.allocate_sent_request(3));
+		let request_id = sent_request.request_id();
+
+		let command_task = async_std::task::spawn(async move {
+			// Check that we get the command to send an update.
+			let_assert!(Some(Command::SendRawMessage(command)) = command_rx.next().await);
+			assert!(command.message.header == MessageHeader::requester_update(request_id, 13));
+			assert!(let Ok(()) = command.result_tx.send(Ok(())));
+
+			// Check that we get the command to send an update.
+			let_assert!(Some(Command::SendRawMessage(command)) = command_rx.next().await);
+			assert!(command.message.header == MessageHeader::requester_update(request_id, 13));
+			assert!(let Ok(()) = command.result_tx.send(Ok(())));
+		});
 
 		// Simulate and receive a responder update.
 		assert!(let Ok(None) = tracker.process_incoming_message(Message::responder_update(sent_request.request_id(), 12, Body)).await);
 		let_assert!(Ok(update) = sent_request.read_message().await);
 		assert!(update.header == MessageHeader::responder_update(sent_request.request_id(), 12));
 
-		// Send a response.
+		// Send an update.
 		let_assert!(Ok(()) = sent_request.send_update(13, Body).await);
-		let_assert!(Some(update) = outgoing_rx.next().await);
-		assert!(update.header == MessageHeader::requester_update(sent_request.request_id(), 13));
 
 		// Simulate and receive a response update.
 		assert!(let Ok(None) = tracker.process_incoming_message(Message::response(sent_request.request_id(), 14, Body)).await);
@@ -284,23 +288,9 @@ mod test {
 		// So no more incoming messages for the request should be accepted.
 		let_assert!(Err(error::ProcessIncomingMessageError::UnknownRequestId(e)) = tracker.process_incoming_message(Message::responder_update(sent_request.request_id(), 15, Body)).await);
 		assert!(e.request_id == sent_request.request_id());
-	}
-}
 
-impl<Body> std::fmt::Debug for UnhandledMessage<Body> {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		match self {
-			Self::ReceivedRequest(x) => {
-				write!(f, "ReceivedRequest(")?;
-				x.fmt(f)?;
-				write!(f, ")")?;
-			}
-			Self::Stream(x) => {
-				write!(f, "Stream(")?;
-				x.fmt(f)?;
-				write!(f, ")")?;
-			}
-		}
-		Ok(())
+		drop(tracker);
+		drop(sent_request);
+		command_task.await;
 	}
 }

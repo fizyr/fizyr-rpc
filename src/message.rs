@@ -30,7 +30,7 @@ pub struct Message<Body> {
 	pub body: Body,
 }
 
-impl<Body: crate::Body> Message<Body> {
+impl<Body> Message<Body> {
 	/// Create a new message with a header and a body.
 	pub fn new(header: MessageHeader, body: Body) -> Self {
 		Self { header, body }
@@ -47,7 +47,10 @@ impl<Body: crate::Body> Message<Body> {
 	}
 
 	/// Create a new error response message.
-	pub fn error_response(request_id: u32, message: &str) -> Self {
+	pub fn error_response(request_id: u32, message: &str) -> Self
+	where
+		Body: crate::Body,
+	{
 		Self::new(MessageHeader::response(request_id, service_id::ERROR), Body::from_error(message))
 	}
 
@@ -98,6 +101,31 @@ impl MessageType {
 			4 => Ok(Self::Stream),
 			value => Err(error::InvalidMessageType { value }),
 		}
+	}
+
+	/// Check if this message type is [`Self::Request`].
+	pub fn is_request(self) -> bool {
+		self == MessageType::Request
+	}
+
+	/// Check if this message type is [`Self::Response`].
+	pub fn is_response(self) -> bool {
+		self == MessageType::Response
+	}
+
+	/// Check if this message type is [`Self::RequesterUpdate`].
+	pub fn is_requester_update(self) -> bool {
+		self == MessageType::RequesterUpdate
+	}
+
+	/// Check if this message type is [`Self::ResponderUpdate`].
+	pub fn is_responder_update(self) -> bool {
+		self == MessageType::ResponderUpdate
+	}
+
+	/// Check if this message type is [`Self::Stream`].
+	pub fn is_stream(self) -> bool {
+		self == MessageType::Stream
 	}
 }
 
