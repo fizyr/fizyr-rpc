@@ -1,6 +1,6 @@
 name: tests
 on:
-  push: { branches: "main" }
+  push: { branches: ["master", "main"] }
   pull_request: { branches: "*" }
 
 jobs:
@@ -10,6 +10,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@master
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo
       - name: Build
         uses: actions-rs/cargo@v1
         with:
