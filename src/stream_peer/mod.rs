@@ -302,4 +302,49 @@ mod test {
 		assert!(message.header == MessageHeader::request(1, 10));
 		assert!(message.body.as_ref() == b"Hello peer_b!");
 	}
+
+	#[async_std::test]
+	async fn test_request_tracker() {
+		let_assert!(Ok((peer_a, peer_b)) = UnixStream::pair());
+
+		let (peer_a, mut handle_a) = StreamPeer::new(peer_a, Default::default());
+		let (peer_b, mut handle_b) = StreamPeer::new(peer_b, Default::default());
+
+		let task_a = async_std::task::spawn(peer_a.run());
+		let task_b = async_std::task::spawn(peer_b.run());
+
+		// Send a request from A.
+		let_assert!(Ok(mut sent_request) = handle_a.send_request(1, &[2][..]).await);
+		let request_id = sent_request.request_id();
+
+		// Receive the request on B.
+		let_assert!(Ok(Incoming::Request(mut received_request)) = handle_b.next_message().await);
+
+		// Send an update from A and receive it on B.
+		let_assert!(Ok(()) = sent_request.send_update(3, &[4][..]).await);
+		let_assert!(Ok(update) = received_request.read_message().await);
+		assert!(update.header == MessageHeader::requester_update(request_id, 3));
+		assert!(update.body.as_ref() == &[4]);
+
+		// Send an update from B and receive it on A.
+		let_assert!(Ok(()) = received_request.send_update(5, &[6][..]).await);
+		let_assert!(Ok(update) = sent_request.read_message().await);
+		assert!(update.header == MessageHeader::responder_update(request_id, 5));
+		assert!(update.body.as_ref() == &[6]);
+
+		// Send the response from B and receive it on A.
+		let_assert!(Ok(()) = received_request.send_response(7, &[8][..]).await);
+		let_assert!(Ok(response) = sent_request.read_message().await);
+		assert!(response.header == MessageHeader::response(request_id, 7));
+		assert!(response.body.as_ref() == &[8]);
+
+		drop(handle_a);
+		drop(handle_b);
+		drop(sent_request);
+
+		// TODO: dropping the handles should stop the tasks.
+		// Doesn't do that yet though.
+		// task_a.await;
+		// task_b.await;
+	}
 }
