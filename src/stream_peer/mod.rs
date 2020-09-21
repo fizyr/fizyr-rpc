@@ -8,7 +8,6 @@ use futures::io::AsyncWriteExt;
 use futures::pin_mut;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
-use futures::task::SpawnExt;
 
 use crate::HEADER_LEN;
 use crate::Incoming;
@@ -16,7 +15,7 @@ use crate::MAX_PAYLOAD_LEN;
 use crate::Message;
 use crate::MessageHeader;
 use crate::MessageType;
-use crate::Peer;
+use crate::PeerHandle;
 use crate::RequestTracker;
 use crate::error;
 use crate::peer::Command;
@@ -49,60 +48,79 @@ impl Default for StreamPeerConfig {
 	}
 }
 
-pub fn stream_peer<Executor, Socket>(
-	executor: Executor,
-	socket: Socket,
-	config: StreamPeerConfig,
-) -> Result<Peer<StreamBody>, futures::task::SpawnError>
-where
-	Executor: futures::task::Spawn,
-	Socket: AsyncRead + AsyncWrite + Unpin + Send + 'static,
-{
-	let (incoming_tx, incoming_rx) = mpsc::unbounded();
-	let (command_tx, command_rx) = mpsc::unbounded();
-	let request_tracker = RequestTracker::new(command_tx.clone());
-
-	executor.spawn(run_peer(socket, request_tracker, command_tx.clone(), command_rx, incoming_tx, config))?;
-
-	Ok(Peer::new(incoming_rx, command_tx))
-}
-
-/// Run a peer loop on a socket.
-async fn run_peer<Socket>(
-	socket: Socket,
+pub struct StreamPeer<Socket> {
+	read_half: futures::io::ReadHalf<Socket>,
+	write_half: futures::io::WriteHalf<Socket>,
 	request_tracker: RequestTracker<StreamBody>,
 	command_tx: mpsc::UnboundedSender<Command<StreamBody>>,
 	command_rx: mpsc::UnboundedReceiver<Command<StreamBody>>,
 	incoming_tx: mpsc::UnboundedSender<Result<Incoming<StreamBody>, error::NextMessageError>>,
 	config: StreamPeerConfig,
-)
+}
+
+impl<Socket> StreamPeer<Socket>
 where
-	Socket: AsyncRead + AsyncWrite + Unpin,
+	Socket: AsyncRead + AsyncWrite + Unpin + 'static,
 {
-	let (read_half, write_half) = socket.split();
+	pub fn new(
+		socket: Socket,
+		config: StreamPeerConfig,
+	) -> (Self, PeerHandle<StreamBody>) {
+		let (read_half, write_half) = socket.split();
+		let (incoming_tx, incoming_rx) = mpsc::unbounded();
+		let (command_tx, command_rx) = mpsc::unbounded();
+		let request_tracker = RequestTracker::new(command_tx.clone());
 
-	let write_loop = command_loop(write_half, request_tracker, command_rx, incoming_tx, config.max_body_len_write);
-	let read_loop = read_loop(read_half,command_tx, config.max_body_len_read);
+		let peer = Self {
+			read_half,
+			write_half,
+			request_tracker,
+			command_tx: command_tx.clone(),
+			command_rx,
+			incoming_tx,
+			config,
+		};
 
-	pin_mut!(write_loop);
-	pin_mut!(read_loop);
+		let handle = PeerHandle::new(incoming_rx, command_tx);
 
-	let ((), other) = futures::future::select(write_loop, read_loop)
-		.await
-		.factor_first();
+		(peer, handle)
+	}
 
-	other.await;
+	/// Run a peer loop on a socket.
+	pub async fn run(mut self) {
+		let Self {
+			read_half,
+			write_half,
+			request_tracker,
+			command_tx,
+			command_rx,
+			incoming_tx,
+			config,
+		} = &mut self;
+
+		let write_loop = command_loop(write_half, request_tracker, command_rx, incoming_tx, config.max_body_len_write);
+		let read_loop = read_loop(read_half,command_tx, config.max_body_len_read);
+
+		pin_mut!(write_loop);
+		pin_mut!(read_loop);
+
+		let ((), other) = futures::future::select(write_loop, read_loop)
+			.await
+			.factor_first();
+
+		other.await;
+	}
 }
 
 async fn read_loop<R: AsyncRead + Unpin>(
-	mut stream: R,
-	mut command_rx: mpsc::UnboundedSender<Command<StreamBody>>,
+	stream: &mut R,
+	command_tx: &mut mpsc::UnboundedSender<Command<StreamBody>>,
 	max_body_len: u32,
 ) {
 	loop {
 		let stream_broken;
 		let message;
-		match read_message(&mut stream, max_body_len).await {
+		match read_message(stream, max_body_len).await {
 			x @ Err(error::ReadMessageError::Io(_)) => {
 				stream_broken = true;
 				message = x;
@@ -113,7 +131,7 @@ async fn read_loop<R: AsyncRead + Unpin>(
 			}
 		}
 
-		let send_result = command_rx.send(crate::peer::ProcessIncomingMessage { message }.into()).await;
+		let send_result = command_tx.send(crate::peer::ProcessIncomingMessage { message }.into()).await;
 		if send_result.is_err() || stream_broken {
 			break;
 		}
@@ -122,9 +140,9 @@ async fn read_loop<R: AsyncRead + Unpin>(
 
 async fn command_loop<W: AsyncWrite + Unpin>(
 	mut stream: W,
-	mut request_tracker: RequestTracker<StreamBody>,
-	mut command_rx: mpsc::UnboundedReceiver<Command<StreamBody>>,
-	mut incoming_tx: mpsc::UnboundedSender<Result<Incoming<StreamBody>, error::NextMessageError>>,
+	request_tracker: &mut RequestTracker<StreamBody>,
+	command_rx: &mut mpsc::UnboundedReceiver<Command<StreamBody>>,
+	incoming_tx: &mut mpsc::UnboundedSender<Result<Incoming<StreamBody>, error::NextMessageError>>,
 	max_body_len: u32,
 ) {
 	loop {

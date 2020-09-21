@@ -10,22 +10,22 @@ use crate::SentRequest;
 use crate::error;
 
 /// Handle to a peer.
-pub struct Peer<Body> {
-	write_half: PeerWriteHalf<Body>,
-	read_half: PeerReadHalf<Body>,
+pub struct PeerHandle<Body> {
+	write_half: PeerWriteHandle<Body>,
+	read_half: PeerReadHandle<Body>,
 }
 
 /// The read half of a peer.
 ///
 /// The read half can be used to receive incoming requests and stream messages.
-pub struct PeerReadHalf<Body> {
+pub struct PeerReadHandle<Body> {
 	incoming_rx: mpsc::UnboundedReceiver<Result<Incoming<Body>, error::NextMessageError>>,
 }
 
 /// The write half of a peer.
 ///
 /// The write half can be used to send request and stream messages.
-pub struct PeerWriteHalf<Body> {
+pub struct PeerWriteHandle<Body> {
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 }
 
@@ -36,20 +36,20 @@ pub enum Command<Body> {
 	ProcessIncomingMessage(ProcessIncomingMessage<Body>),
 }
 
-impl<Body> Peer<Body> {
+impl<Body> PeerHandle<Body> {
 	pub(crate) fn new(
 		incoming_rx: mpsc::UnboundedReceiver<Result<Incoming<Body>, error::NextMessageError>>,
 		command_tx: mpsc::UnboundedSender<Command<Body>>,
 	) -> Self {
-		let write_half = PeerWriteHalf { command_tx };
-		let read_half = PeerReadHalf { incoming_rx };
+		let write_half = PeerWriteHandle { command_tx };
+		let read_half = PeerReadHandle { incoming_rx };
 		Self { write_half, read_half }
 	}
 
 	/// Split the peer in a read half and a write half.
 	///
 	/// Splitting the peer allows you to move both halfs into different tasks.
-	pub fn split(self) -> (PeerReadHalf<Body>, PeerWriteHalf<Body>) {
+	pub fn split(self) -> (PeerReadHandle<Body>, PeerWriteHandle<Body>) {
 		(self.read_half, self.write_half)
 	}
 
@@ -72,7 +72,7 @@ impl<Body> Peer<Body> {
 	}
 }
 
-impl<Body> PeerReadHalf<Body> {
+impl<Body> PeerReadHandle<Body> {
 	/// Get the next request or stream message from the remote peer.
 	///
 	/// Errors for invalid incoming messages are also reported by this function.
@@ -85,7 +85,7 @@ impl<Body> PeerReadHalf<Body> {
 	}
 }
 
-impl<Body> PeerWriteHalf<Body> {
+impl<Body> PeerWriteHandle<Body> {
 	/// Send a new request to the remote peer.
 	pub async fn send_request(&mut self, service_id: i32, body: impl Into<Body>) -> Result<SentRequest<Body>, error::SendRequestError> {
 		let body = body.into();
