@@ -142,24 +142,48 @@ async fn command_loop<W: AsyncWrite + Unpin>(
 					}
 				};
 
+				let request_id = request.request_id();
+
 				let message = Message::request(request.request_id(), request.service_id(), command.body);
 				if let Err(e) = write_message(&mut stream, &message.header, message.body.as_ref(), max_body_len).await {
 					let stream_invalid = is_io_error(&e);
 					let _ = command.result_tx.send(Err(e.into()));
+					let _ = request_tracker.remove_sent_request(request_id);
 					if stream_invalid {
 						break;
+					} else {
+						continue;
 					}
+				}
+
+				// If sending fails, the result_rx was dropped.
+				// Then remove the request from the tracker.
+				if command.result_tx.send(Ok(request)).is_err() {
+					let _ = request_tracker.remove_sent_request(request_id);
 				}
 			}
 
+			// TODO: replace SendRawMessage with specific command for different message types.
+			// Then we can use that to remove the appropriate request from the tracker if result_tx is dropped.
+			// Or just parse the message header to determine which request to remove.
+			//
+			// Actually, should we remove the request if result_tx is dropped?
+			// Needs more thought.
 			Command::SendRawMessage(command) => {
+				if command.message.header.message_type.is_response() {
+					let _ = request_tracker.remove_sent_request(command.message.header.request_id);
+				}
 				if let Err(e) = write_message(&mut stream, &command.message.header, command.message.body.as_ref(), max_body_len).await {
 					let stream_invalid = is_io_error(&e);
 					let _ = command.result_tx.send(Err(e.into()));
 					if stream_invalid {
 						break;
+					} else {
+						continue;
 					}
 				}
+
+				let _ = command.result_tx.send(Ok(()));
 			}
 
 			Command::ProcessIncomingMessage(command) => {
