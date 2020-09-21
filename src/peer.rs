@@ -79,9 +79,9 @@ impl<Body> PeerReadHalf<Body> {
 	/// For example: incoming update messages that are not associated with a received request will be reported as an error here.
 	pub async fn next_message(&mut self) -> Result<Incoming<Body>, error::NextMessageError> {
 		if self.incoming_rx.is_terminated() {
-			return Err(std::io::Error::from(std::io::ErrorKind::NotConnected).into());
+			return Err(error::not_connected().into());
 		}
-		self.incoming_rx.next().await.ok_or_else(|| std::io::Error::from(std::io::ErrorKind::NotConnected))?
+		self.incoming_rx.next().await.ok_or_else(error::not_connected)?
 	}
 }
 
@@ -92,9 +92,9 @@ impl<Body> PeerWriteHalf<Body> {
 		let (result_tx, result_rx) = oneshot::channel();
 		self.command_tx.send(SendRequest { service_id, body, result_tx }.into())
 			.await
-			.map_err(|_| std::io::Error::from(std::io::ErrorKind::NotConnected))?;
+			.map_err(|_| error::not_connected())?;
 
-		result_rx.await.map_err(|_| std::io::Error::from(std::io::ErrorKind::NotConnected))?
+		result_rx.await.map_err(|_| error::not_connected())?
 	}
 
 	/// Send a stream message to the remote peer.
@@ -104,9 +104,9 @@ impl<Body> PeerWriteHalf<Body> {
 		let message = Message::stream(0, service_id, body);
 		self.command_tx.send(SendRawMessage { message, result_tx }.into())
 			.await
-			.map_err(|_| std::io::Error::from(std::io::ErrorKind::NotConnected))?;
+			.map_err(|_| error::not_connected())?;
 
-		result_rx.await.map_err(|_| std::io::Error::from(std::io::ErrorKind::NotConnected))?
+		result_rx.await.map_err(|_| error::not_connected())?
 	}
 }
 
