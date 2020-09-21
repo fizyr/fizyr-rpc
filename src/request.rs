@@ -71,8 +71,9 @@ impl<Body> SentRequest<Body> {
 	}
 
 	/// Send an update for the request.
-	pub async fn send_update(&mut self, service_id: i32, body: Body) -> Result<(), error::WriteMessageError> {
+	pub async fn send_update(&mut self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
 		use crate::peer::SendRawMessage;
+		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();
 		let message = Message::requester_update(self.request_id, service_id, body);
 		self.command_tx.send(SendRawMessage { message, result_tx }.into()).await.map_err(|_| error::not_connected())?;
@@ -110,12 +111,14 @@ impl<Body> ReceivedRequest<Body> {
 	}
 
 	/// Send an update for the request.
-	pub async fn send_update(&mut self, service_id: i32, body: Body) -> Result<(), error::WriteMessageError> {
+	pub async fn send_update(&mut self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+		let body = body.into();
 		self.send_raw_message(Message::responder_update(self.request_id, service_id, body)).await
 	}
 
 	/// Send the final response.
-	pub async fn send_response(mut self, service_id: i32, body: Body) -> Result<(), error::WriteMessageError> {
+	pub async fn send_response(mut self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+		let body = body.into();
 		self.send_raw_message(Message::response(self.request_id, service_id, body)).await
 	}
 

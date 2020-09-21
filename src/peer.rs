@@ -62,12 +62,12 @@ impl<Body> Peer<Body> {
 	}
 
 	/// Send a new request to the remote peer.
-	pub async fn send_request(&mut self, service_id: i32, body: Body) -> Result<SentRequest<Body>, error::SendRequestError> {
+	pub async fn send_request(&mut self, service_id: i32, body: impl Into<Body>) -> Result<SentRequest<Body>, error::SendRequestError> {
 		self.write_half.send_request(service_id, body).await
 	}
 
 	/// Send a stream message to the remote peer.
-	pub async fn send_stream(&mut self, service_id: i32, body: Body) -> Result<(), error::WriteMessageError> {
+	pub async fn send_stream(&mut self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
 		self.write_half.send_stream(service_id, body).await
 	}
 }
@@ -87,7 +87,8 @@ impl<Body> PeerReadHalf<Body> {
 
 impl<Body> PeerWriteHalf<Body> {
 	/// Send a new request to the remote peer.
-	pub async fn send_request(&mut self, service_id: i32, body: Body) -> Result<SentRequest<Body>, error::SendRequestError> {
+	pub async fn send_request(&mut self, service_id: i32, body: impl Into<Body>) -> Result<SentRequest<Body>, error::SendRequestError> {
+		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();
 		self.command_tx.send(SendRequest { service_id, body, result_tx }.into())
 			.await
@@ -97,7 +98,8 @@ impl<Body> PeerWriteHalf<Body> {
 	}
 
 	/// Send a stream message to the remote peer.
-	pub async fn send_stream(&mut self, service_id: i32, body: Body) -> Result<(), error::WriteMessageError> {
+	pub async fn send_stream(&mut self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();
 		let message = Message::stream(0, service_id, body);
 		self.command_tx.send(SendRawMessage { message, result_tx }.into())
