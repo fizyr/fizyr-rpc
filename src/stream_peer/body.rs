@@ -4,6 +4,12 @@ pub struct StreamBody {
 	pub data: Box<[u8]>,
 }
 
+impl<T: Into<Box<[u8]>>> From<T> for StreamBody {
+	fn from(other: T) -> Self {
+		Self { data: other.into() }
+	}
+}
+
 impl crate::Body for StreamBody {
 	fn from_error(message: &str) -> Self {
 		Self::new(message.as_bytes().into())
@@ -28,17 +34,5 @@ impl std::ops::Deref for StreamBody {
 
 	fn deref(&self) -> &[u8] {
 		&self.data
-	}
-}
-
-impl From<Box<[u8]>> for StreamBody {
-	fn from(other: Box<[u8]>) -> Self {
-		Self::new(other)
-	}
-}
-
-impl From<Vec<u8>> for StreamBody {
-	fn from(other: Vec<u8>) -> Self {
-		Self::new(other.into_boxed_slice())
 	}
 }
