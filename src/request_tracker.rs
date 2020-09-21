@@ -227,6 +227,9 @@ mod test {
 			let_assert!(Some(Command::SendRawMessage(command)) = command_rx.next().await);
 			assert!(command.message.header == MessageHeader::response(1, 4));
 			assert!(let Ok(()) = command.result_tx.send(Ok(())));
+
+			// Shouldn't get any more commands.
+			assert!(let None = command_rx.next().await);
 		});
 
 		// Simulate an incoming request and an update.
@@ -265,10 +268,8 @@ mod test {
 			assert!(command.message.header == MessageHeader::requester_update(request_id, 13));
 			assert!(let Ok(()) = command.result_tx.send(Ok(())));
 
-			// Check that we get the command to send an update.
-			let_assert!(Some(Command::SendRawMessage(command)) = command_rx.next().await);
-			assert!(command.message.header == MessageHeader::requester_update(request_id, 13));
-			assert!(let Ok(()) = command.result_tx.send(Ok(())));
+			// Shouldn't get any more commands.
+			assert!(let None = command_rx.next().await);
 		});
 
 		// Simulate and receive a responder update.
