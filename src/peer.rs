@@ -39,8 +39,9 @@ pub enum Command<Body> {
 	SendRawMessage(SendRawMessage<Body>),
 	ProcessIncomingMessage(ProcessIncomingMessage<Body>),
 	Stop,
-	StopWriteHalf,
-	StopReadHalf,
+	UnregisterReadHandle,
+	RegisterWriteHandle,
+	UnregisterWriteHandle,
 }
 
 impl<Body> PeerHandle<Body> {
@@ -80,10 +81,8 @@ impl<Body> PeerHandle<Body> {
 	}
 
 	/// Close the connection with the remote peer.
-	///
-	/// This is equivalent to just dropping the handle.
 	pub fn close(self) {
-		drop(self)
+		self.read_handle.close()
 	}
 
 	/// Make a close handle for the peer.
@@ -105,9 +104,6 @@ impl<Body> PeerReadHandle<Body> {
 	}
 
 	/// Close the connection with the remote peer.
-	///
-	/// Dropping both the read and write handle will close the channel.
-	/// This function can close the channel even if the other handle is still around.
 	pub fn close(&self) {
 		let _ = self.command_tx.send(Command::Stop);
 	}
@@ -125,7 +121,7 @@ impl<Body> PeerReadHandle<Body> {
 
 impl<Body> Drop for PeerReadHandle<Body> {
 	fn drop(&mut self) {
-		let _ = self.command_tx.send(Command::StopReadHalf);
+		let _ = self.command_tx.send(Command::UnregisterReadHandle);
 	}
 }
 
@@ -152,9 +148,6 @@ impl<Body> PeerWriteHandle<Body> {
 	}
 
 	/// Close the connection with the remote peer.
-	///
-	/// Dropping both the read and write handle will close the channel.
-	/// This function can close the channel even if the other handle is still around.
 	pub fn close(&self) {
 		let _ = self.command_tx.send(Command::Stop);
 	}
@@ -170,9 +163,17 @@ impl<Body> PeerWriteHandle<Body> {
 	}
 }
 
+impl<Body> Clone for PeerWriteHandle<Body> {
+	fn clone(&self) -> Self {
+		let command_tx = self.command_tx.clone();
+		let _ = command_tx.send(Command::RegisterWriteHandle);
+		Self { command_tx }
+	}
+}
+
 impl<Body> Drop for PeerWriteHandle<Body> {
 	fn drop(&mut self) {
-		let _ = self.command_tx.send(Command::StopWriteHalf);
+		let _ = self.command_tx.send(Command::UnregisterWriteHandle);
 	}
 }
 

@@ -62,6 +62,7 @@ pub struct StreamPeer<Socket> {
 	command_rx: mpsc::UnboundedReceiver<Command<StreamBody>>,
 	incoming_tx: mpsc::UnboundedSender<Result<Incoming<StreamBody>, error::NextMessageError>>,
 	config: StreamPeerConfig,
+	write_handles: usize,
 }
 
 impl<Socket> StreamPeer<Socket>
@@ -94,6 +95,7 @@ where
 			command_rx,
 			incoming_tx,
 			config,
+			write_handles: 1,
 		};
 
 		let handle = PeerHandle::new(incoming_rx, command_tx);
@@ -128,6 +130,7 @@ where
 			command_rx,
 			incoming_tx,
 			config,
+			write_handles,
 		} = &mut self;
 
 		let (read_half, write_half) = socket.split();
@@ -147,7 +150,7 @@ where
 			incoming_tx,
 			max_body_len: config.max_body_len_write,
 			read_handle_dropped: false,
-			write_handle_dropped: false,
+			write_handles,
 		};
 
 		let read_loop = read_loop.run();
@@ -224,8 +227,8 @@ struct CommandLoop<'a, W> {
 	/// Flag to indicate if the peer read handle has already been stopped.
 	read_handle_dropped: bool,
 
-	/// Flag to indicate if the peer write handle has already been stopped.
-	write_handle_dropped: bool,
+	/// Number of open write handles.
+	write_handles: &'a mut usize,
 }
 
 /// Loop control flow command.
@@ -245,7 +248,7 @@ impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
 	async fn run(&mut self) {
 		loop {
 			// Stop the command loop if both halves of the PeerHandle are dropped.
-			if self.read_handle_dropped && self.write_handle_dropped {
+			if self.read_handle_dropped && *self.write_handles == 0 {
 				break;
 			}
 
@@ -260,14 +263,18 @@ impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
 				Command::SendRawMessage(command) => self.send_raw_message(command).await,
 				Command::ProcessIncomingMessage(command) => self.process_incoming_message(command).await,
 				Command::Stop => LoopFlow::Stop,
-				Command::StopReadHalf => {
+				Command::UnregisterReadHandle => {
 					self.read_handle_dropped = true;
 					LoopFlow::Continue
-				}
-				Command::StopWriteHalf => {
-					self.write_handle_dropped = true;
+				},
+				Command::RegisterWriteHandle => {
+					*self.write_handles += 1;
 					LoopFlow::Continue
-				}
+				},
+				Command::UnregisterWriteHandle => {
+					*self.write_handles -= 1;
+					LoopFlow::Continue
+				},
 			};
 
 			// Stop the loop if the command dictates it.
