@@ -32,7 +32,7 @@ pub struct StreamPeerConfig {
 
 	/// The maximum body size for outgoing messages.
 	///
-	/// If a message is given for sending with a larget body than this size,
+	/// If a message is given for sending with a larger body than this size,
 	/// the message is discarded and an error is returned.
 	/// Stream sockets remain usable since the message header will not be sent either.
 	pub max_body_len_write: u32,
@@ -47,6 +47,11 @@ impl Default for StreamPeerConfig {
 	}
 }
 
+/// Implementation a peer for byte-stream sockets.
+///
+/// This struct represents is used to run the read/write loop of the peer.
+/// To send or receive requests and stream messages,
+/// you need to use the [`PeerHandle`] instead.
 pub struct StreamPeer<Socket> {
 	socket: Socket,
 	request_tracker: RequestTracker<StreamBody>,
@@ -60,6 +65,17 @@ impl<Socket> StreamPeer<Socket>
 where
 	for<'a> &'a mut Socket: SplitAsyncReadWrite,
 {
+	/// Create a new peer and a handle to it.
+	///
+	/// The [`StreamPeer`] itself can be used to run the read/write loop.
+	/// The returned [`PeerHandle`] can be used to send and receive requests and stream messages.
+	///
+	/// If [`Self::run()`] is not called (or aborted),
+	/// then none of the functions of the [`PeerHandle`] will work.
+	/// They will just wait forever.
+	///
+	/// You can also use [`Self::spawn()`] to run the read/write loop in a newly spawned task,
+	/// and only get a [`PeerHandle`].
 	pub fn new(
 		socket: Socket,
 		config: StreamPeerConfig,
@@ -82,6 +98,15 @@ where
 		(peer, handle)
 	}
 
+	/// Spawn a peer in a new task, and get a handle to the peer.
+	///
+	/// The spawned handle will immediately be detached.
+	/// It can not be joined.
+	///
+	/// The returned [`PeerHandle`] can be used to send and receive requests and stream messages.
+	///
+	/// If you need more control of the execution of the peer read/write loop,
+	/// you should use [`Self::new()`] instead.
 	pub async fn spawn(socket: Socket, config: StreamPeerConfig) -> PeerHandle<StreamBody>
 	where
 		Socket: Send + 'static,
@@ -91,7 +116,7 @@ where
 		handle
 	}
 
-	/// Run a peer loop on a socket.
+	/// Run the read/write loop.
 	pub async fn run(mut self) {
 		let Self {
 			socket,
@@ -143,13 +168,20 @@ where
 	}
 }
 
+/// Implementation of the read loop for [`StreamPeer`].
 struct ReadLoop<R> {
+	/// The read half of the socket.
 	read_half: R,
+
+	/// The channel used to send command to the command loop.
 	command_tx: mpsc::UnboundedSender<Command<StreamBody>>,
+
+	/// The maximum body length for incoming messages.
 	max_body_len: u32,
 }
 
 impl<R: AsyncRead + Unpin> ReadLoop<R> {
+	/// Run the read loop.
 	async fn run(&mut self) {
 		loop {
 			// Read a message, and stop the read loop on erorrs.
@@ -169,11 +201,21 @@ impl<R: AsyncRead + Unpin> ReadLoop<R> {
 	}
 }
 
+/// Implementation of the command loop for [`StreamPeer`].
 struct CommandLoop<'a, W> {
+	/// The write half of the socket.
 	write_half: W,
+
+	/// The request tracker.
 	request_tracker: &'a mut RequestTracker<StreamBody>,
+
+	/// The channel for incoming commands.
 	command_rx: &'a mut mpsc::UnboundedReceiver<Command<StreamBody>>,
+
+	/// The channel for sending incoming messages to the [`PeerHandle`].
 	incoming_tx: &'a mut mpsc::UnboundedSender<Result<Incoming<StreamBody>, error::NextMessageError>>,
+
+	/// The maximum body length for outgoing messages.
 	max_body_len: u32,
 
 	/// Flag to indicate if the peer read handle has already been stopped.
@@ -183,6 +225,9 @@ struct CommandLoop<'a, W> {
 	write_handle_dropped: bool,
 }
 
+/// Loop control flow command.
+///
+/// Allows other methods to make decisions on loop control flow.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum LoopFlow {
 	/// Keep the loop running.
@@ -193,6 +238,7 @@ enum LoopFlow {
 }
 
 impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
+	/// Run the command loop.
 	async fn run(&mut self) {
 		loop {
 			// Stop the command loop if both halves of the PeerHandle are dropped.
@@ -280,6 +326,7 @@ impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
 		LoopFlow::Continue
 	}
 
+	/// Process an incoming message.
 	async fn process_incoming_message(&mut self, command: crate::peer::ProcessIncomingMessage<StreamBody>) -> LoopFlow {
 		// Forward errors to the peer read handle.
 		let message = match command.message {
