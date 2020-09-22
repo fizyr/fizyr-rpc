@@ -195,7 +195,7 @@ impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
 		let request_id = request.request_id();
 
 		let message = Message::request(request.request_id(), request.service_id(), command.body);
-		if let Err(e) = write_message(&mut self.write_half, &message.header, message.body.as_ref(), self.max_body_len).await {
+		if let Err(e) = write_message(&mut self.write_half, &message, self.max_body_len).await {
 			let stream_invalid = is_io_error(&e);
 			let _ = command.result_tx.send(Err(e.into()));
 			let _ = self.request_tracker.remove_sent_request(request_id);
@@ -229,7 +229,7 @@ impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
 		// Actually, should we remove the request if result_tx is dropped?
 		// Needs more thought.
 
-		if let Err(e) = write_message(&mut self.write_half, &command.message.header, command.message.body.as_ref(), self.max_body_len).await {
+		if let Err(e) = write_message(&mut self.write_half, &command.message, self.max_body_len).await {
 			let stream_invalid = is_io_error(&e);
 			let _ = command.result_tx.send(Err(e.into()));
 			if stream_invalid {
@@ -308,7 +308,12 @@ pub async fn read_message<R: AsyncRead + Unpin>(stream: &mut R, max_body_len: u3
 }
 
 /// Write a message to an [`AsyncWrite`] stream.
-pub async fn write_message<W: AsyncWrite + Unpin>(stream: &mut W, header: &MessageHeader, body: &[u8], max_body_len: u32) -> Result<(), error::WriteMessageError> {
+pub async fn write_message<W: AsyncWrite + Unpin>(stream: &mut W, message: &Message<StreamBody>, max_body_len: u32) -> Result<(), error::WriteMessageError> {
+	write_raw_message(stream, &message.header, message.body.as_ref(), max_body_len).await
+}
+
+/// Write a message to an [`AsyncWrite`] stream.
+pub async fn write_raw_message<W: AsyncWrite + Unpin>(stream: &mut W, header: &MessageHeader, body: &[u8], max_body_len: u32) -> Result<(), error::WriteMessageError> {
 	error::PayloadTooLarge::check(body.len(), max_body_len.min(MAX_PAYLOAD_LEN))?;
 
 	let mut buffer = [0u8; 16];
@@ -335,7 +340,7 @@ mod test {
 	async fn test_raw_message() {
 		let_assert!(Ok((mut peer_a, mut peer_b)) = UnixStream::pair());
 
-		assert!(let Ok(()) = write_message(&mut peer_a, &MessageHeader::request(1, 10), b"Hello peer_b!", 1024).await);
+		assert!(let Ok(()) = write_raw_message(&mut peer_a, &MessageHeader::request(1, 10), b"Hello peer_b!", 1024).await);
 
 		let_assert!(Ok(message) = read_message(&mut peer_b, 1024).await);
 		assert!(message.header == MessageHeader::request(1, 10));
