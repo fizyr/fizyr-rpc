@@ -21,4 +21,6 @@ pub use request::Outgoing;
 pub use request::ReceivedRequest;
 pub use request::SentRequest;
 pub use request_tracker::RequestTracker;
+pub use stream_peer::StreamBody;
 pub use stream_peer::StreamPeer;
+pub use stream_peer::StreamServer;

@@ -9,7 +9,7 @@ tcp = ["tokio/tcp"]
 unix = ["tokio/uds"]
 
 [dependencies]
-tokio = { version = "0.2.0", features = ["rt-core", "sync", "io-util"] }
+tokio = { version = "0.2.0", features = ["rt-core", "sync", "io-util", "stream"] }
 byteorder = "1.3.4"
 thiserror = "1.0.20"
 

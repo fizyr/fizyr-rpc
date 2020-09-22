@@ -20,7 +20,10 @@ use crate::peer::Command;
 use crate::util::SplitAsyncReadWrite;
 
 mod body;
-use body::StreamBody;
+pub use body::StreamBody;
+
+mod server;
+pub use server::StreamServer;
 
 #[derive(Debug, Copy, Clone)]
 pub struct StreamPeerConfig {
