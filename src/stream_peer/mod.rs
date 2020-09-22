@@ -5,6 +5,7 @@ use tokio::io::AsyncRead;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWrite;
 use tokio::io::AsyncWriteExt;
+use crate::util::{select, Either};
 
 use crate::HEADER_LEN;
 use crate::Incoming;
@@ -98,7 +99,7 @@ where
 
 		let mut read_loop = ReadLoop {
 			read_half,
-			command_tx,
+			command_tx: command_tx.clone(),
 			max_body_len: config.max_body_len_read
 		};
 
@@ -108,22 +109,38 @@ where
 			command_rx,
 			incoming_tx,
 			max_body_len: config.max_body_len_write,
+			read_handle_dropped: false,
+			write_handle_dropped: false,
 		};
 
-		tokio::join!(
-			read_loop.run(),
-			command_loop.run(),
-		);
+		let read_loop = read_loop.run();
+		let command_loop = command_loop.run();
+
+		tokio::pin!(read_loop);
+		tokio::pin!(command_loop);
+
+		match select(read_loop, command_loop).await {
+			Either::Left(((), command_loop)) => {
+				// If the read loop stopped we should still flush all queued incoming messages, then stop.
+				command_tx.send(Command::Stop).map_err(drop).expect("command loop did not stop yet but command channel is closed");
+				command_loop.await;
+			},
+			Either::Right((read_loop, ())) => {
+				// If the command loop stopped, the read loop is pointless.
+				// Nobody will ever observe any effects of the read loop without the command loop.
+				drop(read_loop);
+			},
+		}
 	}
 }
 
-struct ReadLoop<'a, R> {
+struct ReadLoop<R> {
 	read_half: R,
-	command_tx: &'a mut mpsc::UnboundedSender<Command<StreamBody>>,
+	command_tx: mpsc::UnboundedSender<Command<StreamBody>>,
 	max_body_len: u32,
 }
 
-impl<R: AsyncRead + Unpin> ReadLoop<'_, R> {
+impl<R: AsyncRead + Unpin> ReadLoop<R> {
 	async fn run(&mut self) {
 		loop {
 			// Read a message, and stop the read loop on erorrs.
@@ -131,13 +148,12 @@ impl<R: AsyncRead + Unpin> ReadLoop<'_, R> {
 			let stop = message.is_err();
 
 			// But first send the error to the command loop so it can be delivered to the peer.
+			// If that fails the command loop already closed, so just stop the read loop.
 			if self.command_tx.send(crate::peer::ProcessIncomingMessage { message }.into()).is_err() {
-				// If command_tx.send() fails, the command loop already stopped so we can just break.
 				break;
 			}
 
 			if stop {
-				let _  = self.command_tx.send(crate::peer::Command::Stop);
 				break;
 			}
 		}
@@ -150,6 +166,12 @@ struct CommandLoop<'a, W> {
 	command_rx: &'a mut mpsc::UnboundedReceiver<Command<StreamBody>>,
 	incoming_tx: &'a mut mpsc::UnboundedSender<Result<Incoming<StreamBody>, error::NextMessageError>>,
 	max_body_len: u32,
+
+	/// Flag to indicate if the peer read handle has already been stopped.
+	read_handle_dropped: bool,
+
+	/// Flag to indicate if the peer write handle has already been stopped.
+	write_handle_dropped: bool,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -173,7 +195,22 @@ impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
 				Command::SendRawMessage(command) => self.send_raw_message(command).await,
 				Command::ProcessIncomingMessage(command) => self.process_incoming_message(command).await,
 				Command::Stop => LoopFlow::Stop,
+				Command::StopReadHalf => {
+					self.read_handle_dropped = true;
+					LoopFlow::Continue
+				}
+				Command::StopWriteHalf => {
+					self.write_handle_dropped = true;
+					LoopFlow::Continue
+				}
 			};
+
+			dbg!(self.read_handle_dropped);
+			dbg!(self.write_handle_dropped);
+
+			if self.read_handle_dropped && self.write_handle_dropped {
+				break;
+			}
 
 			match flow {
 				LoopFlow::Stop => break,
@@ -244,29 +281,53 @@ impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
 	}
 
 	async fn process_incoming_message(&mut self, command: crate::peer::ProcessIncomingMessage<StreamBody>) -> LoopFlow {
+		// Forward errors to the peer read handle.
 		let message = match command.message {
 			Ok(x) => x,
-			Err(e) => match self.incoming_tx.send(Err(e.into())) {
-				Ok(()) => return LoopFlow::Continue,
-				Err(_) => return LoopFlow::Stop,
+			Err(e) => {
+				let _ = self.send_incoming(Err(e.into()));
+				return LoopFlow::Continue;
 			},
 		};
 
+		// Forward errors from the request tracker too.
 		let incoming = match self.request_tracker.process_incoming_message(message).await {
 			Ok(x) => x,
-			Err(e) => match self.incoming_tx.send(Err(e.into())) {
-				Ok(()) => return LoopFlow::Continue,
-				Err(_) => return LoopFlow::Stop,
+			Err(e) => {
+				let _ = self.send_incoming(Err(e.into()));
+				return LoopFlow::Continue;
 			},
 		};
 
+		// Deliver the message to the peer read handle.
 		if let Some(incoming) = incoming {
 			match self.incoming_tx.send(Ok(incoming)) {
 				Ok(()) => LoopFlow::Continue,
-				Err(_) => LoopFlow::Stop,
+				Err(mpsc::error::SendError(msg)) => {
+					// We already checked earlier that is was Ok().
+					match msg.unwrap() {
+						Incoming::Request(request) => {
+							let response = Message::<StreamBody>::error_response(request.request_id(), &format!("unexpected request for service {}", request.service_id()));
+							if write_message(&mut self.write_half, &response, self.max_body_len).await.is_err() {
+								return LoopFlow::Stop;
+							};
+						},
+						Incoming::Stream(_) => (),
+					}
+					LoopFlow::Continue
+				}
 			}
 		} else {
 			LoopFlow::Continue
+		}
+	}
+
+	async fn send_incoming(&mut self, incoming: Result<Incoming<StreamBody>, error::NextMessageError>) -> Result<(), ()> {
+		if let Err(_) = self.incoming_tx.send(incoming) {
+			self.read_handle_dropped = true;
+			Err(())
+		} else {
+			Ok(())
 		}
 	}
 }
@@ -348,7 +409,7 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn test_request_tracker() {
+	async fn test_peer() {
 		let_assert!(Ok((peer_a, peer_b)) = UnixStream::pair());
 
 		let (peer_a, mut handle_a) = StreamPeer::<UnixStream>::new(peer_a, Default::default());
@@ -386,9 +447,7 @@ mod test {
 		drop(handle_b);
 		drop(sent_request);
 
-		// TODO: dropping the handles should stop the tasks.
-		// Doesn't do that yet though.
-		// task_a.await;
-		// task_b.await;
+		assert!(let Ok(()) = task_a.await);
+		assert!(let Ok(()) = task_b.await);
 	}
 }

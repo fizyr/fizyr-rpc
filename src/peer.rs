@@ -8,8 +8,8 @@ use crate::error;
 
 /// Handle to a peer.
 pub struct PeerHandle<Body> {
-	write_half: PeerWriteHandle<Body>,
 	read_half: PeerReadHandle<Body>,
+	write_half: PeerWriteHandle<Body>,
 }
 
 /// The read half of a peer.
@@ -17,6 +17,7 @@ pub struct PeerHandle<Body> {
 /// The read half can be used to receive incoming requests and stream messages.
 pub struct PeerReadHandle<Body> {
 	incoming_rx: mpsc::UnboundedReceiver<Result<Incoming<Body>, error::NextMessageError>>,
+	command_tx: mpsc::UnboundedSender<Command<Body>>,
 }
 
 /// The write half of a peer.
@@ -32,6 +33,8 @@ pub enum Command<Body> {
 	SendRawMessage(SendRawMessage<Body>),
 	ProcessIncomingMessage(ProcessIncomingMessage<Body>),
 	Stop,
+	StopWriteHalf,
+	StopReadHalf,
 }
 
 impl<Body> PeerHandle<Body> {
@@ -39,9 +42,9 @@ impl<Body> PeerHandle<Body> {
 		incoming_rx: mpsc::UnboundedReceiver<Result<Incoming<Body>, error::NextMessageError>>,
 		command_tx: mpsc::UnboundedSender<Command<Body>>,
 	) -> Self {
+		let read_half = PeerReadHandle { incoming_rx, command_tx: command_tx.clone() };
 		let write_half = PeerWriteHandle { command_tx };
-		let read_half = PeerReadHandle { incoming_rx };
-		Self { write_half, read_half }
+		Self { read_half, write_half }
 	}
 
 	/// Split the peer in a read half and a write half.
@@ -70,16 +73,6 @@ impl<Body> PeerHandle<Body> {
 	}
 }
 
-impl<Body> PeerReadHandle<Body> {
-	/// Get the next request or stream message from the remote peer.
-	///
-	/// Errors for invalid incoming messages are also reported by this function.
-	/// For example: incoming update messages that are not associated with a received request will be reported as an error here.
-	pub async fn next_message(&mut self) -> Result<Incoming<Body>, error::NextMessageError> {
-		self.incoming_rx.recv().await.ok_or_else(error::not_connected)?
-	}
-}
-
 impl<Body> PeerWriteHandle<Body> {
 	/// Send a new request to the remote peer.
 	pub async fn send_request(&mut self, service_id: i32, body: impl Into<Body>) -> Result<SentRequest<Body>, error::SendRequestError> {
@@ -100,6 +93,28 @@ impl<Body> PeerWriteHandle<Body> {
 			.map_err(|_| error::not_connected())?;
 
 		result_rx.await.map_err(|_| error::not_connected())?
+	}
+}
+
+impl<Body> Drop for PeerWriteHandle<Body> {
+	fn drop(&mut self) {
+		let _ = self.command_tx.send(Command::StopWriteHalf);
+	}
+}
+
+impl<Body> PeerReadHandle<Body> {
+	/// Get the next request or stream message from the remote peer.
+	///
+	/// Errors for invalid incoming messages are also reported by this function.
+	/// For example: incoming update messages that are not associated with a received request will be reported as an error here.
+	pub async fn next_message(&mut self) -> Result<Incoming<Body>, error::NextMessageError> {
+		self.incoming_rx.recv().await.ok_or_else(error::not_connected)?
+	}
+}
+
+impl<Body> Drop for PeerReadHandle<Body> {
+	fn drop(&mut self) {
+		let _ = self.command_tx.send(Command::StopReadHalf);
 	}
 }
 
