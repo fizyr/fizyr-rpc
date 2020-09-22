@@ -96,129 +96,179 @@ where
 		tokio::pin!(read_half);
 		tokio::pin!(write_half);
 
+		let mut read_loop = ReadLoop {
+			read_half,
+			command_tx,
+			max_body_len: config.max_body_len_read
+		};
+
+		let mut command_loop = CommandLoop {
+			write_half,
+			request_tracker,
+			command_rx,
+			incoming_tx,
+			max_body_len: config.max_body_len_write,
+		};
+
 		tokio::join!(
-			command_loop(write_half, request_tracker, command_rx, incoming_tx, config.max_body_len_write),
-			read_loop(read_half,command_tx, config.max_body_len_read),
+			read_loop.run(),
+			command_loop.run(),
 		);
 	}
 }
 
-async fn read_loop<R: AsyncRead + Unpin>(
-	mut stream: R,
-	command_tx: &mut mpsc::UnboundedSender<Command<StreamBody>>,
+struct ReadLoop<'a, R> {
+	read_half: R,
+	command_tx: &'a mut mpsc::UnboundedSender<Command<StreamBody>>,
 	max_body_len: u32,
-) {
-	loop {
-		let stream_broken;
-		let message;
-		match read_message(&mut stream, max_body_len).await {
-			x @ Err(error::ReadMessageError::Io(_)) => {
-				stream_broken = true;
-				message = x;
-			}
-			x => {
-				stream_broken = false;
-				message = x;
-			}
-		}
+}
 
-		let send_result = command_tx.send(crate::peer::ProcessIncomingMessage { message }.into());
-		if send_result.is_err() || stream_broken {
-			break;
+impl<R: AsyncRead + Unpin> ReadLoop<'_, R> {
+	async fn run(&mut self) {
+		loop {
+			let stream_broken;
+			let message;
+			match read_message(&mut self.read_half, self.max_body_len).await {
+				x @ Err(error::ReadMessageError::Io(_)) => {
+					stream_broken = true;
+					message = x;
+				}
+				x => {
+					stream_broken = false;
+					message = x;
+				}
+			}
+
+			let send_result = self.command_tx.send(crate::peer::ProcessIncomingMessage { message }.into());
+			if send_result.is_err() || stream_broken {
+				break;
+			}
 		}
 	}
 }
 
-async fn command_loop<W: AsyncWrite + Unpin>(
-	mut stream: W,
-	request_tracker: &mut RequestTracker<StreamBody>,
-	command_rx: &mut mpsc::UnboundedReceiver<Command<StreamBody>>,
-	incoming_tx: &mut mpsc::UnboundedSender<Result<Incoming<StreamBody>, error::NextMessageError>>,
+struct CommandLoop<'a, W> {
+	write_half: W,
+	request_tracker: &'a mut RequestTracker<StreamBody>,
+	command_rx: &'a mut mpsc::UnboundedReceiver<Command<StreamBody>>,
+	incoming_tx: &'a mut mpsc::UnboundedSender<Result<Incoming<StreamBody>, error::NextMessageError>>,
 	max_body_len: u32,
-) {
-	loop {
-		let command = command_rx.recv()
-			.await
-			.expect("all command channels closed, but we keep one open ourselves");
+}
 
-		match command {
-			Command::SendRequest(command) => {
-				let request = match request_tracker.allocate_sent_request(command.service_id) {
-					Ok(x) => x,
-					Err(e) => {
-						let _ = command.result_tx.send(Err(e.into()));
-						continue;
-					}
-				};
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum LoopFlow {
+	/// Keep the loop running.
+	Continue,
 
-				let request_id = request.request_id();
+	/// Stop the loop.
+	Stop,
+}
 
-				let message = Message::request(request.request_id(), request.service_id(), command.body);
-				if let Err(e) = write_message(&mut stream, &message.header, message.body.as_ref(), max_body_len).await {
-					let stream_invalid = is_io_error(&e);
-					let _ = command.result_tx.send(Err(e.into()));
-					let _ = request_tracker.remove_sent_request(request_id);
-					if stream_invalid {
-						break;
-					} else {
-						continue;
-					}
-				}
+impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
+	async fn run(&mut self) {
+		loop {
+			let command = self.command_rx.recv()
+				.await
+				.expect("all command channels closed, but we keep one open ourselves");
 
-				// If sending fails, the result_rx was dropped.
-				// Then remove the request from the tracker.
-				if command.result_tx.send(Ok(request)).is_err() {
-					let _ = request_tracker.remove_sent_request(request_id);
-				}
+			let flow = match command {
+				Command::SendRequest(command) => self.send_request(command).await,
+				Command::SendRawMessage(command) => self.send_raw_message(command).await,
+				Command::ProcessIncomingMessage(command) => self.process_incoming_message(command).await,
+			};
+
+			match flow {
+				LoopFlow::Stop => break,
+				LoopFlow::Continue => continue,
 			}
+		}
+	}
 
-			// TODO: replace SendRawMessage with specific command for different message types.
-			// Then we can use that to remove the appropriate request from the tracker if result_tx is dropped.
-			// Or just parse the message header to determine which request to remove.
-			//
-			// Actually, should we remove the request if result_tx is dropped?
-			// Needs more thought.
-			Command::SendRawMessage(command) => {
-				if command.message.header.message_type.is_response() {
-					let _ = request_tracker.remove_sent_request(command.message.header.request_id);
-				}
-				if let Err(e) = write_message(&mut stream, &command.message.header, command.message.body.as_ref(), max_body_len).await {
-					let stream_invalid = is_io_error(&e);
-					let _ = command.result_tx.send(Err(e.into()));
-					if stream_invalid {
-						break;
-					} else {
-						continue;
-					}
-				}
-
-				let _ = command.result_tx.send(Ok(()));
+	/// Process a SendRequest command.
+	async fn send_request(&mut self, command: crate::peer::SendRequest<StreamBody>) -> LoopFlow {
+		let request = match self.request_tracker.allocate_sent_request(command.service_id) {
+			Ok(x) => x,
+			Err(e) => {
+				let _ = command.result_tx.send(Err(e.into()));
+				return LoopFlow::Continue;
 			}
+		};
 
-			Command::ProcessIncomingMessage(command) => {
-				let message = match command.message {
-					Ok(x) => x,
-					Err(e) => match incoming_tx.send(Err(e.into())) {
-						Ok(()) => continue,
-						Err(_) => break,
-					},
-				};
+		let request_id = request.request_id();
 
-				let incoming = match request_tracker.process_incoming_message(message).await {
-					Ok(x) => x,
-					Err(e) => match incoming_tx.send(Err(e.into())) {
-						Ok(()) => continue,
-						Err(_) => break,
-					},
-				};
-
-				if let Some(incoming) = incoming {
-					match incoming_tx.send(Ok(incoming)) {
-						Ok(()) => continue,
-						Err(_) => break,
-					}
-				}
+		let message = Message::request(request.request_id(), request.service_id(), command.body);
+		if let Err(e) = write_message(&mut self.write_half, &message.header, message.body.as_ref(), self.max_body_len).await {
+			let stream_invalid = is_io_error(&e);
+			let _ = command.result_tx.send(Err(e.into()));
+			let _ = self.request_tracker.remove_sent_request(request_id);
+			if stream_invalid {
+				return LoopFlow::Stop;
+			} else {
+				return LoopFlow::Continue;
 			}
+		}
+
+		// If sending fails, the result_rx was dropped.
+		// Then remove the request from the tracker.
+		if command.result_tx.send(Ok(request)).is_err() {
+			let _ = self.request_tracker.remove_sent_request(request_id);
+		}
+
+		LoopFlow::Continue
+	}
+
+	/// Process a SendRawMessage command.
+	async fn send_raw_message(&mut self, command: crate::peer::SendRawMessage<StreamBody>) -> LoopFlow {
+		// Remove tracked received requests when we send a response.
+		if command.message.header.message_type.is_response() {
+			let _ = self.request_tracker.remove_sent_request(command.message.header.request_id);
+		}
+
+		// TODO: replace SendRawMessage with specific command for different message types.
+		// Then we can use that to remove the appropriate request from the tracker if result_tx is dropped.
+		// Or just parse the message header to determine which request to remove.
+		//
+		// Actually, should we remove the request if result_tx is dropped?
+		// Needs more thought.
+
+		if let Err(e) = write_message(&mut self.write_half, &command.message.header, command.message.body.as_ref(), self.max_body_len).await {
+			let stream_invalid = is_io_error(&e);
+			let _ = command.result_tx.send(Err(e.into()));
+			if stream_invalid {
+				return LoopFlow::Stop;
+			} else {
+				return LoopFlow::Continue;
+			}
+		}
+
+		let _ = command.result_tx.send(Ok(()));
+		LoopFlow::Continue
+	}
+
+	async fn process_incoming_message(&mut self, command: crate::peer::ProcessIncomingMessage<StreamBody>) -> LoopFlow {
+		let message = match command.message {
+			Ok(x) => x,
+			Err(e) => match self.incoming_tx.send(Err(e.into())) {
+				Ok(()) => return LoopFlow::Continue,
+				Err(_) => return LoopFlow::Stop,
+			},
+		};
+
+		let incoming = match self.request_tracker.process_incoming_message(message).await {
+			Ok(x) => x,
+			Err(e) => match self.incoming_tx.send(Err(e.into())) {
+				Ok(()) => return LoopFlow::Continue,
+				Err(_) => return LoopFlow::Stop,
+			},
+		};
+
+		if let Some(incoming) = incoming {
+			match self.incoming_tx.send(Ok(incoming)) {
+				Ok(()) => LoopFlow::Continue,
+				Err(_) => LoopFlow::Stop,
+			}
+		} else {
+			LoopFlow::Continue
 		}
 	}
 }
