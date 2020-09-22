@@ -1,13 +1,10 @@
 use byteorder::ByteOrder;
 use byteorder::LE;
-use futures::channel::mpsc;
-use futures::io::AsyncRead;
-use futures::io::AsyncReadExt;
-use futures::io::AsyncWrite;
-use futures::io::AsyncWriteExt;
-use futures::pin_mut;
-use futures::sink::SinkExt;
-use futures::stream::StreamExt;
+use tokio::sync::mpsc;
+use tokio::io::AsyncRead;
+use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWrite;
+use tokio::io::AsyncWriteExt;
 
 use crate::HEADER_LEN;
 use crate::Incoming;
@@ -19,6 +16,7 @@ use crate::PeerHandle;
 use crate::RequestTracker;
 use crate::error;
 use crate::peer::Command;
+use crate::util::SplitAsyncReadWrite;
 
 mod body;
 use body::StreamBody;
@@ -49,8 +47,7 @@ impl Default for StreamPeerConfig {
 }
 
 pub struct StreamPeer<Socket> {
-	read_half: futures::io::ReadHalf<Socket>,
-	write_half: futures::io::WriteHalf<Socket>,
+	socket: Socket,
 	request_tracker: RequestTracker<StreamBody>,
 	command_tx: mpsc::UnboundedSender<Command<StreamBody>>,
 	command_rx: mpsc::UnboundedReceiver<Command<StreamBody>>,
@@ -60,20 +57,18 @@ pub struct StreamPeer<Socket> {
 
 impl<Socket> StreamPeer<Socket>
 where
-	Socket: AsyncRead + AsyncWrite + Unpin + 'static,
+	for<'a> &'a mut Socket: SplitAsyncReadWrite,
 {
 	pub fn new(
 		socket: Socket,
 		config: StreamPeerConfig,
 	) -> (Self, PeerHandle<StreamBody>) {
-		let (read_half, write_half) = socket.split();
-		let (incoming_tx, incoming_rx) = mpsc::unbounded();
-		let (command_tx, command_rx) = mpsc::unbounded();
+		let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
+		let (command_tx, command_rx) = mpsc::unbounded_channel();
 		let request_tracker = RequestTracker::new(command_tx.clone());
 
 		let peer = Self {
-			read_half,
-			write_half,
+			socket,
 			request_tracker,
 			command_tx: command_tx.clone(),
 			command_rx,
@@ -89,8 +84,7 @@ where
 	/// Run a peer loop on a socket.
 	pub async fn run(mut self) {
 		let Self {
-			read_half,
-			write_half,
+			socket,
 			request_tracker,
 			command_tx,
 			command_rx,
@@ -98,29 +92,26 @@ where
 			config,
 		} = &mut self;
 
-		let write_loop = command_loop(write_half, request_tracker, command_rx, incoming_tx, config.max_body_len_write);
-		let read_loop = read_loop(read_half,command_tx, config.max_body_len_read);
+		let (read_half, write_half) = socket.split();
+		tokio::pin!(read_half);
+		tokio::pin!(write_half);
 
-		pin_mut!(write_loop);
-		pin_mut!(read_loop);
-
-		let ((), other) = futures::future::select(write_loop, read_loop)
-			.await
-			.factor_first();
-
-		other.await;
+		tokio::join!(
+			command_loop(write_half, request_tracker, command_rx, incoming_tx, config.max_body_len_write),
+			read_loop(read_half,command_tx, config.max_body_len_read),
+		);
 	}
 }
 
 async fn read_loop<R: AsyncRead + Unpin>(
-	stream: &mut R,
+	mut stream: R,
 	command_tx: &mut mpsc::UnboundedSender<Command<StreamBody>>,
 	max_body_len: u32,
 ) {
 	loop {
 		let stream_broken;
 		let message;
-		match read_message(stream, max_body_len).await {
+		match read_message(&mut stream, max_body_len).await {
 			x @ Err(error::ReadMessageError::Io(_)) => {
 				stream_broken = true;
 				message = x;
@@ -131,7 +122,7 @@ async fn read_loop<R: AsyncRead + Unpin>(
 			}
 		}
 
-		let send_result = command_tx.send(crate::peer::ProcessIncomingMessage { message }.into()).await;
+		let send_result = command_tx.send(crate::peer::ProcessIncomingMessage { message }.into());
 		if send_result.is_err() || stream_broken {
 			break;
 		}
@@ -146,7 +137,7 @@ async fn command_loop<W: AsyncWrite + Unpin>(
 	max_body_len: u32,
 ) {
 	loop {
-		let command = command_rx.next()
+		let command = command_rx.recv()
 			.await
 			.expect("all command channels closed, but we keep one open ourselves");
 
@@ -207,7 +198,7 @@ async fn command_loop<W: AsyncWrite + Unpin>(
 			Command::ProcessIncomingMessage(command) => {
 				let message = match command.message {
 					Ok(x) => x,
-					Err(e) => match incoming_tx.send(Err(e.into())).await {
+					Err(e) => match incoming_tx.send(Err(e.into())) {
 						Ok(()) => continue,
 						Err(_) => break,
 					},
@@ -215,14 +206,14 @@ async fn command_loop<W: AsyncWrite + Unpin>(
 
 				let incoming = match request_tracker.process_incoming_message(message).await {
 					Ok(x) => x,
-					Err(e) => match incoming_tx.send(Err(e.into())).await {
+					Err(e) => match incoming_tx.send(Err(e.into())) {
 						Ok(()) => continue,
 						Err(_) => break,
 					},
 				};
 
 				if let Some(incoming) = incoming {
-					match incoming_tx.send(Ok(incoming)).await {
+					match incoming_tx.send(Ok(incoming)) {
 						Ok(()) => continue,
 						Err(_) => break,
 					}
@@ -290,9 +281,9 @@ mod test {
 	use assert2::assert;
 	use assert2::let_assert;
 
-	use async_std::os::unix::net::UnixStream;
+	use tokio::net::UnixStream;
 
-	#[async_std::test]
+	#[tokio::test]
 	async fn test_raw_message() {
 		let_assert!(Ok((mut peer_a, mut peer_b)) = UnixStream::pair());
 
@@ -303,15 +294,15 @@ mod test {
 		assert!(message.body.as_ref() == b"Hello peer_b!");
 	}
 
-	#[async_std::test]
+	#[tokio::test]
 	async fn test_request_tracker() {
 		let_assert!(Ok((peer_a, peer_b)) = UnixStream::pair());
 
-		let (peer_a, mut handle_a) = StreamPeer::new(peer_a, Default::default());
-		let (peer_b, mut handle_b) = StreamPeer::new(peer_b, Default::default());
+		let (peer_a, mut handle_a) = StreamPeer::<UnixStream>::new(peer_a, Default::default());
+		let (peer_b, mut handle_b) = StreamPeer::<UnixStream>::new(peer_b, Default::default());
 
-		let task_a = async_std::task::spawn(peer_a.run());
-		let task_b = async_std::task::spawn(peer_b.run());
+		let task_a = tokio::spawn(peer_a.run());
+		let task_b = tokio::spawn(peer_b.run());
 
 		// Send a request from A.
 		let_assert!(Ok(mut sent_request) = handle_a.send_request(1, &[2][..]).await);

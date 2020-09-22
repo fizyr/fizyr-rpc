@@ -1,8 +1,5 @@
-use futures::channel::mpsc;
-use futures::channel::oneshot;
-use futures::sink::SinkExt;
-use futures::stream::FusedStream;
-use futures::stream::StreamExt;
+use tokio::sync::mpsc;
+use tokio::sync::oneshot;
 
 use crate::Incoming;
 use crate::Message;
@@ -78,10 +75,7 @@ impl<Body> PeerReadHandle<Body> {
 	/// Errors for invalid incoming messages are also reported by this function.
 	/// For example: incoming update messages that are not associated with a received request will be reported as an error here.
 	pub async fn next_message(&mut self) -> Result<Incoming<Body>, error::NextMessageError> {
-		if self.incoming_rx.is_terminated() {
-			return Err(error::not_connected().into());
-		}
-		self.incoming_rx.next().await.ok_or_else(error::not_connected)?
+		self.incoming_rx.recv().await.ok_or_else(error::not_connected)?
 	}
 }
 
@@ -91,7 +85,6 @@ impl<Body> PeerWriteHandle<Body> {
 		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();
 		self.command_tx.send(SendRequest { service_id, body, result_tx }.into())
-			.await
 			.map_err(|_| error::not_connected())?;
 
 		result_rx.await.map_err(|_| error::not_connected())?
@@ -103,7 +96,6 @@ impl<Body> PeerWriteHandle<Body> {
 		let (result_tx, result_rx) = oneshot::channel();
 		let message = Message::stream(0, service_id, body);
 		self.command_tx.send(SendRawMessage { message, result_tx }.into())
-			.await
 			.map_err(|_| error::not_connected())?;
 
 		result_rx.await.map_err(|_| error::not_connected())?

@@ -1,5 +1,4 @@
-use futures::channel::mpsc;
-use futures::sink::SinkExt;
+use tokio::sync::mpsc;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 
@@ -53,7 +52,7 @@ impl<Body> RequestTracker<Body> {
 			self.next_sent_request_id = self.next_sent_request_id.wrapping_add(1);
 
 			if let Entry::Vacant(entry) = self.sent_requests.entry(request_id) {
-				let (incoming_tx, incoming_rx) = mpsc::unbounded();
+				let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
 				entry.insert(incoming_tx);
 				return Ok(SentRequest::new(request_id, service_id, incoming_rx, self.command_tx.clone()));
 			}
@@ -79,23 +78,24 @@ impl<Body> RequestTracker<Body> {
 	/// Returns an error if the request ID is already in use.
 	pub fn register_received_request(&mut self, request_id: u32, service_id: i32) -> Result<ReceivedRequest<Body>, error::DuplicateRequestId> {
 		match self.received_requests.entry(request_id) {
-			Entry::Occupied(mut entry) => {
-				// If the existing entry has an open channel, the request ID is still in use.
-				if !entry.get().is_closed() {
-					Err(error::DuplicateRequestId { request_id })
+			Entry::Occupied(_entry) => {
+				// TODO: Check if the channel is closed so we don't error out unneccesarily.
+				// Requires https://github.com/tokio-rs/tokio/pull/2726
+				// if !entry.get().is_closed() {
+				Err(error::DuplicateRequestId { request_id })
 
 				// If the entry has a closed channel then received request has already been dropped.
 				// That means the request ID is no longer in use.
-				} else {
-					let (incoming_tx, incoming_rx) = mpsc::unbounded();
-					entry.insert(incoming_tx);
-					Ok(ReceivedRequest::new(request_id, service_id, incoming_rx, self.command_tx.clone()))
-				}
+				// } else {
+				// 	let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
+				// 	entry.insert(incoming_tx);
+				// 	Ok(ReceivedRequest::new(request_id, service_id, incoming_rx, self.command_tx.clone()))
+				// }
 			}
 
 			// The request ID is available.
 			Entry::Vacant(entry) => {
-				let (incoming_tx, incoming_rx) = mpsc::unbounded();
+				let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
 				entry.insert(incoming_tx);
 				Ok(ReceivedRequest::new(request_id, service_id, incoming_rx, self.command_tx.clone()))
 			}
@@ -151,7 +151,7 @@ impl<Body> RequestTracker<Body> {
 			}
 			Entry::Occupied(mut entry) => {
 				// Forward the message to the sent_request, then remove the entry.
-				let _ = entry.get_mut().send(message).await;
+				let _ = entry.get_mut().send(message);
 				entry.remove();
 				Ok(())
 			}
@@ -166,7 +166,7 @@ impl<Body> RequestTracker<Body> {
 			}
 			Entry::Occupied(mut entry) => {
 				// If the received_request is dropped, clear the entry.
-				if let Err(_) = entry.get_mut().send(message).await {
+				if let Err(_) = entry.get_mut().send(message) {
 					entry.remove();
 					Err(error::UnknownRequestId { request_id })
 				} else {
@@ -184,7 +184,7 @@ impl<Body> RequestTracker<Body> {
 			}
 			Entry::Occupied(mut entry) => {
 				// If the sent_request is dropped, clear the entry.
-				if let Err(_) = entry.get_mut().send(message).await {
+				if let Err(_) = entry.get_mut().send(message) {
 					entry.remove();
 					Err(error::UnknownRequestId { request_id })
 				} else {
@@ -199,7 +199,6 @@ impl<Body> RequestTracker<Body> {
 mod test {
 	use assert2::assert;
 	use assert2::let_assert;
-	use futures::stream::StreamExt;
 
 	use super::*;
 	use crate::MessageHeader;
@@ -212,24 +211,24 @@ mod test {
 		}
 	}
 
-	#[async_std::test]
+	#[tokio::test]
 	async fn test_incoming_request() {
-		let (command_tx, mut command_rx) = mpsc::unbounded();
+		let (command_tx, mut command_rx) = mpsc::unbounded_channel();
 		let mut tracker = RequestTracker::new(command_tx);
 
-		let command_task = async_std::task::spawn(async move {
+		let command_task = tokio::spawn(async move {
 			// Check that we get the command to send an update.
-			let_assert!(Some(Command::SendRawMessage(command)) = command_rx.next().await);
+			let_assert!(Some(Command::SendRawMessage(command)) = command_rx.recv().await);
 			assert!(command.message.header == MessageHeader::responder_update(1, 3));
 			assert!(let Ok(()) = command.result_tx.send(Ok(())));
 
 			// Check that we get the command to send a response.
-			let_assert!(Some(Command::SendRawMessage(command)) = command_rx.next().await);
+			let_assert!(Some(Command::SendRawMessage(command)) = command_rx.recv().await);
 			assert!(command.message.header == MessageHeader::response(1, 4));
 			assert!(let Ok(()) = command.result_tx.send(Ok(())));
 
 			// Shouldn't get any more commands.
-			assert!(let None = command_rx.next().await);
+			assert!(let None = command_rx.recv().await);
 		});
 
 		// Simulate an incoming request and an update.
@@ -246,30 +245,29 @@ mod test {
 
 		// The received request is now dropped, so lets check that new incoming message cause an error.
 		let_assert!(Err(error::ProcessIncomingMessageError::UnknownRequestId(e)) = tracker.process_incoming_message(Message::requester_update(1, 11, Body)).await);
-		eprintln!("{:?}", tracker.process_incoming_message(Message::requester_update(1, 11, Body)).await);
 		assert!(e.request_id == 1);
 
 		drop(tracker);
-		command_task.await;
+		assert!(let Ok(()) = command_task.await);
 	}
 
-	#[async_std::test]
+	#[tokio::test]
 	async fn test_outgoing_request() {
-		let (command_tx, mut command_rx) = mpsc::unbounded();
+		let (command_tx, mut command_rx) = mpsc::unbounded_channel();
 		let mut tracker = RequestTracker::new(command_tx);
 
 		// Simulate an command request.
 		let_assert!(Ok(mut sent_request) = tracker.allocate_sent_request(3));
 		let request_id = sent_request.request_id();
 
-		let command_task = async_std::task::spawn(async move {
+		let command_task = tokio::spawn(async move {
 			// Check that we get the command to send an update.
-			let_assert!(Some(Command::SendRawMessage(command)) = command_rx.next().await);
+			let_assert!(Some(Command::SendRawMessage(command)) = command_rx.recv().await);
 			assert!(command.message.header == MessageHeader::requester_update(request_id, 13));
 			assert!(let Ok(()) = command.result_tx.send(Ok(())));
 
 			// Shouldn't get any more commands.
-			assert!(let None = command_rx.next().await);
+			assert!(let None = command_rx.recv().await);
 		});
 
 		// Simulate and receive a responder update.
@@ -292,6 +290,6 @@ mod test {
 
 		drop(tracker);
 		drop(sent_request);
-		command_task.await;
+		assert!(let Ok(()) = command_task.await);
 	}
 }

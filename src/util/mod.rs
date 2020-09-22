@@ -1,3 +1,2 @@
-//mod bidi_channel;
-
-//pub use bidi_channel::BidiChannel;
+mod split;
+pub use split::SplitAsyncReadWrite;
