@@ -126,21 +126,18 @@ struct ReadLoop<'a, R> {
 impl<R: AsyncRead + Unpin> ReadLoop<'_, R> {
 	async fn run(&mut self) {
 		loop {
-			let stream_broken;
-			let message;
-			match read_message(&mut self.read_half, self.max_body_len).await {
-				x @ Err(error::ReadMessageError::Io(_)) => {
-					stream_broken = true;
-					message = x;
-				}
-				x => {
-					stream_broken = false;
-					message = x;
-				}
+			// Read a message, and stop the read loop on erorrs.
+			let message = read_message(&mut self.read_half, self.max_body_len).await;
+			let stop = message.is_err();
+
+			// But first send the error to the command loop so it can be delivered to the peer.
+			if self.command_tx.send(crate::peer::ProcessIncomingMessage { message }.into()).is_err() {
+				// If command_tx.send() fails, the command loop already stopped so we can just break.
+				break;
 			}
 
-			let send_result = self.command_tx.send(crate::peer::ProcessIncomingMessage { message }.into());
-			if send_result.is_err() || stream_broken {
+			if stop {
+				let _  = self.command_tx.send(crate::peer::Command::Stop);
 				break;
 			}
 		}
@@ -175,6 +172,7 @@ impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
 				Command::SendRequest(command) => self.send_request(command).await,
 				Command::SendRawMessage(command) => self.send_raw_message(command).await,
 				Command::ProcessIncomingMessage(command) => self.process_incoming_message(command).await,
+				Command::Stop => LoopFlow::Stop,
 			};
 
 			match flow {

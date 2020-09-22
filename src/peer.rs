@@ -31,6 +31,7 @@ pub enum Command<Body> {
 	SendRequest(SendRequest<Body>),
 	SendRawMessage(SendRawMessage<Body>),
 	ProcessIncomingMessage(ProcessIncomingMessage<Body>),
+	Stop,
 }
 
 impl<Body> PeerHandle<Body> {
