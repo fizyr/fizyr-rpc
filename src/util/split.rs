@@ -1,6 +1,6 @@
 pub trait SplitAsyncReadWrite {
-	type ReadHalf: tokio::io::AsyncRead;
-	type WriteHalf: tokio::io::AsyncWrite;
+	type ReadHalf: tokio::io::AsyncRead + Send;
+	type WriteHalf: tokio::io::AsyncWrite + Send;
 
 	fn split(self) -> (Self::ReadHalf, Self::WriteHalf);
 }

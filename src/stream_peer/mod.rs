@@ -82,6 +82,15 @@ where
 		(peer, handle)
 	}
 
+	pub async fn spawn(socket: Socket, config: StreamPeerConfig) -> PeerHandle<StreamBody>
+	where
+		Socket: Send + 'static,
+	{
+		let (peer, handle) = Self::new(socket, config);
+		tokio::spawn(peer.run());
+		handle
+	}
+
 	/// Run a peer loop on a socket.
 	pub async fn run(mut self) {
 		let Self {
