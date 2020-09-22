@@ -186,10 +186,17 @@ enum LoopFlow {
 impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
 	async fn run(&mut self) {
 		loop {
+			// Stop the command loop if both halves of the PeerHandle are dropped.
+			if self.read_handle_dropped && self.write_handle_dropped {
+				break;
+			}
+
+			// Get the next command from the channel.
 			let command = self.command_rx.recv()
 				.await
 				.expect("all command channels closed, but we keep one open ourselves");
 
+			// Process the command.
 			let flow = match command {
 				Command::SendRequest(command) => self.send_request(command).await,
 				Command::SendRawMessage(command) => self.send_raw_message(command).await,
@@ -205,13 +212,7 @@ impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
 				}
 			};
 
-			dbg!(self.read_handle_dropped);
-			dbg!(self.write_handle_dropped);
-
-			if self.read_handle_dropped && self.write_handle_dropped {
-				break;
-			}
-
+			// Stop the loop if the command dictates it.
 			match flow {
 				LoopFlow::Stop => break,
 				LoopFlow::Continue => continue,
@@ -232,15 +233,10 @@ impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
 		let request_id = request.request_id();
 
 		let message = Message::request(request.request_id(), request.service_id(), command.body);
-		if let Err(e) = write_message(&mut self.write_half, &message, self.max_body_len).await {
-			let stream_invalid = is_io_error(&e);
+		if let Err((e, flow)) = self.write_message(&message).await {
 			let _ = command.result_tx.send(Err(e.into()));
 			let _ = self.request_tracker.remove_sent_request(request_id);
-			if stream_invalid {
-				return LoopFlow::Stop;
-			} else {
-				return LoopFlow::Continue;
-			}
+			return flow;
 		}
 
 		// If sending fails, the result_rx was dropped.
@@ -266,14 +262,9 @@ impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
 		// Actually, should we remove the request if result_tx is dropped?
 		// Needs more thought.
 
-		if let Err(e) = write_message(&mut self.write_half, &command.message, self.max_body_len).await {
-			let stream_invalid = is_io_error(&e);
+		if let Err((e, flow)) = self.write_message(&command.message).await {
 			let _ = command.result_tx.send(Err(e.into()));
-			if stream_invalid {
-				return LoopFlow::Stop;
-			} else {
-				return LoopFlow::Continue;
-			}
+			return flow;
 		}
 
 		let _ = command.result_tx.send(Ok(()));
@@ -292,7 +283,8 @@ impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
 
 		// Forward errors from the request tracker too.
 		let incoming = match self.request_tracker.process_incoming_message(message).await {
-			Ok(x) => x,
+			Ok(None) => return LoopFlow::Continue,
+			Ok(Some(x)) => x,
 			Err(e) => {
 				let _ = self.send_incoming(Err(e.into()));
 				return LoopFlow::Continue;
@@ -300,28 +292,28 @@ impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
 		};
 
 		// Deliver the message to the peer read handle.
-		if let Some(incoming) = incoming {
-			match self.incoming_tx.send(Ok(incoming)) {
-				Ok(()) => LoopFlow::Continue,
-				Err(mpsc::error::SendError(msg)) => {
-					// We already checked earlier that is was Ok().
-					match msg.unwrap() {
-						Incoming::Request(request) => {
-							let response = Message::<StreamBody>::error_response(request.request_id(), &format!("unexpected request for service {}", request.service_id()));
-							if write_message(&mut self.write_half, &response, self.max_body_len).await.is_err() {
-								return LoopFlow::Stop;
-							};
-						},
-						Incoming::Stream(_) => (),
+		match self.incoming_tx.send(Ok(incoming)) {
+			Ok(()) => LoopFlow::Continue,
+
+			// The read handle was dropped.
+			// `msg` must be Ok(), because we checked it before.
+			Err(mpsc::error::SendError(msg)) => match msg.unwrap() {
+				// Respond to requests with an error.
+				Incoming::Request(request) => {
+					let error_msg = format!("unexpected request for service {}", request.service_id());
+					let response = Message::error_response(request.request_id(), &error_msg);
+					if self.write_message(&response).await.is_err() {
+						LoopFlow::Stop
+					} else {
+						LoopFlow::Continue
 					}
-					LoopFlow::Continue
-				}
+				},
+				Incoming::Stream(_) => LoopFlow::Continue,
 			}
-		} else {
-			LoopFlow::Continue
 		}
 	}
 
+	/// Send an incoming message to the PeerHandle.
 	async fn send_incoming(&mut self, incoming: Result<Incoming<StreamBody>, error::NextMessageError>) -> Result<(), ()> {
 		if let Err(_) = self.incoming_tx.send(incoming) {
 			self.read_handle_dropped = true;
@@ -330,13 +322,13 @@ impl<W: AsyncWrite + Unpin> CommandLoop<'_, W> {
 			Ok(())
 		}
 	}
-}
 
-fn is_io_error(e: &error::WriteMessageError) -> bool {
-	if let error::WriteMessageError::Io(_) = e {
-		true
-	} else {
-		false
+	async fn write_message(&mut self, message: &Message<StreamBody>) -> Result<(), (error::WriteMessageError, LoopFlow)> {
+		match write_message(&mut self.write_half, &message, self.max_body_len).await {
+			Ok(()) => Ok(()),
+			Err(e @ error::WriteMessageError::Io(_)) => Err((e, LoopFlow::Stop)),
+			Err(e @ error::WriteMessageError::PayloadTooLarge(_)) => Err((e, LoopFlow::Continue)),
+		}
 	}
 }
 
