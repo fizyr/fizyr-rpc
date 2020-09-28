@@ -31,7 +31,7 @@ async fn do_main(options: &Options) -> Result<(), String> {
 		.map_err(|e| format!("failed to send request: {}", e))?;
 
 	loop {
-		let message = request.read_message().await.map_err(|e| format!("failed to read message: {}", e))?;
+		let message = request.next_message().await.map_err(|e| format!("failed to read message: {}", e))?;
 		if message.header.message_type.is_response() {
 			let message = std::str::from_utf8(&message.body).map_err(|_| "invalid UTF-8 in response")?;
 			eprintln!("Received response: {}", message);

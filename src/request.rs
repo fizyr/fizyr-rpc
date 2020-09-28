@@ -61,11 +61,11 @@ impl<Body> SentRequest<Body> {
 		self.service_id
 	}
 
-	/// Read the next message from the request.
+	/// Receive the next message from the request.
 	///
 	/// This could be an update message or a response message.
 	// TODO: change return type to eliminate impossible message types?
-	pub async fn read_message(&mut self) -> Result<Message<Body>, error::NextMessageError> {
+	pub async fn next_message(&mut self) -> Result<Message<Body>, error::NextMessageError> {
 		Ok(self.incoming_rx.recv().await.ok_or_else(error::connection_aborted)?)
 	}
 
@@ -107,11 +107,11 @@ impl<Body> ReceivedRequest<Body> {
 		&self.body
 	}
 
-	/// Read the next message from the request.
+	/// Receive the next message from the request.
 	///
 	/// This can only be an update message.
 	// TODO: change return type to eliminate impossible message types?
-	pub async fn read_message(&mut self) -> Result<Message<Body>, error::ReadMessageError> {
+	pub async fn next_message(&mut self) -> Result<Message<Body>, error::ReadMessageError> {
 		Ok(self.incoming_rx.recv().await.ok_or_else(error::connection_aborted)?)
 	}
 

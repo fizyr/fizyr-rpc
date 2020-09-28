@@ -485,19 +485,19 @@ mod test {
 
 		// Send an update from A and receive it on B.
 		let_assert!(Ok(()) = sent_request.send_update(3, &[4][..]).await);
-		let_assert!(Ok(update) = received_request.read_message().await);
+		let_assert!(Ok(update) = received_request.next_message().await);
 		assert!(update.header == MessageHeader::requester_update(request_id, 3));
 		assert!(update.body.as_ref() == &[4]);
 
 		// Send an update from B and receive it on A.
 		let_assert!(Ok(()) = received_request.send_update(5, &[6][..]).await);
-		let_assert!(Ok(update) = sent_request.read_message().await);
+		let_assert!(Ok(update) = sent_request.next_message().await);
 		assert!(update.header == MessageHeader::responder_update(request_id, 5));
 		assert!(update.body.as_ref() == &[6]);
 
 		// Send the response from B and receive it on A.
 		let_assert!(Ok(()) = received_request.send_response(7, &[8][..]).await);
-		let_assert!(Ok(response) = sent_request.read_message().await);
+		let_assert!(Ok(response) = sent_request.next_message().await);
 		assert!(response.header == MessageHeader::response(request_id, 7));
 		assert!(response.body.as_ref() == &[8]);
 
