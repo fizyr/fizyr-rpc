@@ -23,6 +23,7 @@ pub struct SentRequest<Body> {
 pub struct ReceivedRequest<Body> {
 	request_id: u32,
 	service_id: i32,
+	body: Body,
 	incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 }
@@ -84,10 +85,11 @@ impl<Body> ReceivedRequest<Body> {
 	pub(crate) fn new(
 		request_id: u32,
 		service_id: i32,
+		body: Body,
 		incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
 		command_tx: mpsc::UnboundedSender<Command<Body>>,
 	) -> Self {
-		Self { request_id, service_id, incoming_rx, command_tx }
+		Self { request_id, service_id, body, incoming_rx, command_tx }
 	}
 
 	/// Get the request ID of the received request.
@@ -98,6 +100,11 @@ impl<Body> ReceivedRequest<Body> {
 	/// Get the service ID of the initial request message.
 	pub fn service_id(&self) -> i32 {
 		self.service_id
+	}
+
+	/// Get the body of the initial request message.
+	pub fn body(&self) -> &Body {
+		&self.body
 	}
 
 	/// Read the next message from the request.

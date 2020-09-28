@@ -76,7 +76,7 @@ impl<Body> RequestTracker<Body> {
 	/// Register a new sent request.
 	///
 	/// Returns an error if the request ID is already in use.
-	pub fn register_received_request(&mut self, request_id: u32, service_id: i32) -> Result<ReceivedRequest<Body>, error::DuplicateRequestId> {
+	pub fn register_received_request(&mut self, request_id: u32, service_id: i32, body: Body) -> Result<ReceivedRequest<Body>, error::DuplicateRequestId> {
 		match self.received_requests.entry(request_id) {
 			Entry::Occupied(_entry) => {
 				// TODO: Check if the channel is closed so we don't error out unneccesarily.
@@ -97,7 +97,7 @@ impl<Body> RequestTracker<Body> {
 			Entry::Vacant(entry) => {
 				let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
 				entry.insert(incoming_tx);
-				Ok(ReceivedRequest::new(request_id, service_id, incoming_rx, self.command_tx.clone()))
+				Ok(ReceivedRequest::new(request_id, service_id, body, incoming_rx, self.command_tx.clone()))
 			}
 		}
 	}
@@ -122,7 +122,7 @@ impl<Body> RequestTracker<Body> {
 	pub async fn process_incoming_message(&mut self, message: Message<Body>) -> Result<Option<Incoming<Body>>, error::ProcessIncomingMessageError> {
 		match message.header.message_type {
 			MessageType::Request => {
-				let received_request = self.register_received_request(message.header.request_id, message.header.service_id)?;
+				let received_request = self.register_received_request(message.header.request_id, message.header.service_id, message.body)?;
 				Ok(Some(Incoming::Request(received_request)))
 			}
 			MessageType::Response => {
