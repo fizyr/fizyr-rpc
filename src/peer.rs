@@ -33,7 +33,7 @@ pub struct PeerCloseHandle<Body> {
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 }
 
-/// Internal message sent by the write half to the peer task.
+/// Message for the internal peer command loop.
 pub enum Command<Body> {
 	SendRequest(SendRequest<Body>),
 	SendRawMessage(SendRawMessage<Body>),
