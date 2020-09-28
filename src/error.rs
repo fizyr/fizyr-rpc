@@ -1,7 +1,7 @@
 use thiserror::Error;
 
-pub(crate) fn not_connected() -> std::io::Error {
-	std::io::ErrorKind::NotConnected.into()
+pub(crate) fn connection_aborted() -> std::io::Error {
+	std::io::ErrorKind::ConnectionAborted.into()
 }
 
 /// An error occurred while reading a message.
@@ -13,12 +13,32 @@ pub enum ReadMessageError {
 	PayloadTooLarge(#[from] PayloadTooLarge),
 }
 
+impl ReadMessageError {
+	pub fn is_connection_aborted(&self) -> bool {
+		if let Self::Io(e) = &self {
+			e.kind() == std::io::ErrorKind::ConnectionAborted
+		} else {
+			false
+		}
+	}
+}
+
 /// An error occurred while writing a message.
 #[derive(Debug, Error)]
 #[error("{0}")]
 pub enum WriteMessageError {
 	Io(#[from] std::io::Error),
 	PayloadTooLarge(#[from] PayloadTooLarge),
+}
+
+impl WriteMessageError {
+	pub fn is_connection_aborted(&self) -> bool {
+		if let Self::Io(e) = &self {
+			e.kind() == std::io::ErrorKind::ConnectionAborted
+		} else {
+			false
+		}
+	}
 }
 
 /// The message type is invalid.
@@ -86,6 +106,16 @@ pub enum NextMessageError {
 	UnknownRequestId(#[from] UnknownRequestId),
 }
 
+impl NextMessageError {
+	pub fn is_connection_aborted(&self) -> bool {
+		if let Self::Io(e) = &self {
+			e.kind() == std::io::ErrorKind::ConnectionAborted
+		} else {
+			false
+		}
+	}
+}
+
 /// An error occurred while processing an incoming message.
 #[derive(Debug, Error)]
 #[error("{0}")]
@@ -93,6 +123,16 @@ pub enum SendRequestError {
 	Io(#[from] std::io::Error),
 	PayloadTooLarge(#[from] PayloadTooLarge),
 	NoFreeRequestIdFound(#[from] NoFreeRequestIdFound),
+}
+
+impl SendRequestError {
+	pub fn is_connection_aborted(&self) -> bool {
+		if let Self::Io(e) = &self {
+			e.kind() == std::io::ErrorKind::ConnectionAborted
+		} else {
+			false
+		}
+	}
 }
 
 impl From<ProcessIncomingMessageError> for NextMessageError {

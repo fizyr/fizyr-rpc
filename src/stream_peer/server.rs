@@ -42,7 +42,7 @@ where
 	/// and a [`PeerHandle`] is returned to allow interaction with the peer.
 	pub async fn accept(&mut self) -> std::io::Result<PeerHandle<StreamBody>> {
 		let socket = self.listener.next().await;
-		let socket = socket.ok_or_else(crate::error::not_connected)??;
+		let socket = socket.ok_or_else(crate::error::connection_aborted)??;
 		Ok(StreamPeer::spawn(socket, self.config.clone()).await)
 	}
 }

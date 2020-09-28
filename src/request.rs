@@ -65,7 +65,7 @@ impl<Body> SentRequest<Body> {
 	/// This could be an update message or a response message.
 	// TODO: change return type to eliminate impossible message types?
 	pub async fn read_message(&mut self) -> Result<Message<Body>, error::NextMessageError> {
-		Ok(self.incoming_rx.recv().await.ok_or_else(error::not_connected)?)
+		Ok(self.incoming_rx.recv().await.ok_or_else(error::connection_aborted)?)
 	}
 
 	/// Send an update for the request.
@@ -74,8 +74,8 @@ impl<Body> SentRequest<Body> {
 		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();
 		let message = Message::requester_update(self.request_id, service_id, body);
-		self.command_tx.send(SendRawMessage { message, result_tx }.into()).map_err(|_| error::not_connected())?;
-		result_rx.await.map_err(|_| error::not_connected())?
+		self.command_tx.send(SendRawMessage { message, result_tx }.into()).map_err(|_| error::connection_aborted())?;
+		result_rx.await.map_err(|_| error::connection_aborted())?
 	}
 }
 
@@ -105,7 +105,7 @@ impl<Body> ReceivedRequest<Body> {
 	/// This can only be an update message.
 	// TODO: change return type to eliminate impossible message types?
 	pub async fn read_message(&mut self) -> Result<Message<Body>, error::ReadMessageError> {
-		Ok(self.incoming_rx.recv().await.ok_or_else(error::not_connected)?)
+		Ok(self.incoming_rx.recv().await.ok_or_else(error::connection_aborted)?)
 	}
 
 	/// Send an update for the request.
@@ -133,8 +133,8 @@ impl<Body> ReceivedRequest<Body> {
 		use crate::peer::SendRawMessage;
 		let (result_tx, result_rx) = oneshot::channel();
 		self.command_tx.send(SendRawMessage { message, result_tx }.into())
-			.map_err(|_| error::not_connected())?;
-		result_rx.await.map_err(|_| error::not_connected())?
+			.map_err(|_| error::connection_aborted())?;
+		result_rx.await.map_err(|_| error::connection_aborted())?
 	}
 }
 
