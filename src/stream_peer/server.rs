@@ -18,6 +18,13 @@ where
 	Socket: Send + 'static,
 	for<'a> &'a mut Socket: SplitAsyncReadWrite,
 {
+	/// Create a server on a listening socket.
+	///
+	/// The passed in config is used to create [`StreamPeer`] objects for all accepted connections.
+	pub fn new(listener: Listener, config: StreamPeerConfig) -> Self {
+		Self { listener, config }
+	}
+
 	/// Run the server.
 	///
 	/// The server will accept connections in a loop and spawn a user task for each new peer.
