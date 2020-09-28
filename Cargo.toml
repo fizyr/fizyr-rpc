@@ -17,3 +17,4 @@ thiserror = "1.0.20"
 assert2 = "0.3.2"
 tokio = { version = "0.2.0", features = ["rt-core", "uds", "macros"] }
 fizyr-rpc = { path = ".", features = ["unix"] }
+structopt = "0.3.18"
