@@ -4,9 +4,10 @@ pub struct StreamBody {
 	pub data: Box<[u8]>,
 }
 
-impl<T: Into<Box<[u8]>>> From<T> for StreamBody {
-	fn from(other: T) -> Self {
-		Self { data: other.into() }
+impl StreamBody {
+	/// Create a new stream body.
+	fn new(data: Box<[u8]>) -> Self {
+		Self { data }
 	}
 }
 
@@ -16,10 +17,12 @@ impl crate::Body for StreamBody {
 	}
 }
 
-impl StreamBody {
-	/// Create a new stream body.
-	fn new(data: Box<[u8]>) -> Self {
-		Self { data }
+impl<T> From<T> for StreamBody
+where
+	Box<[u8]>: From<T>,
+{
+	fn from(other: T) -> Self {
+		Self { data: other.into() }
 	}
 }
 

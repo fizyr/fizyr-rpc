@@ -15,12 +15,10 @@ use crate::MessageHeader;
 use crate::MessageType;
 use crate::PeerHandle;
 use crate::RequestTracker;
+use crate::StreamBody;
 use crate::error;
 use crate::peer::Command;
 use crate::util::SplitAsyncReadWrite;
-
-mod body;
-pub use body::StreamBody;
 
 mod server;
 pub use server::StreamServer;
