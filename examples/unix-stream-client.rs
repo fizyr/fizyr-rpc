@@ -1,4 +1,6 @@
-use fizyr_rpc::StreamPeer;
+use fizyr_rpc::Peer;
+use fizyr_rpc::IntoTransport;
+
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio::net::UnixStream;
@@ -24,9 +26,10 @@ async fn do_main(options: &Options) -> Result<(), String> {
 		.await
 		.map_err(|e| format!("failed to connect to {}: {}", options.socket.display(), e))?;
 
-	let mut peer = StreamPeer::spawn(socket, Default::default()).await;
+	let (peer, mut handle) = Peer::new(socket.into_transport_default());
+	let peer = tokio::spawn(peer.run());
 
-	let mut request = peer.send_request(1, &b"Hello World!"[..])
+	let mut request = handle.send_request(1, &b"Hello World!"[..])
 		.await
 		.map_err(|e| format!("failed to send request: {}", e))?;
 
@@ -39,5 +42,7 @@ async fn do_main(options: &Options) -> Result<(), String> {
 		}
 	}
 
+	drop(handle);
+	peer.await.map_err(|e| format!("failed to join peer task: {}", e))?;
 	Ok(())
 }

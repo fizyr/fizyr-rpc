@@ -1,4 +1,4 @@
-use fizyr_rpc::StreamServer;
+use fizyr_rpc::Server;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio::net::UnixListener;
@@ -23,7 +23,7 @@ async fn do_main(options: &Options) -> Result<(), String> {
 	let socket = UnixListener::bind(&options.socket)
 		.map_err(|e| format!("failed to bind to {}: {}", options.socket.display(), e))?;
 
-	let mut server = StreamServer::new(socket, Default::default());
+	let mut server = Server::new(socket, Default::default());
 	eprintln!("listening on {}", options.socket.display());
 	let result = server.run(|peer| async {
 		if let Err(e) = handle_peer(peer).await {
