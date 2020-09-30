@@ -19,13 +19,19 @@ pub trait Transport {
 	/// The type of the write half.
 	type WriteHalf: TransportWriteHalf<Body = Self::Body> + Unpin + Send;
 
+	/// Split the transport into a read half and a write half.
 	fn split(self) -> (Self::ReadHalf, Self::WriteHalf);
 }
 
 /// Trait to allow generic creation of transports from a socket.
 pub trait IntoTransport: Sized + Send {
+	/// The body type for messages transferred over the transport.
 	type Body;
+
+	/// The configuration type of the transport.
 	type Config;
+
+	/// The transport type.
 	type Transport;
 
 	/// Create a transport from `self` and a configuration struct.
@@ -42,7 +48,7 @@ pub trait IntoTransport: Sized + Send {
 
 /// Trait for the read half of a transport type.
 pub trait TransportReadHalf {
-	/// The body type of the message.
+	/// The body type for messages transferred over the transport.
 	type Body;
 
 	/// Try to read a message from the transport without blocking.
@@ -64,6 +70,7 @@ pub trait TransportReadHalf {
 
 /// Trait for transport types that you can write message to.
 pub trait TransportWriteHalf {
+	/// The body type for messages transferred over the transport.
 	type Body;
 
 	/// Try to write a message to the transport without blocking.

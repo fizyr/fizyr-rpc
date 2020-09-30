@@ -1,3 +1,7 @@
+//! Rust implementation of the Fizyr RPC procotol.
+
+#![warn(missing_docs)]
+
 #[macro_use]
 mod macros;
 

@@ -1,6 +1,7 @@
 /// The body of a stream message.
 #[derive(Debug, Clone)]
 pub struct StreamBody {
+	/// The message data.
 	pub data: Box<[u8]>,
 }
 

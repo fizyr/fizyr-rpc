@@ -1,4 +1,6 @@
 #[derive(Debug, Copy, Clone)]
+
+/// Configuration for a byte-stream transport.
 pub struct StreamConfig {
 	/// The maximum body size for incoming messages.
 	///
