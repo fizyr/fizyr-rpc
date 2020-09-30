@@ -4,6 +4,7 @@ mod request_tracker;
 mod stream_peer;
 mod util;
 mod peer;
+mod transport;
 pub mod error;
 
 pub use message::Body;
@@ -24,3 +25,7 @@ pub use request_tracker::RequestTracker;
 pub use stream_peer::StreamBody;
 pub use stream_peer::StreamPeer;
 pub use stream_peer::StreamServer;
+pub use transport::IntoTransport;
+pub use transport::Transport;
+pub use transport::TransportReadHalf;
+pub use transport::TransportWriteHalf;
