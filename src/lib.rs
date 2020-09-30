@@ -8,6 +8,7 @@ mod stream;
 mod util;
 mod peer;
 mod peer_handle;
+mod server;
 mod transport;
 pub mod error;
 
@@ -27,6 +28,8 @@ pub use request::Outgoing;
 pub use request::ReceivedRequest;
 pub use request::SentRequest;
 pub use request_tracker::RequestTracker;
+pub use server::Server;
+pub use server::ServerListener;
 pub use stream::StreamBody;
 pub use stream::StreamConfig;
 pub use stream::StreamTransport;
