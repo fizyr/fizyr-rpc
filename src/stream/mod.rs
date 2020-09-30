@@ -23,8 +23,8 @@ impl<'a> crate::Transport for &'a mut StreamTransport<tokio::net::UnixStream> {
 #[cfg(feature = "unix")]
 impl crate::IntoTransport for tokio::net::UnixStream {
 	type Body = StreamBody;
-	type Transport = StreamTransport<tokio::net::UnixStream>;
 	type Config = StreamConfig;
+	type Transport = StreamTransport<tokio::net::UnixStream>;
 
 	fn into_transport(self, config: Self::Config) -> Self::Transport {
 		StreamTransport::new(self, config)
@@ -48,8 +48,8 @@ impl<'a> crate::Transport for &'a mut StreamTransport<tokio::net::TcpStream> {
 #[cfg(feature = "tcp")]
 impl crate::IntoTransport for tokio::net::TcpStream {
 	type Body = StreamBody;
-	type Transport = StreamTransport<tokio::net::TcpStream>;
 	type Config = StreamConfig;
+	type Transport = StreamTransport<tokio::net::TcpStream>;
 
 	fn into_transport(self, config: Self::Config) -> Self::Transport {
 		StreamTransport::new(self, config)

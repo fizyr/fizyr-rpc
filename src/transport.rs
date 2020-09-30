@@ -11,7 +11,7 @@ use crate::error::{ReadMessageError, WriteMessageError};
 /// Instead, you must split it in a read and write half and use those.
 pub trait Transport {
 	/// The body type for the messages.
-	type Body: Send + 'static;
+	type Body;
 
 	/// The type of the read half.
 	type ReadHalf: TransportReadHalf<Body = Self::Body> + Unpin + Send;
@@ -24,9 +24,9 @@ pub trait Transport {
 
 /// Trait to allow generic creation of transports from a socket.
 pub trait IntoTransport: Sized + Send {
-	type Body: crate::Body + Send + 'static;
-	type Transport: Send + 'static;
-	type Config: Clone + Send + 'static;
+	type Body;
+	type Config;
+	type Transport;
 
 	/// Create a transport from `self` and a configuration struct.
 	fn into_transport(self, config: Self::Config) -> Self::Transport;
