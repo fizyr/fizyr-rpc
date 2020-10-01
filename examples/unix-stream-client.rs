@@ -22,27 +22,32 @@ async fn main() {
 }
 
 async fn do_main(options: &Options) -> Result<(), String> {
+	// Connect a socket to the server.
 	let socket = UnixStream::connect(&options.socket)
 		.await
 		.map_err(|e| format!("failed to connect to {}: {}", options.socket.display(), e))?;
 
-	let (peer, mut handle) = Peer::new(socket.into_transport_default());
-	let peer = tokio::spawn(peer.run());
+	// Wrap the socket in a transport, and create a peer from the transport.
+	let mut peer = Peer::spawn(socket.into_transport_default());
 
-	let mut request = handle.send_request(1, &b"Hello World!"[..])
+	// Send a request to the remote peer.
+	let mut request = peer.send_request(1, &b"Hello World!"[..])
 		.await
 		.map_err(|e| format!("failed to send request: {}", e))?;
 
 	loop {
+		// Receive the next message.
+		// This could be an update or the final response message.
 		let message = request.next_message().await.map_err(|e| format!("failed to read message: {}", e))?;
+
+		// Ignore anything but the response.
 		if message.header.message_type.is_response() {
+			// Parse the message body as UTF-8, print it and exit the loop.
 			let message = std::str::from_utf8(&message.body).map_err(|_| "invalid UTF-8 in response")?;
 			eprintln!("Received response: {}", message);
 			break;
 		}
 	}
 
-	drop(handle);
-	peer.await.map_err(|e| format!("failed to join peer task: {}", e))?;
 	Ok(())
 }
