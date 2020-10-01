@@ -171,6 +171,7 @@ impl SendRequestError {
 	}
 }
 
+// Allow a ProcessIncomingMessageError to be converted to a NextMessageError automatically.
 impl From<ProcessIncomingMessageError> for NextMessageError {
 	fn from(other: ProcessIncomingMessageError) -> Self {
 		match other {
@@ -180,6 +181,7 @@ impl From<ProcessIncomingMessageError> for NextMessageError {
 	}
 }
 
+// Allow a ReadMessageError to be converted to a NextMessageError automatically.
 impl From<ReadMessageError> for NextMessageError {
 	fn from(other: ReadMessageError) -> Self {
 		match other {
@@ -190,6 +192,7 @@ impl From<ReadMessageError> for NextMessageError {
 	}
 }
 
+// Allow a WriteMessageError to be converted to a SendRequestError automatically.
 impl From<WriteMessageError> for SendRequestError {
 	fn from(other: WriteMessageError) -> Self {
 		match other {
