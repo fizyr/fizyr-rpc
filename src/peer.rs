@@ -119,6 +119,7 @@ where
 		let read_loop = read_loop.run();
 		let command_loop = command_loop.run();
 
+		// Futures must be pinned in order to poll them.
 		tokio::pin!(read_loop);
 		tokio::pin!(command_loop);
 
