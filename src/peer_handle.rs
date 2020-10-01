@@ -8,29 +8,62 @@ use crate::error;
 use crate::peer::{Command, SendRequest, SendRawMessage};
 
 /// Handle to a peer.
+///
+/// The handle can be used to receiving incoming requests and stream messages,
+/// and to send requests and stream messages.
+///
+/// When the handle is dropped, the peer loop is stopped.
+/// Any open requests will also be terminated.
 pub struct PeerHandle<Body> {
+	/// The read handle for receiving incoming requests and stream messages,
 	read_handle: PeerReadHandle<Body>,
+
+	/// The write handle for sending requests and stream messages.
 	write_handle: PeerWriteHandle<Body>,
 }
 
 /// Handle to receive messages from a peer.
 ///
 /// The read handle can be used to receive incoming requests and stream messages.
+///
+/// When all read and write handles are dropped, the peer loop is stopped.
+/// Any open requests will also be terminated.
 pub struct PeerReadHandle<Body> {
+	/// Channel for incoming request and stream messages.
 	incoming_rx: mpsc::UnboundedReceiver<Result<Incoming<Body>, error::NextMessageError>>,
+
+	/// Channel for sending commands to the peer loop.
+	///
+	/// Used by [`ReceivedRequest`] for sending updates and the response,
+	/// and to notify the peer loop when the read handle is dropped.
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 }
 
 /// Handle to send messages to a peer.
 ///
 /// The write handle can be used to send requests and stream messages.
+///
+/// When all read and write handles are dropped, the peer loop is stopped.
+/// Any open requests will also be terminated.
 pub struct PeerWriteHandle<Body> {
+	/// Channel for sending commands to the peer loop.
+	///
+	/// Use amongst others to send outoing requests and stream messages,
+	/// and copied into [`SentRequest`] to send update messages.
+	///
+	/// Also used to register and unregister the cloned/dropped write handles with the peer.
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 }
 
 /// Handle to close the connection with a peer.
+///
+/// The peer handle can be cloned and moved independent from the [`PeerReadHandle`] or [`PeerWriteHandle`] it was created from.
+/// It does not keep the peer loop running if all other handle types are dropped.
 #[derive(Clone)]
 pub struct PeerCloseHandle<Body> {
+	/// Channel for sending commands to the peer loop.
+	///
+	/// Used to stop the peer loop.
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 }
 
@@ -48,6 +81,8 @@ impl<Body> PeerHandle<Body> {
 	/// Split the peer in a read handle and a write handle.
 	///
 	/// Splitting the peer allows you to move both handles into different tasks.
+	///
+	/// The original handle is consumed, but the peer loop will keep going until all read and write handles are dropped.
 	pub fn split(self) -> (PeerReadHandle<Body>, PeerWriteHandle<Body>) {
 		(self.read_handle, self.write_handle)
 	}
