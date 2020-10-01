@@ -88,7 +88,7 @@ impl PayloadTooLarge {
 #[error("no free request ID was found")]
 pub struct NoFreeRequestIdFound;
 
-/// The request ID is already in use.
+/// The request ID is already associated with an open request.
 #[derive(Debug, Clone, Error)]
 #[error("duplicate request ID: request ID {request_id} is already associated with an open request")]
 pub struct DuplicateRequestId {
@@ -96,7 +96,7 @@ pub struct DuplicateRequestId {
 	pub request_id: u32,
 }
 
-/// The request ID is already in use.
+/// The request ID is not associated with an open request.
 #[derive(Debug, Clone, Error)]
 #[error("unknown request ID: request ID {request_id} is not associated with an open request")]
 pub struct UnknownRequestId {
@@ -115,7 +115,7 @@ pub enum ProcessIncomingMessageError {
 	UnknownRequestId(#[from] UnknownRequestId),
 }
 
-/// An error occurred while processing an incoming message.
+/// An error occurred while reading an incoming message.
 #[derive(Debug, Error)]
 #[error("{0}")]
 pub enum NextMessageError {
@@ -146,7 +146,7 @@ impl NextMessageError {
 	}
 }
 
-/// An error occurred while processing an incoming message.
+/// An error occurred while sending a request.
 #[derive(Debug, Error)]
 #[error("{0}")]
 pub enum SendRequestError {
