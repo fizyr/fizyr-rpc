@@ -294,7 +294,7 @@ where
 		// Needs more thought.
 
 		if let Err((e, flow)) = self.write_message(&command.message).await {
-			let _ = command.result_tx.send(Err(e.into()));
+			let _ = command.result_tx.send(Err(e));
 			return flow;
 		}
 
@@ -347,7 +347,7 @@ where
 
 	/// Send an incoming message to the PeerHandle.
 	async fn send_incoming(&mut self, incoming: Result<Incoming<Body>, error::NextMessageError>) -> Result<(), ()> {
-		if let Err(_) = self.incoming_tx.send(incoming) {
+		if self.incoming_tx.send(incoming).is_err() {
 			*self.read_handle_dropped = true;
 			Err(())
 		} else {

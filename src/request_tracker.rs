@@ -59,7 +59,7 @@ impl<Body> RequestTracker<Body> {
 		}
 
 		// But eventually give up.
-		return Err(error::NoFreeRequestIdFound)
+		Err(error::NoFreeRequestIdFound)
 	}
 
 	/// Remove a sent request from the tracker.
@@ -69,7 +69,7 @@ impl<Body> RequestTracker<Body> {
 	/// or when they would receive a message but the [`SentRequest`] was dropped.
 	pub fn remove_sent_request(&mut self, request_id: u32) -> Result<(), error::UnknownRequestId> {
 		self.sent_requests.remove(&request_id)
-			.ok_or_else(|| error::UnknownRequestId { request_id })?;
+			.ok_or(error::UnknownRequestId { request_id })?;
 		Ok(())
 	}
 
@@ -108,7 +108,7 @@ impl<Body> RequestTracker<Body> {
 	/// Note that received requests are also removed internally when they would receive a message but the [`ReceivedRequest`] was dropped.
 	pub fn remove_received_request(&mut self, request_id: u32) -> Result<(), error::UnknownRequestId> {
 		self.received_requests.remove(&request_id)
-			.ok_or_else(|| error::UnknownRequestId { request_id })?;
+			.ok_or(error::UnknownRequestId { request_id })?;
 		Ok(())
 	}
 
@@ -166,7 +166,7 @@ impl<Body> RequestTracker<Body> {
 			}
 			Entry::Occupied(mut entry) => {
 				// If the received_request is dropped, clear the entry.
-				if let Err(_) = entry.get_mut().send(message) {
+				if entry.get_mut().send(message).is_err() {
 					entry.remove();
 					Err(error::UnknownRequestId { request_id })
 				} else {
@@ -184,7 +184,7 @@ impl<Body> RequestTracker<Body> {
 			}
 			Entry::Occupied(mut entry) => {
 				// If the sent_request is dropped, clear the entry.
-				if let Err(_) = entry.get_mut().send(message) {
+				if entry.get_mut().send(message).is_err() {
 					entry.remove();
 					Err(error::UnknownRequestId { request_id })
 				} else {

@@ -126,7 +126,7 @@ where
 			assert!(this.body_read <= this.body_buffer.len());
 
 			if this.body_read == this.body_buffer.len() {
-				let header = this.parsed_header.clone();
+				let header = this.parsed_header;
 				let body = std::mem::replace(&mut this.body_buffer, Vec::new());
 				this.header_read = 0;
 				this.body_read = 0;
