@@ -1,23 +1,44 @@
 use thiserror::Error;
 
-/// An error occured while reading a message.
+pub(crate) fn connection_aborted() -> std::io::Error {
+	std::io::ErrorKind::ConnectionAborted.into()
+}
+
+/// An error occurred while reading a message.
 #[derive(Debug, Error)]
 #[error("{0}")]
 pub enum ReadMessageError {
 	Io(#[from] std::io::Error),
-
 	InvalidMessageType(#[from] InvalidMessageType),
-
 	PayloadTooLarge(#[from] PayloadTooLarge),
 }
 
-/// An error occured while writing a message.
+impl ReadMessageError {
+	pub fn is_connection_aborted(&self) -> bool {
+		if let Self::Io(e) = &self {
+			e.kind() == std::io::ErrorKind::ConnectionAborted
+		} else {
+			false
+		}
+	}
+}
+
+/// An error occurred while writing a message.
 #[derive(Debug, Error)]
 #[error("{0}")]
 pub enum WriteMessageError {
 	Io(#[from] std::io::Error),
-
 	PayloadTooLarge(#[from] PayloadTooLarge),
+}
+
+impl WriteMessageError {
+	pub fn is_connection_aborted(&self) -> bool {
+		if let Self::Io(e) = &self {
+			e.kind() == std::io::ErrorKind::ConnectionAborted
+		} else {
+			false
+		}
+	}
 }
 
 /// The message type is invalid.
@@ -43,6 +64,101 @@ impl PayloadTooLarge {
 			Ok(())
 		} else {
 			Err(Self { body_len, max_len })
+		}
+	}
+}
+
+/// No free request ID was found.
+#[derive(Debug, Clone, Error)]
+#[error("no free request ID was found")]
+pub struct NoFreeRequestIdFound;
+
+/// The request ID is already in use.
+#[derive(Debug, Clone, Error)]
+#[error("duplicate request ID: request ID {request_id} is already associated with an open request")]
+pub struct DuplicateRequestId {
+	pub request_id: u32,
+}
+
+/// The request ID is already in use.
+#[derive(Debug, Clone, Error)]
+#[error("unknown request ID: request ID {request_id} is not associated with an open request")]
+pub struct UnknownRequestId {
+	pub request_id: u32,
+}
+
+/// An error occurred while processing an incoming message.
+#[derive(Debug, Clone, Error)]
+#[error("{0}")]
+pub enum ProcessIncomingMessageError {
+	DuplicateRequestId(#[from] DuplicateRequestId),
+	UnknownRequestId(#[from] UnknownRequestId),
+}
+
+/// An error occurred while processing an incoming message.
+#[derive(Debug, Error)]
+#[error("{0}")]
+pub enum NextMessageError {
+	Io(#[from] std::io::Error),
+	InvalidMessageType(#[from] InvalidMessageType),
+	PayloadTooLarge(#[from] PayloadTooLarge),
+	DuplicateRequestId(#[from] DuplicateRequestId),
+	UnknownRequestId(#[from] UnknownRequestId),
+}
+
+impl NextMessageError {
+	pub fn is_connection_aborted(&self) -> bool {
+		if let Self::Io(e) = &self {
+			e.kind() == std::io::ErrorKind::ConnectionAborted
+		} else {
+			false
+		}
+	}
+}
+
+/// An error occurred while processing an incoming message.
+#[derive(Debug, Error)]
+#[error("{0}")]
+pub enum SendRequestError {
+	Io(#[from] std::io::Error),
+	PayloadTooLarge(#[from] PayloadTooLarge),
+	NoFreeRequestIdFound(#[from] NoFreeRequestIdFound),
+}
+
+impl SendRequestError {
+	pub fn is_connection_aborted(&self) -> bool {
+		if let Self::Io(e) = &self {
+			e.kind() == std::io::ErrorKind::ConnectionAborted
+		} else {
+			false
+		}
+	}
+}
+
+impl From<ProcessIncomingMessageError> for NextMessageError {
+	fn from(other: ProcessIncomingMessageError) -> Self {
+		match other {
+			ProcessIncomingMessageError::DuplicateRequestId(e) => e.into(),
+			ProcessIncomingMessageError::UnknownRequestId(e) => e.into(),
+		}
+	}
+}
+
+impl From<ReadMessageError> for NextMessageError {
+	fn from(other: ReadMessageError) -> Self {
+		match other {
+			ReadMessageError::Io(e) => e.into(),
+			ReadMessageError::InvalidMessageType(e) => e.into(),
+			ReadMessageError::PayloadTooLarge(e) => e.into(),
+		}
+	}
+}
+
+impl From<WriteMessageError> for SendRequestError {
+	fn from(other: WriteMessageError) -> Self {
+		match other {
+			WriteMessageError::Io(e) => e.into(),
+			WriteMessageError::PayloadTooLarge(e) => e.into(),
 		}
 	}
 }

@@ -1,7 +1,26 @@
 mod message;
+mod request;
+mod request_tracker;
 mod stream_peer;
+mod util;
+mod peer;
 pub mod error;
 
-pub use message::*;
-
+pub use message::Body;
+pub use message::HEADER_LEN;
+pub use message::MAX_PAYLOAD_LEN;
+pub use message::Message;
+pub use message::MessageHeader;
+pub use message::MessageType;
+pub use message::service_id;
+pub use peer::PeerHandle;
+pub use peer::PeerReadHandle;
+pub use peer::PeerWriteHandle;
+pub use request::Incoming;
+pub use request::Outgoing;
+pub use request::ReceivedRequest;
+pub use request::SentRequest;
+pub use request_tracker::RequestTracker;
+pub use stream_peer::StreamBody;
 pub use stream_peer::StreamPeer;
+pub use stream_peer::StreamServer;
