@@ -16,10 +16,12 @@ where
 ///
 /// This trait encapsulates all requirements for the `Listener` type of a [`Server`].
 ///
-/// This is a sealed trait that you can not implement,
-/// but you can use it as trait bound for generic arguments.
-/// You should not rely on any of the items in this trait.
-pub trait ServerListener: crate::util::Listener + private::Sealed {
+/// The trait has a blanket implementation,
+/// so you can not implement it for your own types.
+///
+/// You *can* use it as trait bound for generic arguments,
+/// but you should not rely on any of the items in this trait.
+pub trait ServerListener: crate::util::Listener {
 	#[doc(hidden)]
 	type Body: crate::Body;
 
@@ -31,21 +33,6 @@ pub trait ServerListener: crate::util::Listener + private::Sealed {
 
 	#[doc(hidden)]
 	fn spawn(connection: Self::Connection, config: Self::Config) -> PeerHandle<Self::Body>;
-}
-
-mod private {
-	use crate::{IntoTransport, Transport};
-	pub trait Sealed {}
-
-	impl<Listener> Sealed for Listener
-	where
-		Listener: crate::util::Listener,
-		Listener::Connection: IntoTransport,
-		<Listener::Connection as IntoTransport>::Body: crate::Body + Send + Sync + 'static,
-		<Listener::Connection as IntoTransport>::Config: Clone + Send + Sync + 'static,
-		<Listener::Connection as IntoTransport>::Transport: Send + 'static,
-		for <'a> &'a mut <Listener::Connection as IntoTransport>::Transport: Transport<Body = <Listener::Connection as IntoTransport>::Body>,
-	{}
 }
 
 impl<Listener> ServerListener for Listener
