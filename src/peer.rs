@@ -1,13 +1,13 @@
 use tokio::sync::mpsc;
 use crate::util::{select, Either};
 
-use tokio::sync::oneshot;
 use crate::Incoming;
 use crate::Message;
 use crate::PeerHandle;
 use crate::RequestTracker;
-use crate::error;
 use crate::SentRequest;
+use crate::error;
+use tokio::sync::oneshot;
 
 /// Message for the internal peer command loop.
 pub enum Command<Body> {
@@ -277,7 +277,7 @@ where
 		let request = match self.request_tracker.allocate_sent_request(command.service_id) {
 			Ok(x) => x,
 			Err(e) => {
-				let _ = command.result_tx.send(Err(e.into()));
+				let _: Result<_, _> = command.result_tx.send(Err(e.into()));
 				return LoopFlow::Continue;
 			}
 		};
@@ -286,15 +286,15 @@ where
 
 		let message = Message::request(request.request_id(), request.service_id(), command.body);
 		if let Err((e, flow)) = self.write_message(&message).await {
-			let _ = command.result_tx.send(Err(e.into()));
-			let _ = self.request_tracker.remove_sent_request(request_id);
+			let _: Result<_, _> = command.result_tx.send(Err(e.into()));
+			let _: Result<_, _> = self.request_tracker.remove_sent_request(request_id);
 			return flow;
 		}
 
 		// If sending fails, the result_rx was dropped.
 		// Then remove the request from the tracker.
 		if command.result_tx.send(Ok(request)).is_err() {
-			let _ = self.request_tracker.remove_sent_request(request_id);
+			let _: Result<_, _> = self.request_tracker.remove_sent_request(request_id);
 		}
 
 		LoopFlow::Continue
@@ -304,7 +304,7 @@ where
 	async fn send_raw_message(&mut self, command: crate::peer::SendRawMessage<Body>) -> LoopFlow {
 		// Remove tracked received requests when we send a response.
 		if command.message.header.message_type.is_response() {
-			let _ = self.request_tracker.remove_sent_request(command.message.header.request_id);
+			let _: Result<_, _> = self.request_tracker.remove_sent_request(command.message.header.request_id);
 		}
 
 		// TODO: replace SendRawMessage with specific command for different message types.
@@ -315,11 +315,11 @@ where
 		// Needs more thought.
 
 		if let Err((e, flow)) = self.write_message(&command.message).await {
-			let _ = command.result_tx.send(Err(e));
+			let _: Result<_, _> = command.result_tx.send(Err(e));
 			return flow;
 		}
 
-		let _ = command.result_tx.send(Ok(()));
+		let _: Result<_, _> = command.result_tx.send(Ok(()));
 		LoopFlow::Continue
 	}
 
@@ -329,7 +329,7 @@ where
 		let message = match command.message {
 			Ok(x) => x,
 			Err(e) => {
-				let _ = self.send_incoming(Err(e.into()));
+				let _: Result<_, _> = self.send_incoming(Err(e.into())).await;
 				return LoopFlow::Continue;
 			},
 		};
@@ -339,7 +339,7 @@ where
 			Ok(None) => return LoopFlow::Continue,
 			Ok(Some(x)) => x,
 			Err(e) => {
-				let _ = self.send_incoming(Err(e.into()));
+				let _: Result<_, _> = self.send_incoming(Err(e.into())).await;
 				return LoopFlow::Continue;
 			},
 		};

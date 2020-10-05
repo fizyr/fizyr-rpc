@@ -130,7 +130,7 @@ impl<Body> PeerReadHandle<Body> {
 
 	/// Close the connection with the remote peer.
 	pub fn close(&self) {
-		let _ = self.command_tx.send(Command::Stop);
+		let _: Result<_, _> = self.command_tx.send(Command::Stop);
 	}
 
 	/// Make a close handle for the peer.
@@ -146,7 +146,7 @@ impl<Body> PeerReadHandle<Body> {
 
 impl<Body> Drop for PeerReadHandle<Body> {
 	fn drop(&mut self) {
-		let _ = self.command_tx.send(Command::UnregisterReadHandle);
+		let _: Result<_, _> = self.command_tx.send(Command::UnregisterReadHandle);
 	}
 }
 
@@ -174,7 +174,7 @@ impl<Body> PeerWriteHandle<Body> {
 
 	/// Close the connection with the remote peer.
 	pub fn close(&self) {
-		let _ = self.command_tx.send(Command::Stop);
+		let _: Result<_, _> = self.command_tx.send(Command::Stop);
 	}
 
 	/// Make a close handle for the peer.
@@ -191,20 +191,20 @@ impl<Body> PeerWriteHandle<Body> {
 impl<Body> Clone for PeerWriteHandle<Body> {
 	fn clone(&self) -> Self {
 		let command_tx = self.command_tx.clone();
-		let _ = command_tx.send(Command::RegisterWriteHandle);
+		let _: Result<_, _> = command_tx.send(Command::RegisterWriteHandle);
 		Self { command_tx }
 	}
 }
 
 impl<Body> Drop for PeerWriteHandle<Body> {
 	fn drop(&mut self) {
-		let _ = self.command_tx.send(Command::UnregisterWriteHandle);
+		let _: Result<_, _> = self.command_tx.send(Command::UnregisterWriteHandle);
 	}
 }
 
 impl<Body> PeerCloseHandle<Body> {
 	/// Close the connection with the remote peer.
 	pub fn close(&self) {
-		let _ = self.command_tx.send(Command::Stop);
+		let _: Result<_, _> = self.command_tx.send(Command::Stop);
 	}
 }
