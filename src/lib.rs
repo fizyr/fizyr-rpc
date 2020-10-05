@@ -6,15 +6,18 @@
 mod macros;
 
 mod message;
-mod request;
-mod request_tracker;
-mod stream;
-mod util;
 mod peer;
 mod peer_handle;
+mod request;
+mod request_tracker;
 mod server;
+mod stream;
 mod transport;
+mod util;
 pub mod error;
+
+#[cfg(feature = "shared-memory")]
+mod unix;
 
 pub use message::Body;
 pub use message::HEADER_LEN;
@@ -41,3 +44,6 @@ pub use transport::IntoTransport;
 pub use transport::Transport;
 pub use transport::TransportReadHalf;
 pub use transport::TransportWriteHalf;
+pub use unix::UnixBody;
+pub use unix::UnixConfig;
+pub use unix::UnixTransport;

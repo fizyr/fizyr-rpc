@@ -59,6 +59,16 @@ impl Listener for tokio::net::UnixListener {
 	}
 }
 
+#[cfg(feature = "shared-memory")]
+impl Listener for tokio_seqpacket::UnixSeqpacketListener {
+	type Connection = tokio_seqpacket::UnixSeqpacket;
+	type Address = std::os::unix::net::SocketAddr;
+
+	fn poll_accept(self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
+		tokio_seqpacket::UnixSeqpacketListener::poll_accept(self.get_mut(), context)
+	}
+}
+
 impl<T> Listener for &'_ mut T
 where
 	T: Listener + Unpin + ?Sized,
