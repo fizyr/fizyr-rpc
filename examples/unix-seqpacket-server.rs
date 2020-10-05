@@ -47,7 +47,7 @@ async fn handle_peer(mut peer: fizyr_rpc::PeerHandle<fizyr_rpc::UnixBody>) -> Re
 	eprintln!("new connection accepted");
 	loop {
 		// Receive the next incoming message.
-		let incoming = match peer.next_message().await {
+		let incoming = match dbg!(peer.next_message().await) {
 			Ok(x) => x,
 			Err(e) => if e.is_connection_aborted() {
 				// Log aborted connections but return Ok(()).
