@@ -3,6 +3,7 @@ use std::io::{IoSlice, IoSliceMut};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use crate::error;
 use crate::Message;
 use crate::MessageHeader;
 use crate::error::{PayloadTooLarge, ReadMessageError, WriteMessageError};
@@ -107,6 +108,13 @@ impl crate::TransportReadHalf for UnixReadHalf<tokio_seqpacket::ReadHalf<'_>> {
 		// Immediately wrap all file descriptors to prevent leaking any of them.
 		// We must always do this directly after a successful read.
 		let fds = extract_file_descriptors(&ancillary)?;
+
+		if bytes_read == 0 {
+			return Poll::Ready(Err(error::connection_aborted().into()));
+		}
+
+		// Make sure we received an entire header.
+		error::MessageTooShort::check(bytes_read)?;
 
 		// Parse the header.
 		let header = MessageHeader::decode(&header_buffer)?;
