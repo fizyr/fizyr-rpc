@@ -6,6 +6,7 @@ pub use body::UnixBody;
 pub use config::UnixConfig;
 pub use transport::{UnixReadHalf, UnixTransport, UnixWriteHalf};
 
+#[cfg(feature = "unix-seqpacket")]
 impl<'a> crate::Transport for &'a mut UnixTransport<tokio_seqpacket::UnixSeqpacket> {
 	type Body = UnixBody;
 	type ReadHalf = UnixReadHalf<tokio_seqpacket::ReadHalf<'a>>;
@@ -19,6 +20,7 @@ impl<'a> crate::Transport for &'a mut UnixTransport<tokio_seqpacket::UnixSeqpack
 	}
 }
 
+#[cfg(feature = "unix-seqpacket")]
 impl crate::IntoTransport for tokio_seqpacket::UnixSeqpacket {
 	type Body = UnixBody;
 	type Config = UnixConfig;

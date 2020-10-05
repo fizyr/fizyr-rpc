@@ -2,7 +2,6 @@ use filedesc::FileDesc;
 use std::io::{IoSlice, IoSliceMut};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio_seqpacket::ancillary::{AncillaryData, SocketAncillary};
 
 use crate::Message;
 use crate::MessageHeader;
@@ -81,10 +80,13 @@ impl<W> UnixWriteHalf<W> {
 	}
 }
 
+#[cfg(feature = "unix-seqpacket")]
 impl crate::TransportReadHalf for UnixReadHalf<tokio_seqpacket::ReadHalf<'_>> {
 	type Body = UnixBody;
 
 	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, ReadMessageError>> {
+		use tokio_seqpacket::ancillary::SocketAncillary;
+
 		let this = self.get_mut();
 
 		// Prepare buffers for the message header and body.
@@ -117,10 +119,13 @@ impl crate::TransportReadHalf for UnixReadHalf<tokio_seqpacket::ReadHalf<'_>> {
 	}
 }
 
+#[cfg(feature = "unix-seqpacket")]
 impl crate::TransportWriteHalf for UnixWriteHalf<tokio_seqpacket::WriteHalf<'_>> {
 	type Body = UnixBody;
 
 	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), WriteMessageError>> {
+		use tokio_seqpacket::ancillary::SocketAncillary;
+
 		let this = self.get_mut();
 
 		// Check the outgoing body size.
@@ -153,7 +158,10 @@ impl crate::TransportWriteHalf for UnixWriteHalf<tokio_seqpacket::WriteHalf<'_>>
 /// all received file descriptors will be closed.
 /// This includes file descriptors from later control messages.
 /// This is done to ensure no file descriptors are leaked.
-fn extract_file_descriptors(ancillary: &SocketAncillary) -> Result<Vec<FileDesc>, std::io::Error> {
+#[cfg(feature = "unix-seqpacket")]
+fn extract_file_descriptors(ancillary: &tokio_seqpacket::ancillary::SocketAncillary<'_>) -> Result<Vec<FileDesc>, std::io::Error> {
+	use tokio_seqpacket::ancillary::AncillaryData;
+
 	let mut fds = Vec::new();
 	let mut error = None;
 	for msg in ancillary.messages() {
@@ -188,6 +196,7 @@ fn extract_file_descriptors(ancillary: &SocketAncillary) -> Result<Vec<FileDesc>
 }
 
 /// Convert an AncillaryError into an I/O error.
+#[cfg(feature = "unix-seqpacket")]
 fn convert_ancillary_error(error: tokio_seqpacket::ancillary::AncillaryError) -> std::io::Error {
 	use tokio_seqpacket::ancillary::AncillaryError;
 	let message = match error {

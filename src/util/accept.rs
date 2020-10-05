@@ -47,7 +47,7 @@ impl Listener for tokio::net::TcpListener {
 	}
 }
 
-#[cfg(feature = "unix")]
+#[cfg(feature = "unix-stream")]
 impl Listener for tokio::net::UnixListener {
 	type Connection = tokio::net::UnixStream;
 	type Address = std::os::unix::net::SocketAddr;
@@ -59,7 +59,7 @@ impl Listener for tokio::net::UnixListener {
 	}
 }
 
-#[cfg(feature = "shared-memory")]
+#[cfg(feature = "unix-seqpacket")]
 impl Listener for tokio_seqpacket::UnixSeqpacketListener {
 	type Connection = tokio_seqpacket::UnixSeqpacket;
 	type Address = std::os::unix::net::SocketAddr;

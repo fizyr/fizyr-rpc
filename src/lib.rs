@@ -11,12 +11,14 @@ mod peer_handle;
 mod request;
 mod request_tracker;
 mod server;
-mod stream;
 mod transport;
 mod util;
 pub mod error;
 
-#[cfg(feature = "shared-memory")]
+#[cfg(any(feature = "unix-stream", feature = "tcp"))]
+mod stream;
+
+#[cfg(feature = "unix-seqpacket")]
 mod unix;
 
 pub use message::Body;
@@ -37,13 +39,25 @@ pub use request::SentRequest;
 pub use request_tracker::RequestTracker;
 pub use server::Server;
 pub use server::ServerListener;
-pub use stream::StreamBody;
-pub use stream::StreamConfig;
-pub use stream::StreamTransport;
 pub use transport::IntoTransport;
 pub use transport::Transport;
 pub use transport::TransportReadHalf;
 pub use transport::TransportWriteHalf;
+
+#[cfg(any(feature = "unix-stream", feature = "tcp"))]
+pub use stream::StreamBody;
+
+#[cfg(any(feature = "unix-stream", feature = "tcp"))]
+pub use stream::StreamConfig;
+
+#[cfg(any(feature = "unix-stream", feature = "tcp"))]
+pub use stream::StreamTransport;
+
+#[cfg(feature = "unix-seqpacket")]
 pub use unix::UnixBody;
+
+#[cfg(feature = "unix-seqpacket")]
 pub use unix::UnixConfig;
+
+#[cfg(feature = "unix-seqpacket")]
 pub use unix::UnixTransport;
