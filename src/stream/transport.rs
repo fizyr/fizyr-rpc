@@ -13,26 +13,49 @@ use super::{StreamBody, StreamConfig};
 
 /// Transport layer for byte-stream sockets.
 pub struct StreamTransport<Socket> {
+	/// The socket to use for sending/receiving messages.
 	pub(super) socket: Socket,
+
+	/// The configuration of the transport.
 	pub(super) config: StreamConfig,
 }
 
 /// The read half of a [`StreamTransport`].
 pub struct StreamReadHalf<R> {
+	/// The read half of the underlying socket.
 	pub(super) stream: R,
+
+	/// The maximum body length to accept when reading messages.
 	pub(super) max_body_len: u32,
+
+	/// The buffer for reading the message header.
 	pub(super) header_buffer: [u8; 16],
+
+	/// The number of bytes read for the current message header.
 	pub(super) header_read: usize,
+
+	/// The parsed header.
 	pub(super) parsed_header: MessageHeader,
+
+	/// The buffer for reading the message body.
 	pub(super) body_buffer: Vec<u8>,
+
+	/// The number of bytes read for the current message body.
 	pub(super) body_read: usize,
 }
 
 /// The write half of a [`StreamTransport`].
 pub struct StreamWriteHalf<W> {
+	/// The write half of the underlying socket.
 	pub(super) stream: W,
+
+	/// The maximum body length to enforce for messages.
 	pub(super) max_body_len: u32,
+
+	/// The buffer for the encoded header.
 	pub(super) header_buffer: Option<[u8; 16]>,
+
+	/// The number of bytes written for the current message.
 	pub(super) written: usize,
 }
 
