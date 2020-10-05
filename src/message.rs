@@ -201,6 +201,36 @@ impl MessageHeader {
 			service_id,
 		}
 	}
+
+	/// Decode a message header from a byte slice.
+	///
+	/// The byte slice should NOT contain the message size.
+	///
+	/// # Panic
+	/// This function panics if the buffer does not contain a full header.
+	pub fn decode(buffer: &[u8]) -> Result<Self, error::InvalidMessageType> {
+		use byteorder::{ByteOrder, LE};
+		let message_type = LE::read_u32(&buffer[0..]);
+		let request_id = LE::read_u32(&buffer[4..]);
+		let service_id = LE::read_i32(&buffer[8..]);
+
+		let message_type = MessageType::from_u32(message_type)?;
+		Ok(Self { message_type, request_id, service_id })
+	}
+
+	/// Encode a message header into a byte slice.
+	///
+	/// This will NOT add a message size (which would be impossible even if we wanted to).
+	///
+	/// # Panic
+	/// This function panics if the buffer is not large enough to hold a full header.
+	pub fn encode(&self, buffer: &mut [u8]) {
+		use byteorder::{ByteOrder, LE};
+		assert!(buffer.len() >= 12);
+		LE::write_u32(&mut buffer[0..], self.message_type as u32);
+		LE::write_u32(&mut buffer[4..], self.request_id);
+		LE::write_i32(&mut buffer[8..], self.service_id);
+	}
 }
 
 impl<Body> std::fmt::Debug for Message<Body> {
