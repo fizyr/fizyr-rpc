@@ -4,12 +4,14 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite};
 
-use crate::HEADER_LEN;
 use crate::Message;
 use crate::MessageHeader;
 use crate::MessageType;
 use crate::error::{PayloadTooLarge, ReadMessageError, WriteMessageError};
 use super::{StreamBody, StreamConfig};
+
+/// Length of a message frame and header.
+const FRAMED_HEADER_LEN: usize = 4 + crate::HEADER_LEN as usize;
 
 /// Transport layer for byte-stream sockets.
 pub struct StreamTransport<Socket> {
@@ -28,20 +30,17 @@ pub struct StreamReadHalf<R> {
 	/// The maximum body length to accept when reading messages.
 	pub(super) max_body_len: u32,
 
-	/// The buffer for reading the message header.
-	pub(super) header_buffer: [u8; 16],
+	/// The number of bytes read for the current message.
+	pub(super) bytes_read: usize,
 
-	/// The number of bytes read for the current message header.
-	pub(super) header_read: usize,
+	/// The buffer for reading the message header.
+	pub(super) header_buffer: [u8; FRAMED_HEADER_LEN],
 
 	/// The parsed header.
 	pub(super) parsed_header: MessageHeader,
 
 	/// The buffer for reading the message body.
 	pub(super) body_buffer: Vec<u8>,
-
-	/// The number of bytes read for the current message body.
-	pub(super) body_read: usize,
 }
 
 /// The write half of a [`StreamTransport`].
@@ -52,11 +51,11 @@ pub struct StreamWriteHalf<W> {
 	/// The maximum body length to enforce for messages.
 	pub(super) max_body_len: u32,
 
-	/// The buffer for the encoded header.
-	pub(super) header_buffer: Option<[u8; 16]>,
-
 	/// The number of bytes written for the current message.
-	pub(super) written: usize,
+	pub(super) bytes_written: usize,
+
+	/// The buffer for the encoded message size and header.
+	pub(super) header_buffer: Option<[u8; FRAMED_HEADER_LEN]>,
 }
 
 impl<Socket> StreamTransport<Socket>
@@ -79,11 +78,10 @@ impl<R> StreamReadHalf<R> {
 		Self {
 			stream,
 			max_body_len,
-			header_buffer: [0u8; 16],
-			header_read: 0,
+			header_buffer: [0u8; FRAMED_HEADER_LEN],
+			bytes_read: 0,
 			parsed_header: MessageHeader::request(0, 0),
 			body_buffer: Vec::new(),
-			body_read: 0,
 		}
 	}
 }
@@ -94,7 +92,7 @@ impl<W> StreamWriteHalf<W> {
 			stream,
 			max_body_len,
 			header_buffer: None,
-			written: 0,
+			bytes_written: 0,
 		}
 	}
 }
@@ -117,19 +115,19 @@ where
 
 	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, ReadMessageError>> {
 		let this = self.get_mut();
-		while this.header_read < 16 {
+		while this.bytes_read < FRAMED_HEADER_LEN {
 			let stream = Pin::new(&mut this.stream);
-			this.header_read += ready!(poll_read(stream, context, &mut this.header_buffer[this.header_read..]))?;
-			assert!(this.header_read <= 16);
+			this.bytes_read += ready!(poll_read(stream, context, &mut this.header_buffer[this.bytes_read..]))?;
+			assert!(this.bytes_read <= FRAMED_HEADER_LEN);
 
-			if this.header_read == 16 {
+			if this.bytes_read == FRAMED_HEADER_LEN {
 				// Parse header.
 				let length = LE::read_u32(&this.header_buffer[0..]);
 				let message_type = LE::read_u32(&this.header_buffer[4..]);
 				let request_id = LE::read_u32(&this.header_buffer[8..]);
 				let service_id = LE::read_i32(&this.header_buffer[12..]);
 
-				let body_len = length - HEADER_LEN;
+				let body_len = length - crate::HEADER_LEN as u32;
 				PayloadTooLarge::check(body_len as usize, this.max_body_len)?;
 
 				let message_type = MessageType::from_u32(message_type)?;
@@ -143,16 +141,17 @@ where
 			}
 		}
 
-		while this.body_read < this.body_buffer.len() {
+		while this.bytes_read - FRAMED_HEADER_LEN < this.body_buffer.len() {
 			let stream = Pin::new(&mut this.stream);
-			this.body_read += ready!(poll_read(stream, context, &mut this.body_buffer[this.body_read..]))?;
-			assert!(this.body_read <= this.body_buffer.len());
+			let body_read = this.bytes_read - FRAMED_HEADER_LEN;
+			this.bytes_read += ready!(poll_read(stream, context, &mut this.body_buffer[body_read..]))?;
+			let body_read = this.bytes_read - FRAMED_HEADER_LEN;
+			assert!(body_read <= this.body_buffer.len());
 
-			if this.body_read == this.body_buffer.len() {
+			if body_read == this.body_buffer.len() {
 				let header = this.parsed_header;
 				let body = std::mem::replace(&mut this.body_buffer, Vec::new());
-				this.header_read = 0;
-				this.body_read = 0;
+				this.bytes_read = 0;
 				return Poll::Ready(Ok(Message::new(header, body.into())))
 			}
 		}
@@ -171,25 +170,26 @@ impl<W: AsyncWrite + Unpin> crate::TransportWriteHalf for StreamWriteHalf<W> {
 		PayloadTooLarge::check(body.len(), this.max_body_len)?;
 
 		let header_buffer = this.header_buffer.get_or_insert_with(|| {
-			let mut buffer = [0u8; 16];
-			LE::write_u32(&mut buffer[0..], body.len() as u32 + HEADER_LEN);
+			let mut buffer = [0u8; FRAMED_HEADER_LEN];
+			LE::write_u32(&mut buffer[0..], body.len() as u32 + crate::HEADER_LEN);
 			LE::write_u32(&mut buffer[4..], header.message_type as u32);
 			LE::write_u32(&mut buffer[8..], header.request_id);
 			LE::write_i32(&mut buffer[12..], header.service_id);
 			buffer
 		});
 
-		while this.written < 16 {
+		while this.bytes_written < FRAMED_HEADER_LEN {
 			let stream = Pin::new(&mut this.stream);
-			this.written += ready!(stream.poll_write(context, &header_buffer[this.written..]))?;
+			this.bytes_written += ready!(stream.poll_write(context, &header_buffer[this.bytes_written..]))?;
 		}
 
-		while this.written - 16 < body.len() {
+		while this.bytes_written - FRAMED_HEADER_LEN < body.len() {
+			let body_written = this.bytes_written - FRAMED_HEADER_LEN;
 			let stream = Pin::new(&mut this.stream);
-			this.written += ready!(stream.poll_write(context, &body.data[this.written - 16..]))?;
+			this.bytes_written += ready!(stream.poll_write(context, &body.data[body_written..]))?;
 		}
 
-		this.written = 0;
+		this.bytes_written = 0;
 		this.header_buffer = None;
 		Poll::Ready(Ok(()))
 	}
