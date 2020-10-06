@@ -149,7 +149,12 @@ impl crate::TransportWriteHalf for UnixWriteHalf<tokio_seqpacket::WriteHalf<'_>>
 		let mut ancillary = SocketAncillary::new(&mut ancillary);
 
 		let raw_fds: Vec<_> = body.fds.iter().map(|fd| fd.as_raw_fd()).collect();
-		ancillary.add_fds(&raw_fds);
+		if !ancillary.add_fds(&raw_fds) {
+			return Poll::Ready(Err(std::io::Error::new(
+				std::io::ErrorKind::Other,
+				"not enough space for file descriptors",
+			).into()));
+		}
 
 		ready!(this.stream.poll_send_vectored_with_ancillary(context, &[
 			IoSlice::new(&header_buffer),
