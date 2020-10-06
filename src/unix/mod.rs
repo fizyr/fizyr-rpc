@@ -37,9 +37,12 @@ mod test {
 	use assert2::let_assert;
 
 	use tokio_seqpacket::UnixSeqpacket;
+	use filedesc::FileDesc;
+	use std::os::unix::io::FromRawFd;
 
 	use crate::MessageHeader;
 	use crate::IntoTransport;
+	use crate::UnixBody;
 
 	#[tokio::test]
 	async fn test_unix_transport() {
@@ -53,15 +56,45 @@ mod test {
 		let (mut read_b, mut write_b) = transport_b.split();
 
 		for i in 0..10 {
-			assert!(let Ok(()) = write_a.write_msg(&MessageHeader::request(i * 2, 10), &b"Hello peer_b!"[..].into()).await);
+			let blob_0 = make_blob("blob 0", b"Message in a blob 0");
+			let blob_1 = make_blob("blob 1", b"Message in a blob 1");
+
+			let body = UnixBody::new(&b"Hello peer_b!"[..], vec![blob_0, blob_1]);
+			assert!(let Ok(()) = write_a.write_msg(&MessageHeader::request(i * 2, 10), &body).await);
 			let_assert!(Ok(message) = read_b.read_msg().await);
 			assert!(message.header == MessageHeader::request(i * 2, 10));
 			assert!(message.body.data.as_ref() == b"Hello peer_b!");
+			assert!(message.body.fds.len() == 2);
+			let_assert!(Ok(blob_0) = read_blob(&message.body.fds[0]));
+			let_assert!(Ok(blob_1) = read_blob(&message.body.fds[1]));
+			assert!(blob_0 == b"Message in a blob 0");
+			assert!(blob_1 == b"Message in a blob 1");
 
 			assert!(let Ok(()) = write_b.write_msg(&MessageHeader::request(i * 2 + 1, 11), &b"Hello peer_a!"[..].into()).await);
 			let_assert!(Ok(message) = read_a.read_msg().await);
 			assert!(message.header == MessageHeader::request(i * 2 + 1, 11));
 			assert!(message.body.data.as_ref() == b"Hello peer_a!");
 		}
+	}
+
+	fn make_blob(name: &str, data: &[u8]) -> filedesc::FileDesc {
+		use std::io::{Seek, Write};
+		let_assert!(Ok(fd) = memfd::MemfdOptions::new().close_on_exec(true).create(name));
+		let mut file = fd.into_file();
+		let_assert!(Ok(_) = file.write_all(data));
+		assert!(let Ok(_) = file.seek(std::io::SeekFrom::Start(0)));
+		filedesc::FileDesc::new(file)
+	}
+
+	fn read_blob(fd: &FileDesc) -> std::io::Result<Vec<u8>> {
+		use std::io::Read;
+
+		let mut output = Vec::new();
+		let mut file = unsafe { std::fs::File::from_raw_fd(fd.as_raw_fd()) };
+		let result = file.read_to_end(&mut output);
+		std::mem::forget(file);
+
+		result?;
+		Ok(output)
 	}
 }
