@@ -9,7 +9,7 @@ pub struct UnixBody {
 	pub data: Box<[u8]>,
 
 	/// The file descriptors to attach.
-	pub fds: Box<[FileDesc]>,
+	pub fds: Vec<FileDesc>,
 }
 
 impl UnixBody {
@@ -17,7 +17,7 @@ impl UnixBody {
 	pub fn new<Data, FileDescs>(data: Data, fds: FileDescs) -> Self
 	where
 		Box<[u8]>: From<Data>,
-		Box<[FileDesc]>: From<FileDescs>,
+		Vec<FileDesc>: From<FileDescs>,
 	{
 		Self {
 			data: data.into(),
@@ -36,7 +36,7 @@ impl From<Box<[u8]>> for UnixBody {
 	fn from(other: Box<[u8]>) -> Self {
 		Self {
 			data: other,
-			fds: Box::new([]),
+			fds: Vec::new(),
 		}
 	}
 }
@@ -56,7 +56,7 @@ impl From<Vec<u8>> for UnixBody {
 impl<Data, FileDescs> From<(Data, FileDescs)> for UnixBody
 where
 	Box<[u8]>: From<Data>,
-	Box<[FileDesc]>: From<FileDescs>,
+	Vec<FileDesc>: From<FileDescs>,
 {
 	fn from(other: (Data, FileDescs)) -> Self {
 		let (data, fds) = other;
