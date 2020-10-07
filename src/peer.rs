@@ -26,11 +26,31 @@ pub enum Command<Body> {
 /// To send or receive requests and stream messages,
 /// you need to use the [`PeerHandle`] instead.
 pub struct Peer<Body, Transport> {
+	/// The transport to use for sending/receiving messages.
 	transport: Transport,
+
+	/// The request tracker to track open requests.
 	request_tracker: RequestTracker<Body>,
+
+	/// Sending end of the command channel, so we can send commands to ourselves.
+	///
+	/// This is used to have the read loop inject things into the command loop.
+	/// That way, the read loop doesn't need s mutable referenceto the request tracker,
+	/// which simplifies the implementation.
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
+
+	/// Receiving end of the command channel.
+	///
+	/// Used to make the command loop do the things we want.
 	command_rx: mpsc::UnboundedReceiver<Command<Body>>,
+
+	/// Sending end of the channel for incoming requests and stream messages.
 	incoming_tx: mpsc::UnboundedSender<Result<Incoming<Body>, error::NextMessageError>>,
+
+	/// The number of [`PeerWriteHandle`] objects for this peer.
+	///
+	/// When it hits zero, and the [`PeerReadHandle`] is dropped,
+	/// the internal loops are stopped.
 	write_handles: usize,
 }
 
@@ -51,6 +71,7 @@ where
 	///
 	/// You can also use [`Self::spawn()`] to run the read/write loop in a newly spawned task,
 	/// and only get a [`PeerHandle`].
+	/// You should only use [`Self::spawn()`] if you do not need full control over the execution of the read/write loop.
 	pub fn new(transport: Transport) -> (Self, PeerHandle<Body>) {
 		let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
 		let (command_tx, command_rx) = mpsc::unbounded_channel();
@@ -140,7 +161,7 @@ where
 
 /// Implementation of the read loop of a peer.
 struct ReadLoop<Body, R> {
-	/// The read half of the socket.
+	/// The read half of the message transport.
 	read_half: R,
 
 	/// The channel used to inject things into the peer read/write loop.
@@ -155,7 +176,7 @@ where
 	/// Run the read loop.
 	async fn run(&mut self) {
 		loop {
-			// Read a message, and stop the read loop on erorrs.
+			// Read a message, and stop the read loop on errors.
 			let message = self.read_half.read_msg().await;
 			let stop = message.is_err();
 
@@ -174,7 +195,7 @@ where
 
 /// Implementation of the command loop of a peer.
 struct CommandLoop<'a, Body, W> {
-	/// The write half of the socket.
+	/// The write half of the message transport.
 	write_half: W,
 
 	/// The request tracker.
@@ -364,18 +385,30 @@ where
 	}
 }
 
+/// Command to send a request to the remote peer.
 pub struct SendRequest<Body> {
+	/// The service ID for the request.
 	pub service_id: i32,
+
+	/// The body for the request.
 	pub body: Body,
+
+	/// One-shot channel to transmit back the created [`SentRequest`] object, or an error.
 	pub result_tx: oneshot::Sender<Result<SentRequest<Body>, error::SendRequestError>>,
 }
 
+/// Command to send a raw message to the remote peer.
 pub struct SendRawMessage<Body> {
+	/// The message to send.
 	pub message: Message<Body>,
+
+	/// One-shot channel to receive the result of sending the message.
 	pub result_tx: oneshot::Sender<Result<(), error::WriteMessageError>>,
 }
 
+/// Command to process an incoming message from the remote peer.
 pub struct ProcessIncomingMessage<Body> {
+	/// The message from the remote peer, or an error.
 	pub message: Result<Message<Body>, error::ReadMessageError>,
 }
 
