@@ -9,7 +9,7 @@ use crate::peer::{Command, SendRequest, SendRawMessage};
 
 /// Handle to a peer.
 ///
-/// The handle can be used to receiving incoming requests and stream messages,
+/// The handle can be used to receive incoming requests and stream messages,
 /// and to send requests and stream messages.
 ///
 /// When the handle is dropped, the peer loop is stopped.
