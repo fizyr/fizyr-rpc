@@ -13,9 +13,9 @@ use super::{StreamBody, StreamConfig};
 const FRAMED_HEADER_LEN: usize = 4 + crate::HEADER_LEN as usize;
 
 /// Transport layer for byte-stream sockets.
-pub struct StreamTransport<Socket> {
-	/// The socket to use for sending/receiving messages.
-	pub(super) socket: Socket,
+pub struct StreamTransport<Stream> {
+	/// The stream to use for sending/receiving messages.
+	pub(super) stream: Stream,
 
 	/// The configuration of the transport.
 	pub(super) config: StreamConfig,
@@ -23,7 +23,7 @@ pub struct StreamTransport<Socket> {
 
 /// The read half of a [`StreamTransport`].
 pub struct StreamReadHalf<R> {
-	/// The read half of the underlying socket.
+	/// The read half of the underlying stream.
 	pub(super) stream: R,
 
 	/// The maximum body length to accept when reading messages.
@@ -44,7 +44,7 @@ pub struct StreamReadHalf<R> {
 
 /// The write half of a [`StreamTransport`].
 pub struct StreamWriteHalf<W> {
-	/// The write half of the underlying socket.
+	/// The write half of the underlying stream.
 	pub(super) stream: W,
 
 	/// The maximum body length to enforce for messages.
@@ -57,18 +57,18 @@ pub struct StreamWriteHalf<W> {
 	pub(super) header_buffer: Option<[u8; FRAMED_HEADER_LEN]>,
 }
 
-impl<Socket> StreamTransport<Socket>
+impl<Stream> StreamTransport<Stream>
 where
 	for <'a> &'a mut Self: crate::Transport,
 {
 	/// Create a new transport with custom configuration.
-	pub fn new(socket: Socket, config: StreamConfig) -> Self {
-		Self { socket, config }
+	pub fn new(stream: Stream, config: StreamConfig) -> Self {
+		Self { stream, config }
 	}
 
 	/// Create a new transport using the default configuration.
-	pub fn new_default(socket: Socket) -> Self {
-		Self::new(socket, StreamConfig::default())
+	pub fn new_default(stream: Stream) -> Self {
+		Self::new(stream, StreamConfig::default())
 	}
 }
 

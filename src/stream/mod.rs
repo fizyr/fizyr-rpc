@@ -13,7 +13,7 @@ impl<'a> crate::Transport for &'a mut StreamTransport<tokio::net::UnixStream> {
 	type WriteHalf = StreamWriteHalf<tokio::net::unix::WriteHalf<'a>>;
 
 	fn split(self) -> (Self::ReadHalf, Self::WriteHalf) {
-		let (read_half, write_half) = self.socket.split();
+		let (read_half, write_half) = self.stream.split();
 		let read_half = StreamReadHalf::new(read_half, self.config.max_body_len_read);
 		let write_half = StreamWriteHalf::new(write_half, self.config.max_body_len_write);
 		(read_half, write_half)
@@ -38,7 +38,7 @@ impl<'a> crate::Transport for &'a mut StreamTransport<tokio::net::TcpStream> {
 	type WriteHalf = StreamWriteHalf<tokio::net::tcp::WriteHalf<'a>>;
 
 	fn split(self) -> (Self::ReadHalf, Self::WriteHalf) {
-		let (read_half, write_half) = self.socket.split();
+		let (read_half, write_half) = self.stream.split();
 		let read_half = StreamReadHalf::new(read_half, self.config.max_body_len_read);
 		let write_half = StreamWriteHalf::new(write_half, self.config.max_body_len_write);
 		(read_half, write_half)
