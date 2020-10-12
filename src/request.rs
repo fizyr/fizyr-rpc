@@ -30,13 +30,19 @@ pub struct ReceivedRequest<Body> {
 
 /// An incoming request or stream message.
 pub enum Incoming<Body> {
+	/// An incoming request.
 	Request(ReceivedRequest<Body>),
+
+	/// An incoming stream message.
 	Stream(Message<Body>),
 }
 
 /// An outgoing request or stream message.
 pub enum Outgoing<Body> {
+	/// An outgoing request.
 	Request(SentRequest<Body>),
+
+	/// An outgoing stream message.
 	Stream(Message<Body>),
 }
 

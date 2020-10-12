@@ -1,4 +1,6 @@
-use fizyr_rpc::StreamPeer;
+use fizyr_rpc::Peer;
+use fizyr_rpc::IntoTransport;
+
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio::net::UnixStream;
@@ -20,19 +22,27 @@ async fn main() {
 }
 
 async fn do_main(options: &Options) -> Result<(), String> {
+	// Connect a socket to the server.
 	let socket = UnixStream::connect(&options.socket)
 		.await
 		.map_err(|e| format!("failed to connect to {}: {}", options.socket.display(), e))?;
 
-	let mut peer = StreamPeer::spawn(socket, Default::default()).await;
+	// Wrap the socket in a transport, and create a peer from the transport.
+	let mut peer = Peer::spawn(socket.into_transport_default());
 
+	// Send a request to the remote peer.
 	let mut request = peer.send_request(1, &b"Hello World!"[..])
 		.await
 		.map_err(|e| format!("failed to send request: {}", e))?;
 
 	loop {
+		// Receive the next message.
+		// This could be an update or the final response message.
 		let message = request.next_message().await.map_err(|e| format!("failed to read message: {}", e))?;
+
+		// Ignore anything but the response.
 		if message.header.message_type.is_response() {
+			// Parse the message body as UTF-8, print it and exit the loop.
 			let message = std::str::from_utf8(&message.body).map_err(|_| "invalid UTF-8 in response")?;
 			eprintln!("Received response: {}", message);
 			break;
