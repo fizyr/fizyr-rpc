@@ -9,7 +9,7 @@ use crate::MessageHeader;
 use crate::error::{PayloadTooLarge, ReadMessageError, WriteMessageError};
 use super::{UnixBody, UnixConfig};
 
-/// Transport layer for byte-stream sockets.
+/// Transport layer for Unix datagram/seqpacket sockets.
 pub struct UnixTransport<Socket> {
 	/// The socket to use for sending/receiving messages.
 	pub(super) socket: Socket,
@@ -21,7 +21,7 @@ pub struct UnixTransport<Socket> {
 /// The read half of a [`UnixTransport`].
 pub struct UnixReadHalf<R> {
 	/// The read half of the underlying socket.
-	pub(super) stream: R,
+	pub(super) socket: R,
 
 	/// The maximum body length to accept when reading messages.
 	pub(super) max_body_len: u32,
@@ -36,7 +36,7 @@ pub struct UnixReadHalf<R> {
 /// The write half of a [`UnixTransport`].
 pub struct UnixWriteHalf<W> {
 	/// The write half of the underlying socket.
-	pub(super) stream: W,
+	pub(super) socket: W,
 
 	/// The maximum body length to enforce for messages.
 	pub(super) max_body_len: u32,
@@ -61,9 +61,9 @@ where
 }
 
 impl<R> UnixReadHalf<R> {
-	pub(super) fn new(stream: R, max_body_len: u32, max_fds: u32) -> Self {
+	pub(super) fn new(socket: R, max_body_len: u32, max_fds: u32) -> Self {
 		Self {
-			stream,
+			socket,
 			max_body_len,
 			max_fds,
 			body_buffer: Vec::new(),
@@ -72,9 +72,9 @@ impl<R> UnixReadHalf<R> {
 }
 
 impl<W> UnixWriteHalf<W> {
-	pub(super) fn new(stream: W, max_body_len: u32, max_fds: u32) -> Self {
+	pub(super) fn new(socket: W, max_body_len: u32, max_fds: u32) -> Self {
 		Self {
-			stream,
+			socket,
 			max_body_len,
 			max_fds,
 		}
@@ -100,7 +100,7 @@ impl crate::TransportReadHalf for UnixReadHalf<tokio_seqpacket::ReadHalf<'_>> {
 		let mut ancillary = SocketAncillary::new(&mut ancillary);
 
 		// Read the incoming datagram.
-		let bytes_read = ready!(this.stream.poll_recv_vectored_with_ancillary(context, &mut [
+		let bytes_read = ready!(this.socket.poll_recv_vectored_with_ancillary(context, &mut [
 			IoSliceMut::new(&mut header_buffer),
 			IoSliceMut::new(&mut this.body_buffer),
 		], &mut ancillary))?;
@@ -156,7 +156,7 @@ impl crate::TransportWriteHalf for UnixWriteHalf<tokio_seqpacket::WriteHalf<'_>>
 			).into()));
 		}
 
-		ready!(this.stream.poll_send_vectored_with_ancillary(context, &[
+		ready!(this.socket.poll_send_vectored_with_ancillary(context, &[
 			IoSlice::new(&header_buffer),
 			IoSlice::new(&body.data),
 		], &mut ancillary))?;
