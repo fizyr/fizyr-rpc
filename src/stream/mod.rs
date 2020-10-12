@@ -7,52 +7,95 @@ pub use config::StreamConfig;
 pub use transport::{StreamReadHalf, StreamTransport, StreamWriteHalf};
 
 #[cfg(feature = "unix-stream")]
-impl<'a> crate::Transport for &'a mut StreamTransport<tokio::net::UnixStream> {
-	type Body = StreamBody;
-	type ReadHalf = StreamReadHalf<tokio::net::unix::ReadHalf<'a>>;
-	type WriteHalf = StreamWriteHalf<tokio::net::unix::WriteHalf<'a>>;
+mod impl_unix_stream {
+	use super::*;
 
-	fn split(self) -> (Self::ReadHalf, Self::WriteHalf) {
-		let (read_half, write_half) = self.stream.split();
-		let read_half = StreamReadHalf::new(read_half, self.config.max_body_len_read);
-		let write_half = StreamWriteHalf::new(write_half, self.config.max_body_len_write);
-		(read_half, write_half)
+	impl crate::Transport for StreamTransport<tokio::net::UnixStream> {
+		type Body = StreamBody;
+		type ReadHalf = ReadHalfType;
+		type WriteHalf = WriteHalfType;
+
+		fn split<'a>(&'a mut self) -> (StreamReadHalf<tokio::net::unix::ReadHalf<'a>>, StreamWriteHalf<tokio::net::unix::WriteHalf<'a>>) {
+			let (read_half, write_half) = self.stream.split();
+			let read_half = StreamReadHalf::new(read_half, self.config.max_body_len_read);
+			let write_half = StreamWriteHalf::new(write_half, self.config.max_body_len_write);
+			(read_half, write_half)
+		}
 	}
-}
 
-#[cfg(feature = "unix-stream")]
-impl crate::IntoTransport for tokio::net::UnixStream {
-	type Body = StreamBody;
-	type Config = StreamConfig;
-	type Transport = StreamTransport<tokio::net::UnixStream>;
+	impl crate::IntoTransport for tokio::net::UnixStream {
+		type Body = StreamBody;
+		type Config = StreamConfig;
+		type Transport = StreamTransport<tokio::net::UnixStream>;
 
-	fn into_transport(self, config: Self::Config) -> Self::Transport {
-		StreamTransport::new(self, config)
+		fn into_transport(self, config: Self::Config) -> Self::Transport {
+			StreamTransport::new(self, config)
+		}
+	}
+
+	/// Helper struct to provide the read half types with a lifetime.
+	pub struct ReadHalfType;
+
+	/// Helper struct to provide the write half types with a lifetime.
+	pub struct WriteHalfType;
+
+	impl<'a> crate::transport::ReadHalfType<'a> for ReadHalfType {
+		type Body = StreamBody;
+
+		type ReadHalf = StreamReadHalf<tokio::net::unix::ReadHalf<'a>>;
+	}
+
+	impl<'a> crate::transport::WriteHalfType<'a> for WriteHalfType {
+		type Body = StreamBody;
+
+		type WriteHalf = StreamWriteHalf<tokio::net::unix::WriteHalf<'a>>;
 	}
 }
 
 #[cfg(feature = "tcp")]
-impl<'a> crate::Transport for &'a mut StreamTransport<tokio::net::TcpStream> {
-	type Body = StreamBody;
-	type ReadHalf = StreamReadHalf<tokio::net::tcp::ReadHalf<'a>>;
-	type WriteHalf = StreamWriteHalf<tokio::net::tcp::WriteHalf<'a>>;
+mod impl_tcp {
+	use super::*;
 
-	fn split(self) -> (Self::ReadHalf, Self::WriteHalf) {
-		let (read_half, write_half) = self.stream.split();
-		let read_half = StreamReadHalf::new(read_half, self.config.max_body_len_read);
-		let write_half = StreamWriteHalf::new(write_half, self.config.max_body_len_write);
-		(read_half, write_half)
+	impl crate::Transport for StreamTransport<tokio::net::TcpStream> {
+		type Body = StreamBody;
+		type ReadHalf = ReadHalfType;
+		type WriteHalf = WriteHalfType;
+
+		fn split<'a>(&'a mut self) -> (StreamReadHalf<tokio::net::tcp::ReadHalf<'a>>, StreamWriteHalf<tokio::net::tcp::WriteHalf<'a>>) {
+			let (read_half, write_half) = self.stream.split();
+			let read_half = StreamReadHalf::new(read_half, self.config.max_body_len_read);
+			let write_half = StreamWriteHalf::new(write_half, self.config.max_body_len_write);
+			(read_half, write_half)
+		}
 	}
-}
 
-#[cfg(feature = "tcp")]
-impl crate::IntoTransport for tokio::net::TcpStream {
-	type Body = StreamBody;
-	type Config = StreamConfig;
-	type Transport = StreamTransport<tokio::net::TcpStream>;
+	#[cfg(feature = "tcp")]
+	impl crate::IntoTransport for tokio::net::TcpStream {
+		type Body = StreamBody;
+		type Config = StreamConfig;
+		type Transport = StreamTransport<tokio::net::TcpStream>;
 
-	fn into_transport(self, config: Self::Config) -> Self::Transport {
-		StreamTransport::new(self, config)
+		fn into_transport(self, config: Self::Config) -> Self::Transport {
+			StreamTransport::new(self, config)
+		}
+	}
+
+	/// Helper struct to provide the read half types with a lifetime.
+	pub struct ReadHalfType;
+
+	/// Helper struct to provide the write half types with a lifetime.
+	pub struct WriteHalfType;
+
+	impl<'a> crate::transport::ReadHalfType<'a> for ReadHalfType {
+		type Body = StreamBody;
+
+		type ReadHalf = StreamReadHalf<tokio::net::tcp::ReadHalf<'a>>;
+	}
+
+	impl<'a> crate::transport::WriteHalfType<'a> for WriteHalfType {
+		type Body = StreamBody;
+
+		type WriteHalf = StreamWriteHalf<tokio::net::tcp::WriteHalf<'a>>;
 	}
 }
 

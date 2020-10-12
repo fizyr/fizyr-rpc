@@ -59,7 +59,7 @@ pub struct StreamWriteHalf<W> {
 
 impl<Stream> StreamTransport<Stream>
 where
-	for <'a> &'a mut Self: crate::Transport,
+	Self: crate::Transport,
 {
 	/// Create a new transport with custom configuration.
 	pub fn new(stream: Stream, config: StreamConfig) -> Self {
@@ -159,7 +159,10 @@ where
 	}
 }
 
-impl<W: AsyncWrite + Unpin> crate::TransportWriteHalf for StreamWriteHalf<W> {
+impl<W> crate::TransportWriteHalf for StreamWriteHalf<W>
+where
+	W: AsyncWrite + Send + Unpin,
+{
 	type Body = StreamBody;
 
 	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), WriteMessageError>> {

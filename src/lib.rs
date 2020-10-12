@@ -121,7 +121,7 @@ pub type TcpTransport = StreamTransport<tokio::net::TcpStream>;
 
 /// Peer using the TCP transport.
 #[cfg(feature = "tcp")]
-pub type TcpPeer = Peer<StreamBody, TcpTransport>;
+pub type TcpPeer = Peer<TcpTransport>;
 
 /// Message transport for Unix stream sockets.
 #[cfg(feature = "unix-stream")]
@@ -129,7 +129,7 @@ pub type UnixStreamTransport = StreamTransport<tokio::net::UnixStream>;
 
 /// Peer using the Unix stream transport.
 #[cfg(feature = "unix-stream")]
-pub type UnixStreamPeer = Peer<StreamBody, UnixStreamTransport>;
+pub type UnixStreamPeer = Peer<UnixStreamTransport>;
 
 /// Message transport for Unix seqpacket sockets.
 #[cfg(feature = "unix-seqpacket")]
@@ -137,4 +137,4 @@ pub type UnixSeqpacketTransport = UnixTransport<tokio_seqpacket::UnixSeqpacket>;
 
 /// Peer using the Unix seqpacket transport.
 #[cfg(feature = "unix-seqpacket")]
-pub type UnixSeqpacketPeer = Peer<UnixBody, UnixSeqpacketTransport>;
+pub type UnixSeqpacketPeer = Peer<UnixSeqpacketTransport>;

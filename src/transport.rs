@@ -9,30 +9,55 @@ use crate::error::{ReadMessageError, WriteMessageError};
 ///
 /// Note that you can not use the transport itself directly.
 /// Instead, you must split it in a read and write half and use those.
-pub trait Transport {
+pub trait Transport: Send + 'static {
 	/// The body type for the messages.
-	type Body;
+	type Body: crate::Body;
 
-	/// The type of the read half.
-	type ReadHalf: TransportReadHalf<Body = Self::Body> + Unpin + Send;
+	/// The type of the read half of the transport.
+	type ReadHalf: for<'a> ReadHalfType<'a, Body = Self::Body>;
 
-	/// The type of the write half.
-	type WriteHalf: TransportWriteHalf<Body = Self::Body> + Unpin + Send;
+	/// The type of the write half of the transport.
+	type WriteHalf: for<'a> WriteHalfType<'a, Body = Self::Body>;
 
 	/// Split the transport into a read half and a write half.
-	fn split(self) -> (Self::ReadHalf, Self::WriteHalf);
+	fn split<'a>(&'a mut self) -> (<Self::ReadHalf as ReadHalfType<'a>>::ReadHalf, <Self::WriteHalf as WriteHalfType<'a>>::WriteHalf);
 }
+
+// TODO: Replace this with a generic associated type once it hits stable.
+/// Helper trait to define the type of a read half for a transport.
+///
+/// Used to work around the lack of generic associated types.
+pub trait ReadHalfType<'a> {
+	/// The body type for the transport.
+	type Body;
+
+	/// The concrete type of the read half.
+	type ReadHalf: TransportReadHalf<Body = Self::Body>;
+}
+
+// TODO: Replace this with a generic associated type once it hits stable.
+/// Helper trait to define the type of a write half for a transport.
+///
+/// Used to work around the lack of generic associated types.
+pub trait WriteHalfType<'a> {
+	/// The body type for the transport.
+	type Body;
+
+	/// The concrete type of the write half.
+	type WriteHalf: TransportWriteHalf<Body = Self::Body>;
+}
+
 
 /// Trait to allow generic creation of transports from a socket.
 pub trait IntoTransport: Sized + Send {
 	/// The body type for messages transferred over the transport.
-	type Body;
+	type Body: crate::Body;
 
 	/// The configuration type of the transport.
-	type Config;
+	type Config: Clone + Send + Sync + 'static;
 
 	/// The transport type.
-	type Transport;
+	type Transport: Transport<Body = Self::Body> + Send + 'static;
 
 	/// Create a transport from `self` and a configuration struct.
 	fn into_transport(self, config: Self::Config) -> Self::Transport;
@@ -47,7 +72,7 @@ pub trait IntoTransport: Sized + Send {
 }
 
 /// Trait for the read half of a transport type.
-pub trait TransportReadHalf {
+pub trait TransportReadHalf: Send + Unpin {
 	/// The body type for messages transferred over the transport.
 	type Body;
 
@@ -69,7 +94,7 @@ pub trait TransportReadHalf {
 }
 
 /// Trait for transport types that you can write message to.
-pub trait TransportWriteHalf {
+pub trait TransportWriteHalf: Send + Unpin {
 	/// The body type for messages transferred over the transport.
 	type Body;
 
@@ -164,7 +189,7 @@ where
 
 impl<P> TransportReadHalf for Pin<P>
 where
-	P: std::ops::DerefMut + Unpin,
+	P: std::ops::DerefMut + Send + Unpin,
 	P::Target: TransportReadHalf,
 {
 	type Body = <P::Target as TransportReadHalf>::Body;
@@ -198,7 +223,7 @@ where
 
 impl<P> TransportWriteHalf for Pin<P>
 where
-	P: std::ops::DerefMut + Unpin,
+	P: std::ops::DerefMut + Send + Unpin,
 	P::Target: TransportWriteHalf,
 {
 	type Body = <P::Target as TransportWriteHalf>::Body;

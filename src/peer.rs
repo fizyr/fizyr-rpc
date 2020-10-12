@@ -25,27 +25,27 @@ pub enum Command<Body> {
 /// This struct is used to run the read/write loop of the peer.
 /// To send or receive requests and stream messages,
 /// you need to use the [`PeerHandle`] instead.
-pub struct Peer<Body, Transport> {
+pub struct Peer<Transport: crate::Transport> {
 	/// The transport to use for sending/receiving messages.
 	transport: Transport,
 
 	/// The request tracker to track open requests.
-	request_tracker: RequestTracker<Body>,
+	request_tracker: RequestTracker<Transport::Body>,
 
 	/// Sending end of the command channel, so we can send commands to ourselves.
 	///
 	/// This is used to have the read loop inject things into the command loop.
 	/// That way, the read loop doesn't need a mutable reference to the request tracker,
 	/// which simplifies the implementation.
-	command_tx: mpsc::UnboundedSender<Command<Body>>,
+	command_tx: mpsc::UnboundedSender<Command<Transport::Body>>,
 
 	/// Receiving end of the command channel.
 	///
 	/// Used to make the command loop do the things we want.
-	command_rx: mpsc::UnboundedReceiver<Command<Body>>,
+	command_rx: mpsc::UnboundedReceiver<Command<Transport::Body>>,
 
 	/// Sending end of the channel for incoming requests and stream messages.
-	incoming_tx: mpsc::UnboundedSender<Result<Incoming<Body>, error::NextMessageError>>,
+	incoming_tx: mpsc::UnboundedSender<Result<Incoming<Transport::Body>, error::NextMessageError>>,
 
 	/// The number of [`PeerWriteHandle`][crate::PeerWriteHandle] objects for this peer.
 	///
@@ -54,12 +54,7 @@ pub struct Peer<Body, Transport> {
 	write_handles: usize,
 }
 
-impl<Body, Transport> Peer<Body, Transport>
-where
-	Body: crate::Body + Send + Sync + 'static,
-	Transport: 'static,
-	for<'a> &'a mut Transport: crate::Transport<Body = Body>,
-{
+impl<Transport: crate::Transport> Peer<Transport> {
 	/// Create a new peer and a handle to it.
 	///
 	/// The [`Peer`] itself is used to run the read/write loop.
@@ -72,7 +67,7 @@ where
 	/// You can also use [`Self::spawn()`] to run the read/write loop in a newly spawned task,
 	/// and only get a [`PeerHandle`].
 	/// You should only use [`Self::spawn()`] if you do not need full control over the execution of the read/write loop.
-	pub fn new(transport: Transport) -> (Self, PeerHandle<Body>) {
+	pub fn new(transport: Transport) -> (Self, PeerHandle<Transport::Body>) {
 		let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
 		let (command_tx, command_rx) = mpsc::unbounded_channel();
 		let request_tracker = RequestTracker::new(command_tx.clone());
@@ -100,9 +95,11 @@ where
 	///
 	/// If you need more control of the execution of the peer read/write loop,
 	/// you should use [`Self::new()`] instead.
-	pub fn spawn(transport: Transport) -> PeerHandle<Body>
+	pub fn spawn(transport: Transport) -> PeerHandle<Transport::Body>
 	where
 		Transport: Send + 'static,
+		for<'a> <Transport::ReadHalf as crate::transport::ReadHalfType<'a>>::ReadHalf: Send,
+		for<'a> <Transport::WriteHalf as crate::transport::WriteHalfType<'a>>::WriteHalf: Send,
 	{
 		let (peer, handle) = Self::new(transport);
 		tokio::spawn(peer.run());
@@ -120,7 +117,6 @@ where
 			write_handles,
 		} = &mut self;
 
-		use crate::Transport;
 		let (read_half, write_half) = transport.split();
 
 		let mut read_loop = ReadLoop {
@@ -160,18 +156,21 @@ where
 }
 
 /// Implementation of the read loop of a peer.
-struct ReadLoop<Body, R> {
+struct ReadLoop<R>
+where
+	R: crate::TransportReadHalf,
+{
 	/// The read half of the message transport.
 	read_half: R,
 
 	/// The channel used to inject things into the peer read/write loop.
-	command_tx: mpsc::UnboundedSender<Command<Body>>,
+	command_tx: mpsc::UnboundedSender<Command<R::Body>>,
 }
 
-impl<Body, R> ReadLoop<Body, R>
+impl<R> ReadLoop<R>
 where
-	Body: crate::Body,
-	R: crate::TransportReadHalf<Body = Body> + Unpin,
+	R: crate::TransportReadHalf + Unpin,
+	R::Body: crate::Body,
 {
 	/// Run the read loop.
 	async fn run(&mut self) {
@@ -194,18 +193,21 @@ where
 }
 
 /// Implementation of the command loop of a peer.
-struct CommandLoop<'a, Body, W> {
+struct CommandLoop<'a, W>
+where
+	W: crate::TransportWriteHalf,
+{
 	/// The write half of the message transport.
 	write_half: W,
 
 	/// The request tracker.
-	request_tracker: &'a mut RequestTracker<Body>,
+	request_tracker: &'a mut RequestTracker<W::Body>,
 
 	/// The channel for incoming commands.
-	command_rx: &'a mut mpsc::UnboundedReceiver<Command<Body>>,
+	command_rx: &'a mut mpsc::UnboundedReceiver<Command<W::Body>>,
 
 	/// The channel for sending incoming messages to the [`PeerHandle`].
-	incoming_tx: &'a mut mpsc::UnboundedSender<Result<Incoming<Body>, error::NextMessageError>>,
+	incoming_tx: &'a mut mpsc::UnboundedSender<Result<Incoming<W::Body>, error::NextMessageError>>,
 
 	/// Flag to indicate if the peer read handle has already been stopped.
 	read_handle_dropped: &'a mut bool,
@@ -214,10 +216,10 @@ struct CommandLoop<'a, Body, W> {
 	write_handles: &'a mut usize,
 }
 
-impl<Body, W> CommandLoop<'_, Body, W>
+impl<W> CommandLoop<'_, W>
 where
-	Body: crate::Body,
-	W: crate::TransportWriteHalf<Body = Body> + Unpin,
+	W: crate::TransportWriteHalf + Unpin,
+	W::Body: crate::Body,
 {
 	/// Run the command loop.
 	async fn run(&mut self) {
@@ -261,7 +263,7 @@ where
 	}
 
 	/// Process a SendRequest command.
-	async fn send_request(&mut self, command: crate::peer::SendRequest<Body>) -> LoopFlow {
+	async fn send_request(&mut self, command: crate::peer::SendRequest<W::Body>) -> LoopFlow {
 		let request = match self.request_tracker.allocate_sent_request(command.service_id) {
 			Ok(x) => x,
 			Err(e) => {
@@ -289,7 +291,7 @@ where
 	}
 
 	/// Process a SendRawMessage command.
-	async fn send_raw_message(&mut self, command: crate::peer::SendRawMessage<Body>) -> LoopFlow {
+	async fn send_raw_message(&mut self, command: crate::peer::SendRawMessage<W::Body>) -> LoopFlow {
 		// Remove tracked received requests when we send a response.
 		if command.message.header.message_type.is_response() {
 			let _: Result<_, _> = self.request_tracker.remove_sent_request(command.message.header.request_id);
@@ -312,7 +314,7 @@ where
 	}
 
 	/// Process an incoming message.
-	async fn process_incoming_message(&mut self, command: crate::peer::ProcessIncomingMessage<Body>) -> LoopFlow {
+	async fn process_incoming_message(&mut self, command: crate::peer::ProcessIncomingMessage<W::Body>) -> LoopFlow {
 		// Forward errors to the peer read handle.
 		let message = match command.message {
 			Ok(x) => x,
@@ -355,7 +357,7 @@ where
 	}
 
 	/// Send an incoming message to the PeerHandle.
-	async fn send_incoming(&mut self, incoming: Result<Incoming<Body>, error::NextMessageError>) -> Result<(), ()> {
+	async fn send_incoming(&mut self, incoming: Result<Incoming<W::Body>, error::NextMessageError>) -> Result<(), ()> {
 		if self.incoming_tx.send(incoming).is_err() {
 			*self.read_handle_dropped = true;
 			Err(())
@@ -364,7 +366,7 @@ where
 		}
 	}
 
-	async fn write_message(&mut self, message: &Message<Body>) -> Result<(), (error::WriteMessageError, LoopFlow)> {
+	async fn write_message(&mut self, message: &Message<W::Body>) -> Result<(), (error::WriteMessageError, LoopFlow)> {
 		match self.write_half.write_msg(&message.header, &message.body).await {
 			Ok(()) => Ok(()),
 			Err(e @ error::WriteMessageError::Io(_)) => Err((e, LoopFlow::Stop)),
