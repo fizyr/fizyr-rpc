@@ -47,9 +47,9 @@ pub struct Peer<Body, Transport> {
 	/// Sending end of the channel for incoming requests and stream messages.
 	incoming_tx: mpsc::UnboundedSender<Result<Incoming<Body>, error::NextMessageError>>,
 
-	/// The number of [`PeerWriteHandle`] objects for this peer.
+	/// The number of [`PeerWriteHandle`][crate::PeerWriteHandle] objects for this peer.
 	///
-	/// When it hits zero, and the [`PeerReadHandle`] is dropped,
+	/// When it hits zero, and the [`PeerReadHandle`][crate::PeerReadHandle] is dropped,
 	/// the internal loops are stopped.
 	write_handles: usize,
 }

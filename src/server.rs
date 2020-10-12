@@ -59,7 +59,7 @@ where
 {
 	/// Create a server on a listening socket.
 	///
-	/// The passed in config is used to create [`StreamPeer`] objects for all accepted connections.
+	/// The passed in config is used to create transports and peers for all accepted connections.
 	pub fn new(listener: Listener, config: Listener::Config) -> Self {
 		Self { listener, config }
 	}
@@ -84,7 +84,7 @@ where
 
 	/// Accept a connection and spawn a peer for it.
 	///
-	/// A [`StreamPeer`] is spawned for the new connection,
+	/// A [`Peer`] is spawned for the new connection,
 	/// and a [`PeerHandle`] is returned to allow interaction with the peer.
 	pub async fn accept(&mut self) -> std::io::Result<PeerHandle<Listener::Body>> {
 		let (socket, _addr) = self.listener.accept().await?;

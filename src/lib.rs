@@ -46,7 +46,6 @@ pub use transport::TransportWriteHalf;
 
 #[cfg(any(feature = "unix-stream", feature = "tcp"))]
 pub use stream::StreamBody;
-
 #[cfg(any(feature = "unix-stream", feature = "tcp"))]
 pub use stream::StreamConfig;
 
@@ -61,3 +60,27 @@ pub use unix::UnixConfig;
 
 #[cfg(feature = "unix-seqpacket")]
 pub use unix::UnixTransport;
+
+/// Message transport for TCP.
+#[cfg(feature = "tcp")]
+pub type TcpTransport = StreamTransport<tokio::net::TcpStream>;
+
+/// Peer using the TCP transport.
+#[cfg(feature = "tcp")]
+pub type TcpPeer = Peer<StreamBody, TcpTransport>;
+
+/// Message transport for Unix stream sockets.
+#[cfg(feature = "unix-stream")]
+pub type UnixStreamTransport = StreamTransport<tokio::net::UnixStream>;
+
+/// Peer using the Unix stream transport.
+#[cfg(feature = "unix-stream")]
+pub type UnixStreamPeer = Peer<StreamBody, UnixStreamTransport>;
+
+/// Message transport for Unix seqpacket sockets.
+#[cfg(feature = "unix-seqpacket")]
+pub type UnixSeqpacketTransport = UnixTransport<tokio_seqpacket::UnixSeqpacket>;
+
+/// Peer using the Unix seqpacket transport.
+#[cfg(feature = "unix-seqpacket")]
+pub type UnixSeqpacketPeer = Peer<UnixBody, UnixSeqpacketTransport>;

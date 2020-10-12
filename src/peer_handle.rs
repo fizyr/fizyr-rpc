@@ -34,7 +34,7 @@ pub struct PeerReadHandle<Body> {
 
 	/// Channel for sending commands to the peer loop.
 	///
-	/// Used by [`ReceivedRequest`] for sending updates and the response,
+	/// Used by [`ReceivedRequest`][crate::ReceivedRequest] for sending updates and the response,
 	/// and to notify the peer loop when the read handle is dropped.
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 }
