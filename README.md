@@ -13,7 +13,7 @@ Additionally, you can send individual stream messages that do not initiate a req
 
 ### Peer and PeerHandle
 
-As a user of the library, you will mostly be using the [`PeerHandle`][PeerHandle] and [`Server`][Server] objects.
+As a user of the library, you will mostly be using the [`PeerHandle`][PeerHandle] object.
 The `PeerHandle` is used to interact with a remote peer.
 It is used to send and receive requests and stream messages.
 It can also be split in a [`PeerReadHandle`][PeerReadHandle] and a [`PeerWriteHandle`][PeerWriteHandle],
@@ -29,7 +29,7 @@ which will run the future in a background task and returns a `PeerHandle`.
 
 ### Server
 
-The [`Server`] struct is used to accept incoming connections and gives you a `PeerHandle` for each incoming connection.
+The [`Server`][Server] struct is used to accept incoming connections and gives you a `PeerHandle` for each incoming connection.
 You can then use the handle to process incoming messages and to send messages to the peer.
 Usually, you will want to spawn a task for each accepted connection that handles the communication.
 
