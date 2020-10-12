@@ -1,11 +1,19 @@
 [package]
 name = "fizyr-rpc"
+description = "native Rust implementation of the Fizyr RPC protocol"
 version = "0.1.0"
 authors = [
 	"Fizyr B.V. <info@fizyr.com>",
 	"Maarten de Vries <maarten@de-vri.es>",
 ]
+
 license = "BSD-2-Clause OR Apache-2.0"
+repository = "https://github.com/fizyr/fizyr-rpc-rs"
+documentation = "https://docs.rs/fizyr-rpc"
+readme = "README.md"
+
+keywords = ["rpc", "shared-memory"]
+categories = ["asynchronous", "network-programming"]
 
 edition = "2018"
 
