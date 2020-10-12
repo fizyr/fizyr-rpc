@@ -48,6 +48,17 @@ This `StreamBody` body type contains raw bytes.
 The [`UnixSeqpacketTransport`][UnixSeqpacketTransport] has messages with a [`UnixBody`][UnixBody],
 which allows you to embed file descriptors with each message.
 
+## Features
+
+The library uses features to avoid unnecessarily large dependency trees.
+Each feature corresponds to a different transport type.
+None of the features are enabled by default.
+Currently, the library has these features:
+
+* `tcp`: for the [`TcpTransport`][TcpTransport]
+* `unix-stream`: for the [`UnixStreamTransport`][UnixStreamTransport]
+* `unix-seqpacket`: for the [`UnixSeqpacketTransport`][UnixSeqpacketTransport]
+
 [Peer]: https://docs.rs/fizyr-rpc/latest/fizyr-rpc/struct.Peer.html
 [Peer::run]: https://docs.rs/fizyr-rpc/latest/fizyr-rpc/struct.Peer.html#method.run
 [Peer::spawn]: https://docs.rs/fizyr-rpc/latest/fizyr-rpc/struct.Peer.html#method.spawn
