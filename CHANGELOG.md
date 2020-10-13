@@ -1,3 +1,6 @@
+v0.1.4:
+  * Regenerate `README.md` from library documentation.
+
 v0.1.3:
   * Fix link of `docs.rs` badge in README.
 
