@@ -164,8 +164,7 @@ where
 
 impl<R> ReadLoop<R>
 where
-	R: crate::TransportReadHalf + Unpin,
-	R::Body: crate::Body,
+	R: crate::TransportReadHalf,
 {
 	/// Run the read loop.
 	async fn run(&mut self) {
@@ -213,8 +212,7 @@ where
 
 impl<W> CommandLoop<'_, W>
 where
-	W: crate::TransportWriteHalf + Unpin,
-	W::Body: crate::Body,
+	W: crate::TransportWriteHalf,
 {
 	/// Run the command loop.
 	async fn run(&mut self) {

@@ -29,7 +29,7 @@ pub trait Transport: Send + 'static {
 /// Used to work around the lack of generic associated types.
 pub trait ReadHalfType<'a> {
 	/// The body type for the transport.
-	type Body;
+	type Body: crate::Body;
 
 	/// The concrete type of the read half.
 	type ReadHalf: TransportReadHalf<Body = Self::Body>;
@@ -41,7 +41,7 @@ pub trait ReadHalfType<'a> {
 /// Used to work around the lack of generic associated types.
 pub trait WriteHalfType<'a> {
 	/// The body type for the transport.
-	type Body;
+	type Body: crate::Body;
 
 	/// The concrete type of the write half.
 	type WriteHalf: TransportWriteHalf<Body = Self::Body>;
@@ -74,7 +74,7 @@ pub trait IntoTransport: Sized + Send {
 /// Trait for the read half of a transport type.
 pub trait TransportReadHalf: Send + Unpin {
 	/// The body type for messages transferred over the transport.
-	type Body;
+	type Body: crate::Body;
 
 	/// Try to read a message from the transport without blocking.
 	///
@@ -96,7 +96,7 @@ pub trait TransportReadHalf: Send + Unpin {
 /// Trait for transport types that you can write message to.
 pub trait TransportWriteHalf: Send + Unpin {
 	/// The body type for messages transferred over the transport.
-	type Body;
+	type Body: crate::Body;
 
 	/// Try to write a message to the transport without blocking.
 	///
