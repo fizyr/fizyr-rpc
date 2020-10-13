@@ -214,18 +214,6 @@ struct CommandLoop<'a, Body, W> {
 	write_handles: &'a mut usize,
 }
 
-/// Loop control flow command.
-///
-/// Allows other methods to make decisions on loop control flow.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-enum LoopFlow {
-	/// Keep the loop running.
-	Continue,
-
-	/// Stop the loop.
-	Stop,
-}
-
 impl<Body, W> CommandLoop<'_, Body, W>
 where
 	Body: crate::Body,
@@ -383,6 +371,18 @@ where
 			Err(e @ error::WriteMessageError::PayloadTooLarge(_)) => Err((e, LoopFlow::Continue)),
 		}
 	}
+}
+
+/// Loop control flow command.
+///
+/// Allows other methods to make decisions on loop control flow.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum LoopFlow {
+	/// Keep the loop running.
+	Continue,
+
+	/// Stop the loop.
+	Stop,
 }
 
 /// Command to send a request to the remote peer.
