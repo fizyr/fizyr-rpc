@@ -95,12 +95,7 @@ impl<Transport: crate::Transport> Peer<Transport> {
 	///
 	/// If you need more control of the execution of the peer read/write loop,
 	/// you should use [`Self::new()`] instead.
-	pub fn spawn(transport: Transport) -> PeerHandle<Transport::Body>
-	where
-		Transport: Send + 'static,
-		for<'a> <Transport::ReadHalf as crate::transport::ReadHalfType<'a>>::ReadHalf: Send,
-		for<'a> <Transport::WriteHalf as crate::transport::WriteHalfType<'a>>::WriteHalf: Send,
-	{
+	pub fn spawn(transport: Transport) -> PeerHandle<Transport::Body> {
 		let (peer, handle) = Self::new(transport);
 		tokio::spawn(peer.run());
 		handle
