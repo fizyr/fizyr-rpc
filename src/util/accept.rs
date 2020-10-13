@@ -47,7 +47,7 @@ impl Listener for tokio::net::TcpListener {
 	}
 }
 
-#[cfg(feature = "unix")]
+#[cfg(feature = "unix-stream")]
 impl Listener for tokio::net::UnixListener {
 	type Connection = tokio::net::UnixStream;
 	type Address = std::os::unix::net::SocketAddr;
@@ -56,6 +56,16 @@ impl Listener for tokio::net::UnixListener {
 		let accept = tokio::net::UnixListener::accept(self.get_mut());
 		tokio::pin!(accept);
 		accept.poll(context)
+	}
+}
+
+#[cfg(feature = "unix-seqpacket")]
+impl Listener for tokio_seqpacket::UnixSeqpacketListener {
+	type Connection = tokio_seqpacket::UnixSeqpacket;
+	type Address = std::os::unix::net::SocketAddr;
+
+	fn poll_accept(self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
+		tokio_seqpacket::UnixSeqpacketListener::poll_accept(self.get_mut(), context)
 	}
 }
 

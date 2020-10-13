@@ -13,6 +13,9 @@ pub enum ReadMessageError {
 	/// An I/O error occurred.
 	Io(#[from] std::io::Error),
 
+	/// The received message is too short to be valid.
+	MessageTooShort(#[from] MessageTooShort),
+
 	/// The received message has an invalid type.
 	InvalidMessageType(#[from] InvalidMessageType),
 
@@ -49,6 +52,25 @@ impl WriteMessageError {
 			e.kind() == std::io::ErrorKind::ConnectionAborted
 		} else {
 			false
+		}
+	}
+}
+
+/// The received message is too short to contain a valid message.
+#[derive(Debug, Clone, Error)]
+#[error("the message is too short to be valid: need atleast 12 bytes for the header, got only {message_len} bytes")]
+pub struct MessageTooShort {
+	/// The actual size of the received message.
+	pub message_len: usize,
+}
+
+impl MessageTooShort {
+	/// Check if a message size is large enough to contain a valid message.
+	pub fn check(message_len: usize) -> Result<(), Self> {
+		if message_len >= crate::HEADER_LEN as usize {
+			Ok(())
+		} else {
+			Err(Self { message_len })
 		}
 	}
 }
@@ -122,6 +144,9 @@ pub enum NextMessageError {
 	/// An I/O error occurred.
 	Io(#[from] std::io::Error),
 
+	/// The received message is too short to be valid.
+	MessageTooShort(#[from] MessageTooShort),
+
 	/// The incoming message has an invalid message type.
 	InvalidMessageType(#[from] InvalidMessageType),
 
@@ -186,6 +211,7 @@ impl From<ReadMessageError> for NextMessageError {
 	fn from(other: ReadMessageError) -> Self {
 		match other {
 			ReadMessageError::Io(e) => e.into(),
+			ReadMessageError::MessageTooShort(e) => e.into(),
 			ReadMessageError::InvalidMessageType(e) => e.into(),
 			ReadMessageError::PayloadTooLarge(e) => e.into(),
 		}

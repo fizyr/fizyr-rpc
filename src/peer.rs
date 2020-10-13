@@ -1,13 +1,13 @@
 use tokio::sync::mpsc;
 use crate::util::{select, Either};
 
-use tokio::sync::oneshot;
 use crate::Incoming;
 use crate::Message;
 use crate::PeerHandle;
 use crate::RequestTracker;
-use crate::error;
 use crate::SentRequest;
+use crate::error;
+use tokio::sync::oneshot;
 
 /// Message for the internal peer command loop.
 pub enum Command<Body> {
@@ -35,7 +35,7 @@ pub struct Peer<Body, Transport> {
 	/// Sending end of the command channel, so we can send commands to ourselves.
 	///
 	/// This is used to have the read loop inject things into the command loop.
-	/// That way, the read loop doesn't need s mutable referenceto the request tracker,
+	/// That way, the read loop doesn't need a mutable reference to the request tracker,
 	/// which simplifies the implementation.
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 
@@ -47,9 +47,9 @@ pub struct Peer<Body, Transport> {
 	/// Sending end of the channel for incoming requests and stream messages.
 	incoming_tx: mpsc::UnboundedSender<Result<Incoming<Body>, error::NextMessageError>>,
 
-	/// The number of [`PeerWriteHandle`] objects for this peer.
+	/// The number of [`PeerWriteHandle`][crate::PeerWriteHandle] objects for this peer.
 	///
-	/// When it hits zero, and the [`PeerReadHandle`] is dropped,
+	/// When it hits zero, and the [`PeerReadHandle`][crate::PeerReadHandle] is dropped,
 	/// the internal loops are stopped.
 	write_handles: usize,
 }
@@ -214,18 +214,6 @@ struct CommandLoop<'a, Body, W> {
 	write_handles: &'a mut usize,
 }
 
-/// Loop control flow command.
-///
-/// Allows other methods to make decisions on loop control flow.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-enum LoopFlow {
-	/// Keep the loop running.
-	Continue,
-
-	/// Stop the loop.
-	Stop,
-}
-
 impl<Body, W> CommandLoop<'_, Body, W>
 where
 	Body: crate::Body,
@@ -277,7 +265,7 @@ where
 		let request = match self.request_tracker.allocate_sent_request(command.service_id) {
 			Ok(x) => x,
 			Err(e) => {
-				let _ = command.result_tx.send(Err(e.into()));
+				let _: Result<_, _> = command.result_tx.send(Err(e.into()));
 				return LoopFlow::Continue;
 			}
 		};
@@ -286,15 +274,15 @@ where
 
 		let message = Message::request(request.request_id(), request.service_id(), command.body);
 		if let Err((e, flow)) = self.write_message(&message).await {
-			let _ = command.result_tx.send(Err(e.into()));
-			let _ = self.request_tracker.remove_sent_request(request_id);
+			let _: Result<_, _> = command.result_tx.send(Err(e.into()));
+			let _: Result<_, _> = self.request_tracker.remove_sent_request(request_id);
 			return flow;
 		}
 
 		// If sending fails, the result_rx was dropped.
 		// Then remove the request from the tracker.
 		if command.result_tx.send(Ok(request)).is_err() {
-			let _ = self.request_tracker.remove_sent_request(request_id);
+			let _: Result<_, _> = self.request_tracker.remove_sent_request(request_id);
 		}
 
 		LoopFlow::Continue
@@ -304,7 +292,7 @@ where
 	async fn send_raw_message(&mut self, command: crate::peer::SendRawMessage<Body>) -> LoopFlow {
 		// Remove tracked received requests when we send a response.
 		if command.message.header.message_type.is_response() {
-			let _ = self.request_tracker.remove_sent_request(command.message.header.request_id);
+			let _: Result<_, _> = self.request_tracker.remove_sent_request(command.message.header.request_id);
 		}
 
 		// TODO: replace SendRawMessage with specific command for different message types.
@@ -315,11 +303,11 @@ where
 		// Needs more thought.
 
 		if let Err((e, flow)) = self.write_message(&command.message).await {
-			let _ = command.result_tx.send(Err(e));
+			let _: Result<_, _> = command.result_tx.send(Err(e));
 			return flow;
 		}
 
-		let _ = command.result_tx.send(Ok(()));
+		let _: Result<_, _> = command.result_tx.send(Ok(()));
 		LoopFlow::Continue
 	}
 
@@ -329,7 +317,7 @@ where
 		let message = match command.message {
 			Ok(x) => x,
 			Err(e) => {
-				let _ = self.send_incoming(Err(e.into()));
+				let _: Result<_, _> = self.send_incoming(Err(e.into())).await;
 				return LoopFlow::Continue;
 			},
 		};
@@ -339,7 +327,7 @@ where
 			Ok(None) => return LoopFlow::Continue,
 			Ok(Some(x)) => x,
 			Err(e) => {
-				let _ = self.send_incoming(Err(e.into()));
+				let _: Result<_, _> = self.send_incoming(Err(e.into())).await;
 				return LoopFlow::Continue;
 			},
 		};
@@ -383,6 +371,18 @@ where
 			Err(e @ error::WriteMessageError::PayloadTooLarge(_)) => Err((e, LoopFlow::Continue)),
 		}
 	}
+}
+
+/// Loop control flow command.
+///
+/// Allows other methods to make decisions on loop control flow.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum LoopFlow {
+	/// Keep the loop running.
+	Continue,
+
+	/// Stop the loop.
+	Stop,
 }
 
 /// Command to send a request to the remote peer.

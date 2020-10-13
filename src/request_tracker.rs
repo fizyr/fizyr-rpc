@@ -151,7 +151,7 @@ impl<Body> RequestTracker<Body> {
 			}
 			Entry::Occupied(mut entry) => {
 				// Forward the message to the sent_request, then remove the entry.
-				let _ = entry.get_mut().send(message);
+				let _: Result<_, _> = entry.get_mut().send(message);
 				entry.remove();
 				Ok(())
 			}

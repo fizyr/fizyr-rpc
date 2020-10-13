@@ -6,7 +6,7 @@ pub use body::StreamBody;
 pub use config::StreamConfig;
 pub use transport::{StreamReadHalf, StreamTransport, StreamWriteHalf};
 
-#[cfg(feature = "unix")]
+#[cfg(feature = "unix-stream")]
 impl<'a> crate::Transport for &'a mut StreamTransport<tokio::net::UnixStream> {
 	type Body = StreamBody;
 	type ReadHalf = StreamReadHalf<tokio::net::unix::ReadHalf<'a>>;
@@ -20,7 +20,7 @@ impl<'a> crate::Transport for &'a mut StreamTransport<tokio::net::UnixStream> {
 	}
 }
 
-#[cfg(feature = "unix")]
+#[cfg(feature = "unix-stream")]
 impl crate::IntoTransport for tokio::net::UnixStream {
 	type Body = StreamBody;
 	type Config = StreamConfig;
