@@ -35,7 +35,7 @@ pub struct Peer<Body, Transport> {
 	/// Sending end of the command channel, so we can send commands to ourselves.
 	///
 	/// This is used to have the read loop inject things into the command loop.
-	/// That way, the read loop doesn't need s mutable referenceto the request tracker,
+	/// That way, the read loop doesn't need a mutable reference to the request tracker,
 	/// which simplifies the implementation.
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 
