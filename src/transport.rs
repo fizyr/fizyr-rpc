@@ -1,9 +1,9 @@
+use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::future::Future;
 
-use crate::{Message, MessageHeader};
 use crate::error::{ReadMessageError, WriteMessageError};
+use crate::{Message, MessageHeader};
 
 /// Trait for types that represent a bi-direction message transport.
 ///
@@ -47,7 +47,6 @@ pub trait WriteHalfType<'a> {
 	/// The concrete type of the write half.
 	type WriteHalf: TransportWriteHalf<Body = Self::Body>;
 }
-
 
 /// Trait to allow generic creation of transports from a socket.
 pub trait IntoTransport: Sized + Send {
@@ -116,11 +115,7 @@ pub trait TransportWriteHalf: Send + Unpin {
 
 	/// Asynchronously write a message to the transport.
 	fn write_msg<'c>(&'c mut self, header: &'c MessageHeader, body: &'c Self::Body) -> WriteMsg<Self> {
-		WriteMsg {
-			inner: self,
-			header,
-			body,
-		}
+		WriteMsg { inner: self, header, body }
 	}
 }
 
@@ -202,22 +197,32 @@ where
 
 impl<T> TransportWriteHalf for &'_ mut T
 where
-	T: TransportWriteHalf + Unpin + ?Sized
+	T: TransportWriteHalf + Unpin + ?Sized,
 {
 	type Body = T::Body;
 
-	fn poll_write_msg(mut self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), WriteMessageError>> {
+	fn poll_write_msg(
+		mut self: Pin<&mut Self>,
+		context: &mut Context,
+		header: &MessageHeader,
+		body: &Self::Body,
+	) -> Poll<Result<(), WriteMessageError>> {
 		self.as_mut().poll_write_msg(context, header, body)
 	}
 }
 
 impl<T> TransportWriteHalf for Box<T>
 where
-	T: TransportWriteHalf + Unpin + ?Sized
+	T: TransportWriteHalf + Unpin + ?Sized,
 {
 	type Body = T::Body;
 
-	fn poll_write_msg(mut self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), WriteMessageError>> {
+	fn poll_write_msg(
+		mut self: Pin<&mut Self>,
+		context: &mut Context,
+		header: &MessageHeader,
+		body: &Self::Body,
+	) -> Poll<Result<(), WriteMessageError>> {
 		self.as_mut().poll_write_msg(context, header, body)
 	}
 }

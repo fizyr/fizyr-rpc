@@ -215,7 +215,11 @@ impl MessageHeader {
 		let service_id = LE::read_i32(&buffer[8..]);
 
 		let message_type = MessageType::from_u32(message_type)?;
-		Ok(Self { message_type, request_id, service_id })
+		Ok(Self {
+			message_type,
+			request_id,
+			service_id,
+		})
 	}
 
 	/// Encode a message header into a byte slice.
@@ -236,8 +240,6 @@ impl MessageHeader {
 impl<Body> std::fmt::Debug for Message<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		// TODO: use finish_non_exhaustive when it hits stable.
-		f.debug_struct("Message")
-			.field("header", &self.header)
-			.finish()
+		f.debug_struct("Message").field("header", &self.header).finish()
 	}
 }

@@ -21,8 +21,7 @@ async fn main() {
 
 async fn do_main(options: &Options) -> Result<(), String> {
 	// Create a listening socket for the server.
-	let socket = UnixListener::bind(&options.socket)
-		.map_err(|e| format!("failed to bind to {}: {}", options.socket.display(), e))?;
+	let socket = UnixListener::bind(&options.socket).map_err(|e| format!("failed to bind to {}: {}", options.socket.display(), e))?;
 
 	// Wrap the socket in an RPC server.
 	let mut server = Server::new(socket, Default::default());
@@ -49,13 +48,15 @@ async fn handle_peer(mut peer: fizyr_rpc::PeerHandle<fizyr_rpc::StreamBody>) -> 
 		// Receive the next incoming message.
 		let incoming = match peer.next_message().await {
 			Ok(x) => x,
-			Err(e) => if e.is_connection_aborted() {
-				// Log aborted connections but return Ok(()).
-				eprintln!("connection closed by peer");
-				return Ok(());
-			} else {
-				// Pass other errors up to the caller.
-				return Err(format!("failed to receive message from peer: {}", e));
+			Err(e) => {
+				if e.is_connection_aborted() {
+					// Log aborted connections but return Ok(()).
+					eprintln!("connection closed by peer");
+					return Ok(());
+				} else {
+					// Pass other errors up to the caller.
+					return Err(format!("failed to receive message from peer: {}", e));
+				}
 			},
 		};
 
@@ -68,7 +69,7 @@ async fn handle_peer(mut peer: fizyr_rpc::PeerHandle<fizyr_rpc::StreamBody>) -> 
 					.send_error_response(&format!("unknown service ID: {}", n))
 					.await
 					.map_err(|e| format!("failed to send error response message: {}", e))?,
-			}
+			},
 		}
 	}
 }

@@ -4,10 +4,10 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite};
 
+use super::{StreamBody, StreamConfig};
+use crate::error::{PayloadTooLarge, ReadMessageError, WriteMessageError};
 use crate::Message;
 use crate::MessageHeader;
-use crate::error::{PayloadTooLarge, ReadMessageError, WriteMessageError};
-use super::{StreamBody, StreamConfig};
 
 /// Length of a message frame and header.
 const FRAMED_HEADER_LEN: usize = 4 + crate::HEADER_LEN as usize;
@@ -151,7 +151,7 @@ where
 				let header = this.parsed_header;
 				let body = std::mem::replace(&mut this.body_buffer, Vec::new());
 				this.bytes_read = 0;
-				return Poll::Ready(Ok(Message::new(header, body.into())))
+				return Poll::Ready(Ok(Message::new(header, body.into())));
 			}
 		}
 

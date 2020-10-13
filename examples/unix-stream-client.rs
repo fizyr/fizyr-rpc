@@ -1,5 +1,5 @@
-use fizyr_rpc::Peer;
 use fizyr_rpc::IntoTransport;
+use fizyr_rpc::Peer;
 
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -31,7 +31,8 @@ async fn do_main(options: &Options) -> Result<(), String> {
 	let mut peer = Peer::spawn(socket.into_transport_default());
 
 	// Send a request to the remote peer.
-	let mut request = peer.send_request(1, &b"Hello World!"[..])
+	let mut request = peer
+		.send_request(1, &b"Hello World!"[..])
 		.await
 		.map_err(|e| format!("failed to send request: {}", e))?;
 

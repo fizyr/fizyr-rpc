@@ -27,20 +27,19 @@ pub struct Accept<'a, L: ?Sized> {
 
 impl<L> Future for Accept<'_, L>
 where
-	L: Listener + Unpin + ?Sized
+	L: Listener + Unpin + ?Sized,
 {
 	type Output = std::io::Result<(L::Connection, L::Address)>;
 
 	fn poll(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
 		Pin::new(&mut *self.inner).poll_accept(context)
 	}
-
 }
 
 #[cfg(feature = "tcp")]
 impl Listener for tokio::net::TcpListener {
-	type Connection = tokio::net::TcpStream;
 	type Address = std::net::SocketAddr;
+	type Connection = tokio::net::TcpStream;
 
 	fn poll_accept(self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
 		tokio::net::TcpListener::poll_accept(self.get_mut(), context)
@@ -49,8 +48,8 @@ impl Listener for tokio::net::TcpListener {
 
 #[cfg(feature = "unix-stream")]
 impl Listener for tokio::net::UnixListener {
-	type Connection = tokio::net::UnixStream;
 	type Address = std::os::unix::net::SocketAddr;
+	type Connection = tokio::net::UnixStream;
 
 	fn poll_accept(self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
 		let accept = tokio::net::UnixListener::accept(self.get_mut());
@@ -61,8 +60,8 @@ impl Listener for tokio::net::UnixListener {
 
 #[cfg(feature = "unix-seqpacket")]
 impl Listener for tokio_seqpacket::UnixSeqpacketListener {
-	type Connection = tokio_seqpacket::UnixSeqpacket;
 	type Address = std::os::unix::net::SocketAddr;
+	type Connection = tokio_seqpacket::UnixSeqpacket;
 
 	fn poll_accept(self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
 		tokio_seqpacket::UnixSeqpacketListener::poll_accept(self.get_mut(), context)
@@ -73,8 +72,8 @@ impl<T> Listener for &'_ mut T
 where
 	T: Listener + Unpin + ?Sized,
 {
-	type Connection = T::Connection;
 	type Address = T::Address;
+	type Connection = T::Connection;
 
 	fn poll_accept(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
 		self.as_mut().poll_accept(context)
@@ -85,8 +84,8 @@ impl<T> Listener for Box<T>
 where
 	T: Listener + Unpin + ?Sized,
 {
-	type Connection = T::Connection;
 	type Address = T::Address;
+	type Connection = T::Connection;
 
 	fn poll_accept(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
 		self.as_mut().poll_accept(context)
@@ -98,8 +97,8 @@ where
 	P: std::ops::DerefMut + Unpin,
 	P::Target: Listener,
 {
-	type Connection = <P::Target as Listener>::Connection;
 	type Address = <P::Target as Listener>::Address;
+	type Connection = <P::Target as Listener>::Connection;
 
 	fn poll_accept(self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
 		self.get_mut().as_mut().poll_accept(context)

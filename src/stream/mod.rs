@@ -41,13 +41,11 @@ mod impl_unix_stream {
 
 	impl<'a> crate::transport::ReadHalfType<'a> for ReadHalfType {
 		type Body = StreamBody;
-
 		type ReadHalf = StreamReadHalf<tokio::net::unix::ReadHalf<'a>>;
 	}
 
 	impl<'a> crate::transport::WriteHalfType<'a> for WriteHalfType {
 		type Body = StreamBody;
-
 		type WriteHalf = StreamWriteHalf<tokio::net::unix::WriteHalf<'a>>;
 	}
 }
@@ -88,13 +86,11 @@ mod impl_tcp {
 
 	impl<'a> crate::transport::ReadHalfType<'a> for ReadHalfType {
 		type Body = StreamBody;
-
 		type ReadHalf = StreamReadHalf<tokio::net::tcp::ReadHalf<'a>>;
 	}
 
 	impl<'a> crate::transport::WriteHalfType<'a> for WriteHalfType {
 		type Body = StreamBody;
-
 		type WriteHalf = StreamWriteHalf<tokio::net::tcp::WriteHalf<'a>>;
 	}
 }

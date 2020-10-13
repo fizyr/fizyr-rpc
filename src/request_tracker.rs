@@ -1,14 +1,14 @@
-use tokio::sync::mpsc;
-use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
+use std::collections::BTreeMap;
+use tokio::sync::mpsc;
 
+use crate::error;
+use crate::peer::Command;
 use crate::Incoming;
 use crate::Message;
 use crate::MessageType;
 use crate::ReceivedRequest;
 use crate::SentRequest;
-use crate::error;
-use crate::peer::Command;
 
 /// Tracker that manages open requests.
 ///
@@ -68,15 +68,19 @@ impl<Body> RequestTracker<Body> {
 	/// Note that sent requests are also removed internally when they receive a response,
 	/// or when they would receive a message but the [`SentRequest`] was dropped.
 	pub fn remove_sent_request(&mut self, request_id: u32) -> Result<(), error::UnknownRequestId> {
-		self.sent_requests.remove(&request_id)
-			.ok_or(error::UnknownRequestId { request_id })?;
+		self.sent_requests.remove(&request_id).ok_or(error::UnknownRequestId { request_id })?;
 		Ok(())
 	}
 
 	/// Register a new sent request.
 	///
 	/// Returns an error if the request ID is already in use.
-	pub fn register_received_request(&mut self, request_id: u32, service_id: i32, body: Body) -> Result<ReceivedRequest<Body>, error::DuplicateRequestId> {
+	pub fn register_received_request(
+		&mut self,
+		request_id: u32,
+		service_id: i32,
+		body: Body,
+	) -> Result<ReceivedRequest<Body>, error::DuplicateRequestId> {
 		match self.received_requests.entry(request_id) {
 			Entry::Occupied(_entry) => {
 				// TODO: Check if the channel is closed so we don't error out unneccesarily.
@@ -91,14 +95,14 @@ impl<Body> RequestTracker<Body> {
 				// 	entry.insert(incoming_tx);
 				// 	Ok(ReceivedRequest::new(request_id, service_id, incoming_rx, self.command_tx.clone()))
 				// }
-			}
+			},
 
 			// The request ID is available.
 			Entry::Vacant(entry) => {
 				let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
 				entry.insert(incoming_tx);
 				Ok(ReceivedRequest::new(request_id, service_id, body, incoming_rx, self.command_tx.clone()))
-			}
+			},
 		}
 	}
 
@@ -107,8 +111,7 @@ impl<Body> RequestTracker<Body> {
 	/// This should be called when a request is finished to make the ID available again.
 	/// Note that received requests are also removed internally when they would receive a message but the [`ReceivedRequest`] was dropped.
 	pub fn remove_received_request(&mut self, request_id: u32) -> Result<(), error::UnknownRequestId> {
-		self.received_requests.remove(&request_id)
-			.ok_or(error::UnknownRequestId { request_id })?;
+		self.received_requests.remove(&request_id).ok_or(error::UnknownRequestId { request_id })?;
 		Ok(())
 	}
 
@@ -124,46 +127,40 @@ impl<Body> RequestTracker<Body> {
 			MessageType::Request => {
 				let received_request = self.register_received_request(message.header.request_id, message.header.service_id, message.body)?;
 				Ok(Some(Incoming::Request(received_request)))
-			}
+			},
 			MessageType::Response => {
 				self.process_incoming_response(message).await?;
 				Ok(None)
-			}
+			},
 			MessageType::RequesterUpdate => {
 				self.process_incoming_requester_update(message).await?;
 				Ok(None)
-			}
+			},
 			MessageType::ResponderUpdate => {
 				self.process_incoming_responder_update(message).await?;
 				Ok(None)
-			}
-			MessageType::Stream => {
-				Ok(Some(Incoming::Stream(message)))
-			}
+			},
+			MessageType::Stream => Ok(Some(Incoming::Stream(message))),
 		}
 	}
 
 	async fn process_incoming_response(&mut self, message: Message<Body>) -> Result<(), error::UnknownRequestId> {
 		let request_id = message.header.request_id;
 		match self.sent_requests.entry(request_id) {
-			Entry::Vacant(_) => {
-				Err(error::UnknownRequestId { request_id })
-			}
+			Entry::Vacant(_) => Err(error::UnknownRequestId { request_id }),
 			Entry::Occupied(mut entry) => {
 				// Forward the message to the sent_request, then remove the entry.
 				let _: Result<_, _> = entry.get_mut().send(message);
 				entry.remove();
 				Ok(())
-			}
+			},
 		}
 	}
 
 	async fn process_incoming_requester_update(&mut self, message: Message<Body>) -> Result<(), error::UnknownRequestId> {
 		let request_id = message.header.request_id;
 		match self.received_requests.entry(request_id) {
-			Entry::Vacant(_) => {
-				Err(error::UnknownRequestId { request_id })
-			}
+			Entry::Vacant(_) => Err(error::UnknownRequestId { request_id }),
 			Entry::Occupied(mut entry) => {
 				// If the received_request is dropped, clear the entry.
 				if entry.get_mut().send(message).is_err() {
@@ -172,16 +169,14 @@ impl<Body> RequestTracker<Body> {
 				} else {
 					Ok(())
 				}
-			}
+			},
 		}
 	}
 
 	async fn process_incoming_responder_update(&mut self, message: Message<Body>) -> Result<(), error::UnknownRequestId> {
 		let request_id = message.header.request_id;
 		match self.sent_requests.entry(request_id) {
-			Entry::Vacant(_) => {
-				Err(error::UnknownRequestId { request_id })
-			}
+			Entry::Vacant(_) => Err(error::UnknownRequestId { request_id }),
 			Entry::Occupied(mut entry) => {
 				// If the sent_request is dropped, clear the entry.
 				if entry.get_mut().send(message).is_err() {
@@ -190,7 +185,7 @@ impl<Body> RequestTracker<Body> {
 				} else {
 					Ok(())
 				}
-			}
+			},
 		}
 	}
 }
@@ -244,7 +239,10 @@ mod test {
 		let_assert!(Ok(()) = received_request.send_response(4, Body).await);
 
 		// The received request is now dropped, so lets check that new incoming message cause an error.
-		let_assert!(Err(error::ProcessIncomingMessageError::UnknownRequestId(e)) = tracker.process_incoming_message(Message::requester_update(1, 11, Body)).await);
+		let_assert!(
+			Err(error::ProcessIncomingMessageError::UnknownRequestId(e)) =
+				tracker.process_incoming_message(Message::requester_update(1, 11, Body)).await
+		);
 		assert!(e.request_id == 1);
 
 		drop(tracker);
@@ -285,7 +283,11 @@ mod test {
 
 		// After receiving the response, the entry should be removed from the tracker.
 		// So no more incoming messages for the request should be accepted.
-		let_assert!(Err(error::ProcessIncomingMessageError::UnknownRequestId(e)) = tracker.process_incoming_message(Message::responder_update(sent_request.request_id(), 15, Body)).await);
+		let_assert!(
+			Err(error::ProcessIncomingMessageError::UnknownRequestId(e)) = tracker
+				.process_incoming_message(Message::responder_update(sent_request.request_id(), 15, Body))
+				.await
+		);
 		assert!(e.request_id == sent_request.request_id());
 
 		drop(tracker);

@@ -1,9 +1,9 @@
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-use crate::Message;
 use crate::error;
 use crate::peer::Command;
+use crate::Message;
 
 /// A handle for a sent request.
 ///
@@ -54,7 +54,12 @@ impl<Body> SentRequest<Body> {
 		incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
 		command_tx: mpsc::UnboundedSender<Command<Body>>,
 	) -> Self {
-		Self { request_id, service_id, incoming_rx, command_tx }
+		Self {
+			request_id,
+			service_id,
+			incoming_rx,
+			command_tx,
+		}
 	}
 
 	/// Get the request ID of the sent request.
@@ -81,7 +86,9 @@ impl<Body> SentRequest<Body> {
 		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();
 		let message = Message::requester_update(self.request_id, service_id, body);
-		self.command_tx.send(SendRawMessage { message, result_tx }.into()).map_err(|_| error::connection_aborted())?;
+		self.command_tx
+			.send(SendRawMessage { message, result_tx }.into())
+			.map_err(|_| error::connection_aborted())?;
 		result_rx.await.map_err(|_| error::connection_aborted())?
 	}
 }
@@ -95,7 +102,13 @@ impl<Body> ReceivedRequest<Body> {
 		incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
 		command_tx: mpsc::UnboundedSender<Command<Body>>,
 	) -> Self {
-		Self { request_id, service_id, body, incoming_rx, command_tx }
+		Self {
+			request_id,
+			service_id,
+			body,
+			incoming_rx,
+			command_tx,
+		}
 	}
 
 	/// Get the request ID of the received request.
@@ -145,7 +158,8 @@ impl<Body> ReceivedRequest<Body> {
 	async fn send_raw_message(&mut self, message: Message<Body>) -> Result<(), error::WriteMessageError> {
 		use crate::peer::SendRawMessage;
 		let (result_tx, result_rx) = oneshot::channel();
-		self.command_tx.send(SendRawMessage { message, result_tx }.into())
+		self.command_tx
+			.send(SendRawMessage { message, result_tx }.into())
 			.map_err(|_| error::connection_aborted())?;
 		result_rx.await.map_err(|_| error::connection_aborted())?
 	}
@@ -178,12 +192,12 @@ impl<Body> std::fmt::Debug for Incoming<Body> {
 				write!(f, "ReceivedRequest(")?;
 				x.fmt(f)?;
 				write!(f, ")")?;
-			}
+			},
 			Self::Stream(x) => {
 				write!(f, "Stream(")?;
 				x.fmt(f)?;
 				write!(f, ")")?;
-			}
+			},
 		}
 		Ok(())
 	}

@@ -1,6 +1,6 @@
-use crate::PeerHandle;
-use crate::IntoTransport;
 use super::Peer;
+use crate::IntoTransport;
+use crate::PeerHandle;
 
 /// Server that spawns peers for all accepted connections.
 pub struct Server<Listener>

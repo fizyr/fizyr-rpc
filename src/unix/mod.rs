@@ -1,6 +1,6 @@
 mod body;
-mod transport;
 mod config;
+mod transport;
 
 pub use body::UnixBody;
 pub use config::UnixConfig;
@@ -42,16 +42,13 @@ mod impl_unix_seqpacket {
 
 	impl<'a> crate::transport::ReadHalfType<'a> for ReadHalfType {
 		type Body = UnixBody;
-
 		type ReadHalf = UnixReadHalf<tokio_seqpacket::ReadHalf<'a>>;
 	}
 
 	impl<'a> crate::transport::WriteHalfType<'a> for WriteHalfType {
 		type Body = UnixBody;
-
 		type WriteHalf = UnixWriteHalf<tokio_seqpacket::WriteHalf<'a>>;
 	}
-
 }
 
 #[cfg(test)]
@@ -59,12 +56,12 @@ mod test {
 	use assert2::assert;
 	use assert2::let_assert;
 
-	use tokio_seqpacket::UnixSeqpacket;
 	use filedesc::FileDesc;
 	use std::os::unix::io::FromRawFd;
+	use tokio_seqpacket::UnixSeqpacket;
 
-	use crate::MessageHeader;
 	use crate::IntoTransport;
+	use crate::MessageHeader;
 	use crate::UnixBody;
 
 	#[tokio::test]

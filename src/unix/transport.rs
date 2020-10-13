@@ -3,11 +3,11 @@ use std::io::{IoSlice, IoSliceMut};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use super::{UnixBody, UnixConfig};
 use crate::error;
+use crate::error::{PayloadTooLarge, ReadMessageError, WriteMessageError};
 use crate::Message;
 use crate::MessageHeader;
-use crate::error::{PayloadTooLarge, ReadMessageError, WriteMessageError};
-use super::{UnixBody, UnixConfig};
 
 /// Transport layer for Unix datagram/seqpacket sockets.
 pub struct UnixTransport<Socket> {
@@ -100,10 +100,11 @@ impl crate::TransportReadHalf for UnixReadHalf<tokio_seqpacket::ReadHalf<'_>> {
 		let mut ancillary = SocketAncillary::new(&mut ancillary);
 
 		// Read the incoming datagram.
-		let bytes_read = ready!(this.socket.poll_recv_vectored_with_ancillary(context, &mut [
-			IoSliceMut::new(&mut header_buffer),
-			IoSliceMut::new(&mut this.body_buffer),
-		], &mut ancillary))?;
+		let bytes_read = ready!(this.socket.poll_recv_vectored_with_ancillary(
+			context,
+			&mut [IoSliceMut::new(&mut header_buffer), IoSliceMut::new(&mut this.body_buffer)],
+			&mut ancillary
+		))?;
 
 		// Immediately wrap all file descriptors to prevent leaking any of them.
 		// We must always do this directly after a successful read.
@@ -156,10 +157,11 @@ impl crate::TransportWriteHalf for UnixWriteHalf<tokio_seqpacket::WriteHalf<'_>>
 			).into()));
 		}
 
-		ready!(this.socket.poll_send_vectored_with_ancillary(context, &[
-			IoSlice::new(&header_buffer),
-			IoSlice::new(&body.data),
-		], &mut ancillary))?;
+		ready!(this.socket.poll_send_vectored_with_ancillary(
+			context,
+			&[IoSlice::new(&header_buffer), IoSlice::new(&body.data)]
+			, &mut ancillary
+		))?;
 
 		Poll::Ready(Ok(()))
 	}
@@ -185,7 +187,9 @@ fn extract_file_descriptors(ancillary: &tokio_seqpacket::ancillary::SocketAncill
 					fds.extend(msg.map(|fd| unsafe { FileDesc::from_raw_fd(fd) }));
 				} else {
 					for fd in msg {
-						unsafe { FileDesc::from_raw_fd(fd); }
+						unsafe {
+							FileDesc::from_raw_fd(fd);
+						}
 					}
 				}
 			},
@@ -195,8 +199,10 @@ fn extract_file_descriptors(ancillary: &tokio_seqpacket::ancillary::SocketAncill
 
 			// Can't return yet until we processed all file descriptors,
 			// so store the error in an Option.
-			Err(e) => if error.is_none() {
-				error = Some(convert_ancillary_error(e));
+			Err(e) => {
+				if error.is_none() {
+					error = Some(convert_ancillary_error(e));
+				}
 			},
 		}
 	}
@@ -213,7 +219,11 @@ fn extract_file_descriptors(ancillary: &tokio_seqpacket::ancillary::SocketAncill
 fn convert_ancillary_error(error: tokio_seqpacket::ancillary::AncillaryError) -> std::io::Error {
 	use tokio_seqpacket::ancillary::AncillaryError;
 	let message = match error {
-		AncillaryError::Unknown { cmsg_level, cmsg_type } => format!("unknown cmsg in ancillary data with cmsg_level {} and cmsg_type {}", cmsg_level, cmsg_type),
+		AncillaryError::Unknown { cmsg_level, cmsg_type } => format!(
+			"unknown cmsg in ancillary data with cmsg_level {} and cmsg_type {}",
+			cmsg_level,
+			cmsg_type
+		),
 		e => format!("error in ancillary data: {:?}", e),
 	};
 

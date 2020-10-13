@@ -1,12 +1,12 @@
-use tokio::sync::mpsc;
 use crate::util::{select, Either};
+use tokio::sync::mpsc;
 
+use crate::error;
 use crate::Incoming;
 use crate::Message;
 use crate::PeerHandle;
 use crate::RequestTracker;
 use crate::SentRequest;
-use crate::error;
 use tokio::sync::oneshot;
 
 /// Message for the internal peer command loop.
@@ -138,7 +138,10 @@ impl<Transport: crate::Transport> Peer<Transport> {
 		match select(read_loop, command_loop).await {
 			Either::Left(((), command_loop)) => {
 				// If the read loop stopped we should still flush all queued incoming messages, then stop.
-				command_tx.send(Command::Stop).map_err(drop).expect("command loop did not stop yet but command channel is closed");
+				command_tx
+					.send(Command::Stop)
+					.map_err(drop)
+					.expect("command loop did not stop yet but command channel is closed");
 				command_loop.await;
 			},
 			Either::Right((read_loop, ())) => {
@@ -223,7 +226,9 @@ where
 			}
 
 			// Get the next command from the channel.
-			let command = self.command_rx.recv()
+			let command = self
+				.command_rx
+				.recv()
 				.await
 				.expect("all command channels closed, but we keep one open ourselves");
 
@@ -262,7 +267,7 @@ where
 			Err(e) => {
 				let _: Result<_, _> = command.result_tx.send(Err(e.into()));
 				return LoopFlow::Continue;
-			}
+			},
 		};
 
 		let request_id = request.request_id();
@@ -345,7 +350,7 @@ where
 					}
 				},
 				Incoming::Stream(_) => LoopFlow::Continue,
-			}
+			},
 		}
 	}
 
@@ -425,25 +430,19 @@ impl<Body> std::fmt::Debug for Command<Body> {
 
 impl<Body> std::fmt::Debug for SendRequest<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		f.debug_struct("SendRequest")
-			.field("service_id", &self.service_id)
-			.finish()
+		f.debug_struct("SendRequest").field("service_id", &self.service_id).finish()
 	}
 }
 
 impl<Body> std::fmt::Debug for SendRawMessage<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		f.debug_struct("SendRawMessage")
-			.field("message", &self.message)
-			.finish()
+		f.debug_struct("SendRawMessage").field("message", &self.message).finish()
 	}
 }
 
 impl<Body> std::fmt::Debug for ProcessIncomingMessage<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		f.debug_struct("ProcessIncomingMessage")
-			.field("message", &self.message)
-			.finish()
+		f.debug_struct("ProcessIncomingMessage").field("message", &self.message).finish()
 	}
 }
 
@@ -471,8 +470,8 @@ mod test {
 	use assert2::assert;
 	use assert2::let_assert;
 
-	use tokio::net::UnixStream;
 	use crate::{MessageHeader, StreamTransport};
+	use tokio::net::UnixStream;
 
 	#[tokio::test]
 	async fn test_peer() {

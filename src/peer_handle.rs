@@ -1,11 +1,11 @@
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
+use crate::error;
+use crate::peer::{Command, SendRawMessage, SendRequest};
 use crate::Incoming;
 use crate::Message;
 use crate::SentRequest;
-use crate::error;
-use crate::peer::{Command, SendRequest, SendRawMessage};
 
 /// Handle to a peer.
 ///
@@ -73,7 +73,10 @@ impl<Body> PeerHandle<Body> {
 		incoming_rx: mpsc::UnboundedReceiver<Result<Incoming<Body>, error::NextMessageError>>,
 		command_tx: mpsc::UnboundedSender<Command<Body>>,
 	) -> Self {
-		let read_handle = PeerReadHandle { incoming_rx, command_tx: command_tx.clone() };
+		let read_handle = PeerReadHandle {
+			incoming_rx,
+			command_tx: command_tx.clone(),
+		};
 		let write_handle = PeerWriteHandle { command_tx };
 		Self { read_handle, write_handle }
 	}
@@ -155,7 +158,8 @@ impl<Body> PeerWriteHandle<Body> {
 	pub async fn send_request(&mut self, service_id: i32, body: impl Into<Body>) -> Result<SentRequest<Body>, error::SendRequestError> {
 		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();
-		self.command_tx.send(SendRequest { service_id, body, result_tx }.into())
+		self.command_tx
+			.send(SendRequest { service_id, body, result_tx }.into())
 			.map_err(|_| error::connection_aborted())?;
 
 		result_rx.await.map_err(|_| error::connection_aborted())?
@@ -166,7 +170,8 @@ impl<Body> PeerWriteHandle<Body> {
 		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();
 		let message = Message::stream(0, service_id, body);
-		self.command_tx.send(SendRawMessage { message, result_tx }.into())
+		self.command_tx
+			.send(SendRawMessage { message, result_tx }.into())
 			.map_err(|_| error::connection_aborted())?;
 
 		result_rx.await.map_err(|_| error::connection_aborted())?
