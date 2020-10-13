@@ -35,3 +35,6 @@ tokio = { version = "0.2.0", features = ["rt-core", "uds", "macros"] }
 fizyr-rpc = { path = ".", features = ["unix-seqpacket", "unix-stream", "tcp"] }
 structopt = "0.3.18"
 memfd = "0.3.0"
+
+[package.metadata.docs.rs]
+features = ["tcp", "unix-stream", "unix-seqpacket"]
