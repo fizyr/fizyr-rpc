@@ -20,6 +20,7 @@ pub trait Transport: Send + 'static {
 	type WriteHalf: for<'a> WriteHalfType<'a, Body = Self::Body>;
 
 	/// Split the transport into a read half and a write half.
+	#[allow(clippy::needless_lifetimes)]
 	fn split<'a>(&'a mut self) -> (<Self::ReadHalf as ReadHalfType<'a>>::ReadHalf, <Self::WriteHalf as WriteHalfType<'a>>::WriteHalf);
 }
 
