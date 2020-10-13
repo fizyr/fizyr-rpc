@@ -1,6 +1,6 @@
 [package]
 name = "fizyr-rpc"
-description = "native Rust implementation of the Fizyr RPC protocol"
+description = "Native Rust implementation of the Fizyr RPC protocol"
 version = "0.1.0"
 authors = [
 	"Fizyr B.V. <info@fizyr.com>",

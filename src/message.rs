@@ -10,7 +10,7 @@ pub const HEADER_LEN: u32 = 12;
 pub const MAX_PAYLOAD_LEN: u32 = u32::MAX - HEADER_LEN;
 
 /// Trait for types that can be used as message body.
-pub trait Body {
+pub trait Body: Send + Sync + 'static {
 	/// Create a message body from an error message.
 	fn from_error(message: &str) -> Self;
 }

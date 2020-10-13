@@ -47,7 +47,7 @@ pub struct UnixWriteHalf<W> {
 
 impl<Socket> UnixTransport<Socket>
 where
-	for <'a> &'a mut Self: crate::Transport,
+	Self: crate::Transport,
 {
 	/// Create a new transport with custom configuration.
 	pub fn new(socket: Socket, config: UnixConfig) -> Self {

@@ -7,28 +7,51 @@ pub use config::UnixConfig;
 pub use transport::{UnixReadHalf, UnixTransport, UnixWriteHalf};
 
 #[cfg(feature = "unix-seqpacket")]
-impl<'a> crate::Transport for &'a mut UnixTransport<tokio_seqpacket::UnixSeqpacket> {
-	type Body = UnixBody;
-	type ReadHalf = UnixReadHalf<tokio_seqpacket::ReadHalf<'a>>;
-	type WriteHalf = UnixWriteHalf<tokio_seqpacket::WriteHalf<'a>>;
+mod impl_unix_seqpacket {
+	use super::*;
 
-	fn split(self) -> (Self::ReadHalf, Self::WriteHalf) {
-		let (read_half, write_half) = self.socket.split();
-		let read_half = UnixReadHalf::new(read_half, self.config.max_body_len_read, self.config.max_fds_read);
-		let write_half = UnixWriteHalf::new(write_half, self.config.max_body_len_write, self.config.max_fds_write);
-		(read_half, write_half)
+	impl crate::Transport for UnixTransport<tokio_seqpacket::UnixSeqpacket> {
+		type Body = UnixBody;
+		type ReadHalf = ReadHalfType;
+		type WriteHalf = WriteHalfType;
+
+		fn split<'a>(&'a mut self) -> (UnixReadHalf<tokio_seqpacket::ReadHalf<'a>>, UnixWriteHalf<tokio_seqpacket::WriteHalf<'a>>) {
+			let (read_half, write_half) = self.socket.split();
+			let read_half = UnixReadHalf::new(read_half, self.config.max_body_len_read, self.config.max_fds_read);
+			let write_half = UnixWriteHalf::new(write_half, self.config.max_body_len_write, self.config.max_fds_write);
+			(read_half, write_half)
+		}
 	}
-}
 
-#[cfg(feature = "unix-seqpacket")]
-impl crate::IntoTransport for tokio_seqpacket::UnixSeqpacket {
-	type Body = UnixBody;
-	type Config = UnixConfig;
-	type Transport = UnixTransport<tokio_seqpacket::UnixSeqpacket>;
+	#[cfg(feature = "unix-seqpacket")]
+	impl crate::IntoTransport for tokio_seqpacket::UnixSeqpacket {
+		type Body = UnixBody;
+		type Config = UnixConfig;
+		type Transport = UnixTransport<tokio_seqpacket::UnixSeqpacket>;
 
-	fn into_transport(self, config: Self::Config) -> Self::Transport {
-		UnixTransport::new(self, config)
+		fn into_transport(self, config: Self::Config) -> Self::Transport {
+			UnixTransport::new(self, config)
+		}
 	}
+
+	/// Helper struct to provide the read half types with a lifetime.
+	pub struct ReadHalfType;
+
+	/// Helper struct to provide the write half types with a lifetime.
+	pub struct WriteHalfType;
+
+	impl<'a> crate::transport::ReadHalfType<'a> for ReadHalfType {
+		type Body = UnixBody;
+
+		type ReadHalf = UnixReadHalf<tokio_seqpacket::ReadHalf<'a>>;
+	}
+
+	impl<'a> crate::transport::WriteHalfType<'a> for WriteHalfType {
+		type Body = UnixBody;
+
+		type WriteHalf = UnixWriteHalf<tokio_seqpacket::WriteHalf<'a>>;
+	}
+
 }
 
 #[cfg(test)]

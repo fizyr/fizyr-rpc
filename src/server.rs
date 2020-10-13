@@ -1,5 +1,4 @@
 use crate::PeerHandle;
-use crate::Transport;
 use crate::IntoTransport;
 use super::Peer;
 
@@ -21,7 +20,7 @@ where
 ///
 /// You *can* use it as trait bound for generic arguments,
 /// but you should not rely on any of the items in this trait.
-pub trait ServerListener: crate::util::Listener {
+pub trait ServerListener: crate::util::Listener + Unpin {
 	#[doc(hidden)]
 	type Body: crate::Body;
 
@@ -37,12 +36,8 @@ pub trait ServerListener: crate::util::Listener {
 
 impl<Listener> ServerListener for Listener
 where
-	Listener: crate::util::Listener,
+	Listener: crate::util::Listener + Unpin,
 	Listener::Connection: IntoTransport,
-	<Listener::Connection as IntoTransport>::Body: crate::Body + Send + Sync + 'static,
-	<Listener::Connection as IntoTransport>::Config: Clone + Send + Sync + 'static,
-	<Listener::Connection as IntoTransport>::Transport: Send + 'static,
-	for <'a> &'a mut <Listener::Connection as IntoTransport>::Transport: Transport<Body = <Listener::Connection as IntoTransport>::Body>,
 {
 	type Body = <Listener::Connection as IntoTransport>::Body;
 	type Config = <Listener::Connection as IntoTransport>::Config;
@@ -53,10 +48,7 @@ where
 	}
 }
 
-impl<Listener> Server<Listener>
-where
-	Listener: ServerListener + Unpin,
-{
+impl<Listener: ServerListener> Server<Listener> {
 	/// Create a server on a listening socket.
 	///
 	/// The passed in config is used to create transports and peers for all accepted connections.
@@ -87,7 +79,7 @@ where
 	/// A [`Peer`] is spawned for the new connection,
 	/// and a [`PeerHandle`] is returned to allow interaction with the peer.
 	pub async fn accept(&mut self) -> std::io::Result<PeerHandle<Listener::Body>> {
-		let (socket, _addr) = self.listener.accept().await?;
-		Ok(Listener::spawn(socket, self.config.clone()))
+		let (connection, _addr) = self.listener.accept().await?;
+		Ok(Listener::spawn(connection, self.config.clone()))
 	}
 }
