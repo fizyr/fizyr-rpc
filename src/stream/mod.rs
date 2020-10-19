@@ -8,6 +8,8 @@ pub use transport::{StreamReadHalf, StreamTransport, StreamWriteHalf};
 
 #[cfg(feature = "unix-stream")]
 mod impl_unix_stream {
+	use std::future::Future;
+	use std::pin::Pin;
 	use super::*;
 
 	impl crate::Transport for StreamTransport<tokio::net::UnixStream> {
@@ -34,6 +36,20 @@ mod impl_unix_stream {
 		}
 	}
 
+	impl<'a, Address> crate::Connect<'a, Address> for StreamTransport<tokio::net::UnixStream>
+	where
+		Address: AsRef<std::path::Path> + 'a,
+	{
+		type Future = Pin<Box<dyn Future<Output = std::io::Result<Self>> + 'a>>;
+
+		fn connect(address: Address, config: Self::Config) -> Self::Future {
+			Box::pin(async move {
+				let socket = tokio::net::UnixStream::connect(address).await?;
+				Ok(Self::new(socket, config))
+			})
+		}
+	}
+
 	/// Helper struct to provide the read half types with a lifetime.
 	pub struct ReadHalfType;
 
@@ -53,6 +69,8 @@ mod impl_unix_stream {
 
 #[cfg(feature = "tcp")]
 mod impl_tcp {
+	use std::future::Future;
+	use std::pin::Pin;
 	use super::*;
 
 	impl crate::Transport for StreamTransport<tokio::net::TcpStream> {
@@ -69,7 +87,6 @@ mod impl_tcp {
 		}
 	}
 
-	#[cfg(feature = "tcp")]
 	impl crate::IntoTransport for tokio::net::TcpStream {
 		type Body = StreamBody;
 		type Config = StreamConfig;
@@ -77,6 +94,20 @@ mod impl_tcp {
 
 		fn into_transport(self, config: Self::Config) -> Self::Transport {
 			StreamTransport::new(self, config)
+		}
+	}
+
+	impl<'a, Address> crate::Connect<'a, Address> for StreamTransport<tokio::net::TcpStream>
+	where
+		Address: tokio::net::ToSocketAddrs + 'a,
+	{
+		type Future = Pin<Box<dyn Future<Output = std::io::Result<Self>> + 'a>>;
+
+		fn connect(address: Address, config: Self::Config) -> Self::Future {
+			Box::pin(async {
+				let socket = tokio::net::TcpStream::connect(address).await?;
+				Ok(Self::new(socket, config))
+			})
 		}
 	}
 

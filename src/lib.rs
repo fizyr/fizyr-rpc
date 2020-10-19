@@ -95,6 +95,7 @@ pub use request::SentRequest;
 pub use request_tracker::RequestTracker;
 pub use server::Server;
 pub use server::ServerListener;
+pub use transport::Connect;
 pub use transport::IntoTransport;
 pub use transport::Transport;
 pub use transport::TransportReadHalf;

@@ -88,7 +88,7 @@ impl<Transport: crate::Transport> Peer<Transport> {
 
 	/// Spawn a peer in a new task, and get a handle to the peer.
 	///
-	/// The spawned handle will immediately be detached.
+	/// The spawned task will immediately be detached.
 	/// It can not be joined.
 	///
 	/// The returned [`PeerHandle`] can be used to send and receive requests and stream messages.
@@ -99,6 +99,24 @@ impl<Transport: crate::Transport> Peer<Transport> {
 		let (peer, handle) = Self::new(transport);
 		tokio::spawn(peer.run());
 		handle
+	}
+
+	/// Connect to a remote peer.
+	///
+	/// Similar to [`Self::spawn()`], this spawns a background task for the peer.
+	///
+	/// The returned [`PeerHandle`] can be used to send and receive requests and stream messages.
+	///
+	/// The type of address accepted depends on the transport.
+	/// For internet transports such as TCP, the address must implement [`tokio::net::ToSocketAddrs`].
+	/// For unix transports, the address must implement [`AsRef<std::path::Path>`].
+	pub async fn connect<'a, Address>(address: Address, config: Transport::Config) -> std::io::Result<PeerHandle<Transport::Body>>
+	where
+		Address: 'a,
+		Transport: crate::transport::Connect<'a, Address>,
+	{
+		let transport = Transport::connect(address, config).await?;
+		Ok(Self::spawn(transport))
 	}
 
 	/// Run the read/write loop.
