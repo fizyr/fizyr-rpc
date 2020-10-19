@@ -1,3 +1,6 @@
+v0.2.0:
+  * Rename `into_transport_default()` to `into_default_transport()`.
+
 v0.1.4:
   * Regenerate `README.md` from library documentation.
 

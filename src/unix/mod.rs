@@ -68,8 +68,8 @@ mod test {
 	async fn test_unix_transport() {
 		let_assert!(Ok((socket_a, socket_b)) = UnixSeqpacket::pair());
 
-		let mut transport_a = socket_a.into_transport_default();
-		let mut transport_b = socket_b.into_transport_default();
+		let mut transport_a = socket_a.into_default_transport();
+		let mut transport_b = socket_b.into_default_transport();
 
 		use crate::{Transport, TransportReadHalf, TransportWriteHalf};
 		let (mut read_a, mut write_a) = transport_a.split();

@@ -63,7 +63,7 @@ pub trait IntoTransport: Sized + Send {
 	fn into_transport(self, config: Self::Config) -> Self::Transport;
 
 	/// Create a transport from `self` using the default configuration.
-	fn into_transport_default(self) -> Self::Transport
+	fn into_default_transport(self) -> Self::Transport
 	where
 		Self::Config: Default,
 	{
