@@ -13,6 +13,9 @@ pub trait Transport: Send + 'static {
 	/// The body type for the messages.
 	type Body: crate::Body;
 
+	/// The configuration type for the transport.
+	type Config: Clone + Default + Send + Sync + 'static;
+
 	/// The type of the read half of the transport.
 	type ReadHalf: for<'a> ReadHalfType<'a, Body = Self::Body>;
 

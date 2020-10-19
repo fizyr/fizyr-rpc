@@ -12,6 +12,7 @@ mod impl_unix_seqpacket {
 
 	impl crate::Transport for UnixTransport<tokio_seqpacket::UnixSeqpacket> {
 		type Body = UnixBody;
+		type Config = UnixConfig;
 		type ReadHalf = ReadHalfType;
 		type WriteHalf = WriteHalfType;
 

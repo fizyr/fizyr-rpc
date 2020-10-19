@@ -12,6 +12,7 @@ mod impl_unix_stream {
 
 	impl crate::Transport for StreamTransport<tokio::net::UnixStream> {
 		type Body = StreamBody;
+		type Config = StreamConfig;
 		type ReadHalf = ReadHalfType;
 		type WriteHalf = WriteHalfType;
 
@@ -56,6 +57,7 @@ mod impl_tcp {
 
 	impl crate::Transport for StreamTransport<tokio::net::TcpStream> {
 		type Body = StreamBody;
+		type Config = StreamConfig;
 		type ReadHalf = ReadHalfType;
 		type WriteHalf = WriteHalfType;
 
