@@ -20,12 +20,10 @@ It can also be split in a [`PeerReadHandle`] and a [`PeerWriteHandle`],
 to allow moving the handles into different tasks.
 The write handle can also be cloned and used in multiple tasks.
 
-To obtain a [`PeerHandle`], you must first create a [`Peer`] object.
-The [`Peer`] object is responsible for reading and writing messages with the peer,
-but you can't use it for sending or receiving messages directly.
-Instead, you must ensure that the [`Peer::run()`] future is being polled.
-The easiest way to do that is by calling [`Peer::spawn()`],
-which will run the future in a background task and returns a [`PeerHandle`].
+To obtain a [`PeerHandle`], you can call [`Peer::connect()`].
+This will connect to a remote server and spawn a background task to read and write messages over the connection.
+If you need full control over tasks, you can instead create a [`Peer`] object
+and call [`Peer::run()`] manually.
 
 ### Server
 
@@ -61,9 +59,31 @@ Currently, the library has these features:
 * `unix-stream`: for the [`UnixStreamTransport`]
 * `unix-seqpacket`: for the [`UnixSeqpacketTransport`]
 
+## Example
+
+```rust
+use fizyr_rpc::{TcpPeer, StreamConfig};
+
+let mut peer = TcpPeer::connect("localhost:1337", StreamConfig::default()).await?;
+let mut request = peer.send_request(1, &b"Hello World!"[..]).await?;
+
+loop {
+    let message = request.next_message().await?;
+    let body = std::str::from_utf8(&message.body)?;
+
+    if message.header.message_type.is_responder_update() {
+        eprintln!("Received update: {}", body);
+    } else if message.header.message_type.is_response() {
+        eprintln!("Received response: {}", body);
+        break;
+    }
+}
+
+```
+
 [`Peer`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Peer.html
+[`Peer::connect()`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Peer.html#method.connect
 [`Peer::run()`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Peer.html#method.run
-[`Peer::spawn()`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Peer.html#method.spawn
 [`PeerHandle`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.PeerHandle.html
 [`PeerReadHandle`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.PeerReadHandle.html
 [`PeerWriteHandle`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.PeerWriteHandle.html
