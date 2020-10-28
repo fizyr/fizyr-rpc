@@ -1,9 +1,7 @@
-use fizyr_rpc::IntoTransport;
-use fizyr_rpc::Peer;
+use fizyr_rpc::UnixSeqpacketPeer;
 
 use std::path::PathBuf;
 use structopt::StructOpt;
-use tokio_seqpacket::UnixSeqpacket;
 
 #[derive(StructOpt)]
 #[structopt(setting = structopt::clap::AppSettings::ColoredHelp)]
@@ -22,13 +20,9 @@ async fn main() {
 }
 
 async fn do_main(options: &Options) -> Result<(), String> {
-	// Connect a socket to the server.
-	let socket = UnixSeqpacket::connect(&options.socket)
-		.await
+	// Connect to a remote server.
+	let mut peer = UnixSeqpacketPeer::connect(&options.socket, Default::default()).await
 		.map_err(|e| format!("failed to connect to {}: {}", options.socket.display(), e))?;
-
-	// Wrap the socket in a transport, and create a peer from the transport.
-	let mut peer = Peer::spawn(socket.into_transport_default());
 
 	// Send a request to the remote peer.
 	let mut request = peer

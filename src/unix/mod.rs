@@ -8,10 +8,13 @@ pub use transport::{UnixReadHalf, UnixTransport, UnixWriteHalf};
 
 #[cfg(feature = "unix-seqpacket")]
 mod impl_unix_seqpacket {
+	use std::future::Future;
+	use std::pin::Pin;
 	use super::*;
 
 	impl crate::Transport for UnixTransport<tokio_seqpacket::UnixSeqpacket> {
 		type Body = UnixBody;
+		type Config = UnixConfig;
 		type ReadHalf = ReadHalfType;
 		type WriteHalf = WriteHalfType;
 
@@ -23,7 +26,6 @@ mod impl_unix_seqpacket {
 		}
 	}
 
-	#[cfg(feature = "unix-seqpacket")]
 	impl crate::IntoTransport for tokio_seqpacket::UnixSeqpacket {
 		type Body = UnixBody;
 		type Config = UnixConfig;
@@ -31,6 +33,20 @@ mod impl_unix_seqpacket {
 
 		fn into_transport(self, config: Self::Config) -> Self::Transport {
 			UnixTransport::new(self, config)
+		}
+	}
+
+	impl<'a, Address> crate::Connect<'a, Address> for UnixTransport<tokio_seqpacket::UnixSeqpacket>
+	where
+		Address: AsRef<std::path::Path> + 'a,
+	{
+		type Future = Pin<Box<dyn Future<Output = std::io::Result<Self>> + 'a>>;
+
+		fn connect(address: Address, config: Self::Config) -> Self::Future {
+			Box::pin(async move {
+				let socket = tokio_seqpacket::UnixSeqpacket::connect(address).await?;
+				Ok(Self::new(socket, config))
+			})
 		}
 	}
 
@@ -68,8 +84,8 @@ mod test {
 	async fn test_unix_transport() {
 		let_assert!(Ok((socket_a, socket_b)) = UnixSeqpacket::pair());
 
-		let mut transport_a = socket_a.into_transport_default();
-		let mut transport_b = socket_b.into_transport_default();
+		let mut transport_a = socket_a.into_default_transport();
+		let mut transport_b = socket_b.into_default_transport();
 
 		use crate::{Transport, TransportReadHalf, TransportWriteHalf};
 		let (mut read_a, mut write_a) = transport_a.split();

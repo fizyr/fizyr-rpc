@@ -13,6 +13,9 @@ pub trait Transport: Send + 'static {
 	/// The body type for the messages.
 	type Body: crate::Body;
 
+	/// The configuration type for the transport.
+	type Config: Clone + Default + Send + Sync + 'static;
+
 	/// The type of the read half of the transport.
 	type ReadHalf: for<'a> ReadHalfType<'a, Body = Self::Body>;
 
@@ -63,12 +66,21 @@ pub trait IntoTransport: Sized + Send {
 	fn into_transport(self, config: Self::Config) -> Self::Transport;
 
 	/// Create a transport from `self` using the default configuration.
-	fn into_transport_default(self) -> Self::Transport
+	fn into_default_transport(self) -> Self::Transport
 	where
 		Self::Config: Default,
 	{
 		self.into_transport(Self::Config::default())
 	}
+}
+
+/// Trait for connecting transports to a remote address.
+pub trait Connect<'a, Address: 'a>: Sized + Transport {
+	/// The type of the future returned by `Self::connect`.
+	type Future: Future<Output = std::io::Result<Self>>;
+
+	/// Create a new transport connected to a remote address.
+	fn connect(address: Address, config: Self::Config) -> Self::Future;
 }
 
 /// Trait for the read half of a transport type.

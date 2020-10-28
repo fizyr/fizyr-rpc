@@ -15,12 +15,10 @@
 //! to allow moving the handles into different tasks.
 //! The write handle can also be cloned and used in multiple tasks.
 //!
-//! To obtain a [`PeerHandle`], you must first create a [`Peer`] object.
-//! The [`Peer`] object is responsible for reading and writing messages with the peer,
-//! but you can't use it for sending or receiving messages directly.
-//! Instead, you must ensure that the [`Peer::run()`] future is being polled.
-//! The easiest way to do that is by calling [`Peer::spawn()`],
-//! which will run the future in a background task and returns a [`PeerHandle`].
+//! To obtain a [`PeerHandle`], you can call [`Peer::connect()`].
+//! This will connect to a remote server and spawn a background task to read and write messages over the connection.
+//! If you need full control over tasks, you can instead create a [`Peer`] object
+//! and call [`Peer::run()`] manually.
 //!
 //! ## Server
 //!
@@ -55,6 +53,31 @@
 //! * `tcp`: for the [`TcpTransport`]
 //! * `unix-stream`: for the [`UnixStreamTransport`]
 //! * `unix-seqpacket`: for the [`UnixSeqpacketTransport`]
+//!
+//! # Example
+//!
+//! ```no_run
+//! use fizyr_rpc::{TcpPeer, StreamConfig};
+//!
+//! # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut peer = TcpPeer::connect("localhost:1337", StreamConfig::default()).await?;
+//! let mut request = peer.send_request(1, &b"Hello World!"[..]).await?;
+//!
+//! loop {
+//!     let message = request.next_message().await?;
+//!     let body = std::str::from_utf8(&message.body)?;
+//!
+//!     if message.header.message_type.is_responder_update() {
+//!         eprintln!("Received update: {}", body);
+//!     } else if message.header.message_type.is_response() {
+//!         eprintln!("Received response: {}", body);
+//!         break;
+//!     }
+//! }
+//!
+//! # Ok(())
+//! # }
+//! ```
 
 #![warn(missing_docs)]
 
@@ -95,6 +118,7 @@ pub use request::SentRequest;
 pub use request_tracker::RequestTracker;
 pub use server::Server;
 pub use server::ServerListener;
+pub use transport::Connect;
 pub use transport::IntoTransport;
 pub use transport::Transport;
 pub use transport::TransportReadHalf;

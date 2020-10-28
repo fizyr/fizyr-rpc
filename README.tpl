@@ -6,8 +6,8 @@
 {{readme}}
 
 [`Peer`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Peer.html
+[`Peer::connect()`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Peer.html#method.connect
 [`Peer::run()`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Peer.html#method.run
-[`Peer::spawn()`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Peer.html#method.spawn
 [`PeerHandle`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.PeerHandle.html
 [`PeerReadHandle`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.PeerReadHandle.html
 [`PeerWriteHandle`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.PeerWriteHandle.html
