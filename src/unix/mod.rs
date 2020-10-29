@@ -50,6 +50,20 @@ mod impl_unix_seqpacket {
 		}
 	}
 
+	impl<'a, Address> crate::util::Bind<'a, Address> for tokio_seqpacket::UnixSeqpacketListener
+	where
+		Address: AsRef<std::path::Path> + 'a,
+	{
+		// TODO: Use more efficient custom future?
+		type Future = Pin<Box<dyn Future<Output = std::io::Result<Self>> + 'a>>;
+
+		fn bind(address: Address) -> Self::Future {
+			Box::pin(async {
+				Self::bind(address)
+			})
+		}
+	}
+
 	/// Helper struct to provide the read half types with a lifetime.
 	pub struct ReadHalfType;
 

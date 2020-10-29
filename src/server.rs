@@ -56,6 +56,20 @@ impl<Listener: ServerListener> Server<Listener> {
 		Self { listener, config }
 	}
 
+	/// Create a server with a new listening socket bound to the given address.
+	///
+	/// The type of address accepted depends on the listener.
+	/// For internet transports such as TCP, the address must implement [`tokio::net::ToSocketAddrs`].
+	/// For unix transports, the address must implement [`AsRef<std::path::Path>`].
+	///
+	/// This function is asynchronous because it may perform a DNS lookup for some address types.
+	pub async fn bind<'a, Address: 'a>(address: Address, config: Listener::Config) -> std::io::Result<Self>
+	where
+		Listener: crate::util::Bind<'a, Address>,
+	{
+		Ok(Self::new(Listener::bind(address).await?, config))
+	}
+
 	/// Run the server.
 	///
 	/// The server will accept connections in a loop and spawn a user task for each new peer.
