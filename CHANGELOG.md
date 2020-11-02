@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.2.1 - unreleased
+## v0.2.1 - 2020-09-03
 ### Fixed
 - Fixed link in README.
 
