@@ -6,6 +6,9 @@
 - Added `Server::bind` function.
 
 ### Changed
+- Use `Vec<u8>` for body data instead of `Box<[u8]>`.
+
+### Changed
 - Renamed `into_transport_default()` to `into_default_transport()`.
 
 ## v0.1.4 - 2020-10-04
