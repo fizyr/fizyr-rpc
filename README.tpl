@@ -13,7 +13,7 @@
 [`PeerWriteHandle`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.PeerWriteHandle.html
 [`Server`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Server.html
 
-[`Transport`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/trait.Transport.html
+[`transport::Transport`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/transport/trait.Transport.html
 [`TcpTransport`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/type.TcpTransport.html
 [`UnixStreamTransport`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/type.UnixStreamTransport.html
 [`UnixSeqpacketTransport`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/type.UnixSeqpacketTransport.html

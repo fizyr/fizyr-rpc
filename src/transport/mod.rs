@@ -1,9 +1,29 @@
+//! Transport traits and concrete implementations.
+//!
+//! Transports are responsible for passing raw messages to a remote peer.
+//! They are used by the [`Peer`][crate::Peer] struct to implement higher level RPC communication.
+//!
+//! Specific transports must be enabled with individual feature flags.
+//! None of the concrete transport implementations are enabled by default.
+
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use crate::error::{ReadMessageError, WriteMessageError};
 use crate::{Message, MessageHeader};
+
+#[cfg(any(feature = "unix-stream", feature = "tcp"))]
+pub(crate) mod stream;
+
+#[cfg(any(feature = "unix-stream", feature = "tcp"))]
+pub use stream::StreamTransport;
+
+#[cfg(feature = "unix-seqpacket")]
+pub use unix::UnixTransport;
+
+#[cfg(feature = "unix-seqpacket")]
+pub(crate) mod unix;
 
 /// Trait for types that represent a bi-direction message transport.
 ///
@@ -49,38 +69,6 @@ pub trait WriteHalfType<'a> {
 
 	/// The concrete type of the write half.
 	type WriteHalf: TransportWriteHalf<Body = Self::Body>;
-}
-
-/// Trait to allow generic creation of transports from a socket.
-pub trait IntoTransport: Sized + Send {
-	/// The body type for messages transferred over the transport.
-	type Body: crate::Body;
-
-	/// The configuration type of the transport.
-	type Config: Clone + Send + Sync + 'static;
-
-	/// The transport type.
-	type Transport: Transport<Body = Self::Body> + Send + 'static;
-
-	/// Create a transport from `self` and a configuration struct.
-	fn into_transport(self, config: Self::Config) -> Self::Transport;
-
-	/// Create a transport from `self` using the default configuration.
-	fn into_default_transport(self) -> Self::Transport
-	where
-		Self::Config: Default,
-	{
-		self.into_transport(Self::Config::default())
-	}
-}
-
-/// Trait for connecting transports to a remote address.
-pub trait Connect<'a, Address: 'a>: Sized + Transport {
-	/// The type of the future returned by `Self::connect`.
-	type Future: Future<Output = std::io::Result<Self>>;
-
-	/// Create a new transport connected to a remote address.
-	fn connect(address: Address, config: Self::Config) -> Self::Future;
 }
 
 /// Trait for the read half of a transport type.

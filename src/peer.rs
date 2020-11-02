@@ -1,13 +1,14 @@
 use crate::util::{select, Either};
 use tokio::sync::mpsc;
 
-use crate::error;
 use crate::Incoming;
 use crate::Message;
 use crate::PeerHandle;
-use crate::RequestTracker;
 use crate::SentRequest;
+use crate::error;
+use crate::request_tracker::RequestTracker;
 use tokio::sync::oneshot;
+use crate::util;
 
 /// Message for the internal peer command loop.
 pub enum Command<Body> {
@@ -25,7 +26,7 @@ pub enum Command<Body> {
 /// This struct is used to run the read/write loop of the peer.
 /// To send or receive requests and stream messages,
 /// you need to use the [`PeerHandle`] instead.
-pub struct Peer<Transport: crate::Transport> {
+pub struct Peer<Transport: crate::transport::Transport> {
 	/// The transport to use for sending/receiving messages.
 	transport: Transport,
 
@@ -54,7 +55,7 @@ pub struct Peer<Transport: crate::Transport> {
 	write_handles: usize,
 }
 
-impl<Transport: crate::Transport> Peer<Transport> {
+impl<Transport: crate::transport::Transport> Peer<Transport> {
 	/// Create a new peer and a handle to it.
 	///
 	/// The [`Peer`] itself is used to run the read/write loop.
@@ -113,7 +114,7 @@ impl<Transport: crate::Transport> Peer<Transport> {
 	pub async fn connect<'a, Address>(address: Address, config: Transport::Config) -> std::io::Result<PeerHandle<Transport::Body>>
 	where
 		Address: 'a,
-		Transport: crate::transport::Connect<'a, Address>,
+		Transport: util::Connect<'a, Address>,
 	{
 		let transport = Transport::connect(address, config).await?;
 		Ok(Self::spawn(transport))
@@ -174,7 +175,7 @@ impl<Transport: crate::Transport> Peer<Transport> {
 /// Implementation of the read loop of a peer.
 struct ReadLoop<R>
 where
-	R: crate::TransportReadHalf,
+	R: crate::transport::TransportReadHalf,
 {
 	/// The read half of the message transport.
 	read_half: R,
@@ -185,7 +186,7 @@ where
 
 impl<R> ReadLoop<R>
 where
-	R: crate::TransportReadHalf,
+	R: crate::transport::TransportReadHalf,
 {
 	/// Run the read loop.
 	async fn run(&mut self) {
@@ -210,7 +211,7 @@ where
 /// Implementation of the command loop of a peer.
 struct CommandLoop<'a, W>
 where
-	W: crate::TransportWriteHalf,
+	W: crate::transport::TransportWriteHalf,
 {
 	/// The write half of the message transport.
 	write_half: W,
@@ -233,7 +234,7 @@ where
 
 impl<W> CommandLoop<'_, W>
 where
-	W: crate::TransportWriteHalf,
+	W: crate::transport::TransportWriteHalf,
 {
 	/// Run the command loop.
 	async fn run(&mut self) {
@@ -488,7 +489,8 @@ mod test {
 	use assert2::assert;
 	use assert2::let_assert;
 
-	use crate::{MessageHeader, StreamTransport};
+	use crate::MessageHeader;
+	use crate::transport::StreamTransport;
 	use tokio::net::UnixStream;
 
 	#[tokio::test]

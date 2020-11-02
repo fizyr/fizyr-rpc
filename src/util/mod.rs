@@ -1,10 +1,20 @@
+//! Utility traits.
+//!
+//! The traits in this module are used to implement utility functions on [`Peer`][crate::Peer] and [`Server`][crate::Server].
+//! You do not normally need to use these traits directly.
+//!
+//! However, if you wish to implement a custom transport,
+//! you may also wish to implement these traits.
+
 mod accept;
+mod connect;
+mod into_transport;
 mod select;
 
-pub use accept::Accept;
-pub use accept::Bind;
-pub use accept::Listener;
+pub use accept::{Accept, Bind, Listener};
+pub use connect::Connect;
+pub use into_transport::IntoTransport;
 
-pub use select::select;
-pub use select::Either;
-pub use select::Select;
+// `select` is not a trait, but it's not exported publicly.
+// So the module documentation is still fine.
+pub(crate) use select::{select, Either};

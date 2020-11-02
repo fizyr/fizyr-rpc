@@ -110,6 +110,7 @@ impl<Body> RequestTracker<Body> {
 	///
 	/// This should be called when a request is finished to make the ID available again.
 	/// Note that received requests are also removed internally when they would receive a message but the [`ReceivedRequest`] was dropped.
+	#[allow(unused)] // TODO: Evaluate if Peer should be calling this sometimes.
 	pub fn remove_received_request(&mut self, request_id: u32) -> Result<(), error::UnknownRequestId> {
 		self.received_requests.remove(&request_id).ok_or(error::UnknownRequestId { request_id })?;
 		Ok(())

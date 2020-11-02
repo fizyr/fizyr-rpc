@@ -12,7 +12,7 @@ mod impl_unix_seqpacket {
 	use std::pin::Pin;
 	use super::*;
 
-	impl crate::Transport for UnixTransport<tokio_seqpacket::UnixSeqpacket> {
+	impl crate::transport::Transport for UnixTransport<tokio_seqpacket::UnixSeqpacket> {
 		type Body = UnixBody;
 		type Config = UnixConfig;
 		type ReadHalf = ReadHalfType;
@@ -26,7 +26,7 @@ mod impl_unix_seqpacket {
 		}
 	}
 
-	impl crate::IntoTransport for tokio_seqpacket::UnixSeqpacket {
+	impl crate::util::IntoTransport for tokio_seqpacket::UnixSeqpacket {
 		type Body = UnixBody;
 		type Config = UnixConfig;
 		type Transport = UnixTransport<tokio_seqpacket::UnixSeqpacket>;
@@ -36,7 +36,7 @@ mod impl_unix_seqpacket {
 		}
 	}
 
-	impl<'a, Address> crate::Connect<'a, Address> for UnixTransport<tokio_seqpacket::UnixSeqpacket>
+	impl<'a, Address> crate::util::Connect<'a, Address> for UnixTransport<tokio_seqpacket::UnixSeqpacket>
 	where
 		Address: AsRef<std::path::Path> + 'a,
 	{
@@ -90,7 +90,7 @@ mod test {
 	use std::os::unix::io::FromRawFd;
 	use tokio_seqpacket::UnixSeqpacket;
 
-	use crate::IntoTransport;
+	use crate::util::IntoTransport;
 	use crate::MessageHeader;
 	use crate::UnixBody;
 
@@ -101,7 +101,7 @@ mod test {
 		let mut transport_a = socket_a.into_default_transport();
 		let mut transport_b = socket_b.into_default_transport();
 
-		use crate::{Transport, TransportReadHalf, TransportWriteHalf};
+		use crate::transport::{Transport, TransportReadHalf, TransportWriteHalf};
 		let (mut read_a, mut write_a) = transport_a.split();
 		let (mut read_b, mut write_b) = transport_b.split();
 

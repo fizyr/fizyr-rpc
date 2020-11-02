@@ -34,7 +34,7 @@ Usually, you will want to spawn a task for each accepted connection that handles
 
 ### Transports
 
-Each peer internally uses a [`Transport`].
+Each peer internally uses a [`Transport`][transport::Transport].
 The transport is responsible for reading and writing raw messages.
 By abstracting away the message transport,
 the library can expose a single generic [`Peer`] and [`Server`] struct.
@@ -89,7 +89,7 @@ loop {
 [`PeerWriteHandle`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.PeerWriteHandle.html
 [`Server`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Server.html
 
-[`Transport`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/trait.Transport.html
+[`transport::Transport`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/transport/trait.Transport.html
 [`TcpTransport`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/type.TcpTransport.html
 [`UnixStreamTransport`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/type.UnixStreamTransport.html
 [`UnixSeqpacketTransport`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/type.UnixSeqpacketTransport.html

@@ -12,7 +12,7 @@ mod impl_unix_stream {
 	use std::pin::Pin;
 	use super::*;
 
-	impl crate::Transport for StreamTransport<tokio::net::UnixStream> {
+	impl crate::transport::Transport for StreamTransport<tokio::net::UnixStream> {
 		type Body = StreamBody;
 		type Config = StreamConfig;
 		type ReadHalf = ReadHalfType;
@@ -26,7 +26,7 @@ mod impl_unix_stream {
 		}
 	}
 
-	impl crate::IntoTransport for tokio::net::UnixStream {
+	impl crate::util::IntoTransport for tokio::net::UnixStream {
 		type Body = StreamBody;
 		type Config = StreamConfig;
 		type Transport = StreamTransport<tokio::net::UnixStream>;
@@ -36,7 +36,7 @@ mod impl_unix_stream {
 		}
 	}
 
-	impl<'a, Address> crate::Connect<'a, Address> for StreamTransport<tokio::net::UnixStream>
+	impl<'a, Address> crate::util::Connect<'a, Address> for StreamTransport<tokio::net::UnixStream>
 	where
 		Address: AsRef<std::path::Path> + 'a,
 	{
@@ -87,7 +87,7 @@ mod impl_tcp {
 	use std::pin::Pin;
 	use super::*;
 
-	impl crate::Transport for StreamTransport<tokio::net::TcpStream> {
+	impl crate::transport::Transport for StreamTransport<tokio::net::TcpStream> {
 		type Body = StreamBody;
 		type Config = StreamConfig;
 		type ReadHalf = ReadHalfType;
@@ -101,7 +101,7 @@ mod impl_tcp {
 		}
 	}
 
-	impl crate::IntoTransport for tokio::net::TcpStream {
+	impl crate::util::IntoTransport for tokio::net::TcpStream {
 		type Body = StreamBody;
 		type Config = StreamConfig;
 		type Transport = StreamTransport<tokio::net::TcpStream>;
@@ -111,7 +111,7 @@ mod impl_tcp {
 		}
 	}
 
-	impl<'a, Address> crate::Connect<'a, Address> for StreamTransport<tokio::net::TcpStream>
+	impl<'a, Address> crate::util::Connect<'a, Address> for StreamTransport<tokio::net::TcpStream>
 	where
 		Address: tokio::net::ToSocketAddrs + 'a,
 	{
@@ -170,7 +170,7 @@ mod test {
 		let mut transport_a = StreamTransport::new(peer_a, StreamConfig::default());
 		let mut transport_b = StreamTransport::new(peer_b, StreamConfig::default());
 
-		use crate::{Transport, TransportReadHalf, TransportWriteHalf};
+		use crate::transport::{Transport, TransportReadHalf, TransportWriteHalf};
 		let (mut read_a, mut write_a) = transport_a.split();
 		let (mut read_b, mut write_b) = transport_b.split();
 

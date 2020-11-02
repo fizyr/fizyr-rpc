@@ -1,6 +1,10 @@
 use crate::error;
 
-/// The encoded length of a message header (excluding the frame size).
+/// The encoded length of a message header.
+///
+/// This does not include the message framing that may be used by a transport.
+/// For example, [`StreamTransport`][crate::transport::StreamTransport] preceeds each message
+/// by a 32 bit message size.
 pub const HEADER_LEN: u32 = 12;
 
 /// The maximum length of a message body.

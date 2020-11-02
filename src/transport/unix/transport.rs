@@ -47,7 +47,7 @@ pub struct UnixWriteHalf<W> {
 
 impl<Socket> UnixTransport<Socket>
 where
-	Self: crate::Transport,
+	Self: crate::transport::Transport,
 {
 	/// Create a new transport with custom configuration.
 	pub fn new(socket: Socket, config: UnixConfig) -> Self {
@@ -82,7 +82,7 @@ impl<W> UnixWriteHalf<W> {
 }
 
 #[cfg(feature = "unix-seqpacket")]
-impl crate::TransportReadHalf for UnixReadHalf<tokio_seqpacket::ReadHalf<'_>> {
+impl crate::transport::TransportReadHalf for UnixReadHalf<tokio_seqpacket::ReadHalf<'_>> {
 	type Body = UnixBody;
 
 	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, ReadMessageError>> {
@@ -129,7 +129,7 @@ impl crate::TransportReadHalf for UnixReadHalf<tokio_seqpacket::ReadHalf<'_>> {
 }
 
 #[cfg(feature = "unix-seqpacket")]
-impl crate::TransportWriteHalf for UnixWriteHalf<tokio_seqpacket::WriteHalf<'_>> {
+impl crate::transport::TransportWriteHalf for UnixWriteHalf<tokio_seqpacket::WriteHalf<'_>> {
 	type Body = UnixBody;
 
 	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), WriteMessageError>> {

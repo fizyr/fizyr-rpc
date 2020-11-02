@@ -29,7 +29,7 @@
 //!
 //! ## Transports
 //!
-//! Each peer internally uses a [`Transport`].
+//! Each peer internally uses a [`Transport`][transport::Transport].
 //! The transport is responsible for reading and writing raw messages.
 //! By abstracting away the message transport,
 //! the library can expose a single generic [`Peer`] and [`Server`] struct.
@@ -91,14 +91,9 @@ mod peer_handle;
 mod request;
 mod request_tracker;
 mod server;
-mod transport;
-mod util;
 
-#[cfg(any(feature = "unix-stream", feature = "tcp"))]
-mod stream;
-
-#[cfg(feature = "unix-seqpacket")]
-mod unix;
+pub mod transport;
+pub mod util;
 
 pub use message::service_id;
 pub use message::Body;
@@ -115,35 +110,24 @@ pub use request::Incoming;
 pub use request::Outgoing;
 pub use request::ReceivedRequest;
 pub use request::SentRequest;
-pub use request_tracker::RequestTracker;
 pub use server::Server;
 pub use server::ServerListener;
-pub use transport::Connect;
-pub use transport::IntoTransport;
-pub use transport::Transport;
-pub use transport::TransportReadHalf;
-pub use transport::TransportWriteHalf;
 
 #[cfg(any(feature = "unix-stream", feature = "tcp"))]
-pub use stream::StreamBody;
-#[cfg(any(feature = "unix-stream", feature = "tcp"))]
-pub use stream::StreamConfig;
+pub use transport::stream::StreamBody;
 
 #[cfg(any(feature = "unix-stream", feature = "tcp"))]
-pub use stream::StreamTransport;
+pub use transport::stream::StreamConfig;
 
 #[cfg(feature = "unix-seqpacket")]
-pub use unix::UnixBody;
+pub use transport::unix::UnixBody;
 
 #[cfg(feature = "unix-seqpacket")]
-pub use unix::UnixConfig;
-
-#[cfg(feature = "unix-seqpacket")]
-pub use unix::UnixTransport;
+pub use transport::unix::UnixConfig;
 
 /// Message transport for TCP.
 #[cfg(feature = "tcp")]
-pub type TcpTransport = StreamTransport<tokio::net::TcpStream>;
+pub type TcpTransport = transport::StreamTransport<tokio::net::TcpStream>;
 
 /// Peer using the TCP transport.
 #[cfg(feature = "tcp")]
@@ -155,7 +139,7 @@ pub type TcpServer = Server<tokio::net::TcpListener>;
 
 /// Message transport for Unix stream sockets.
 #[cfg(feature = "unix-stream")]
-pub type UnixStreamTransport = StreamTransport<tokio::net::UnixStream>;
+pub type UnixStreamTransport = transport::StreamTransport<tokio::net::UnixStream>;
 
 /// Peer using the Unix stream transport.
 #[cfg(feature = "unix-stream")]
@@ -167,7 +151,7 @@ pub type UnixStreamServer = Server<tokio::net::UnixListener>;
 
 /// Message transport for Unix seqpacket sockets.
 #[cfg(feature = "unix-seqpacket")]
-pub type UnixSeqpacketTransport = UnixTransport<tokio_seqpacket::UnixSeqpacket>;
+pub type UnixSeqpacketTransport = transport::UnixTransport<tokio_seqpacket::UnixSeqpacket>;
 
 /// Peer using the Unix seqpacket transport.
 #[cfg(feature = "unix-seqpacket")]

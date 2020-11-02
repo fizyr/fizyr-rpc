@@ -1,6 +1,6 @@
-use super::Peer;
-use crate::IntoTransport;
+use crate::Peer;
 use crate::PeerHandle;
+use crate::util;
 
 /// Server that spawns peers for all accepted connections.
 pub struct Server<Listener>
@@ -20,7 +20,7 @@ where
 ///
 /// You *can* use it as trait bound for generic arguments,
 /// but you should not rely on any of the items in this trait.
-pub trait ServerListener: crate::util::Listener + Unpin {
+pub trait ServerListener: util::Listener + Unpin {
 	#[doc(hidden)]
 	type Body: crate::Body;
 
@@ -36,14 +36,15 @@ pub trait ServerListener: crate::util::Listener + Unpin {
 
 impl<Listener> ServerListener for Listener
 where
-	Listener: crate::util::Listener + Unpin,
-	Listener::Connection: IntoTransport,
+	Listener: util::Listener + Unpin,
+	Listener::Connection: util::IntoTransport,
 {
-	type Body = <Listener::Connection as IntoTransport>::Body;
-	type Config = <Listener::Connection as IntoTransport>::Config;
-	type Transport = <Listener::Connection as IntoTransport>::Transport;
+	type Body = <Listener::Connection as util::IntoTransport>::Body;
+	type Config = <Listener::Connection as util::IntoTransport>::Config;
+	type Transport = <Listener::Connection as util::IntoTransport>::Transport;
 
 	fn spawn(connection: Self::Connection, config: Self::Config) -> PeerHandle<Self::Body> {
+		use util::IntoTransport;
 		Peer::spawn(connection.into_transport(config))
 	}
 }
@@ -65,7 +66,7 @@ impl<Listener: ServerListener> Server<Listener> {
 	/// This function is asynchronous because it may perform a DNS lookup for some address types.
 	pub async fn bind<'a, Address: 'a>(address: Address, config: Listener::Config) -> std::io::Result<Self>
 	where
-		Listener: crate::util::Bind<'a, Address>,
+		Listener: util::Bind<'a, Address>,
 	{
 		Ok(Self::new(Listener::bind(address).await?, config))
 	}

@@ -4,7 +4,10 @@ use std::task::{Context, Poll};
 
 /// Trait for listeners that can accept new connections.
 pub trait Listener {
+	/// The type of the connections return by the [`Self::accept()`] function.
 	type Connection: std::fmt::Debug;
+
+	/// The type of the address returned by the [`Self::accept()`] function.
 	type Address: std::fmt::Debug;
 
 	/// Try to accept a new connection without blocking.
@@ -30,6 +33,7 @@ pub trait Bind<'a, Address: 'a>: Sized + Listener {
 	fn bind(address: Address) -> Self::Future;
 }
 
+/// Future type returned by [`Listener::accept`].
 pub struct Accept<'a, L: ?Sized> {
 	inner: &'a mut L,
 }

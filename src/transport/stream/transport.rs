@@ -59,7 +59,7 @@ pub struct StreamWriteHalf<W> {
 
 impl<Stream> StreamTransport<Stream>
 where
-	Self: crate::Transport,
+	Self: crate::transport::Transport,
 {
 	/// Create a new transport with custom configuration.
 	pub fn new(stream: Stream, config: StreamConfig) -> Self {
@@ -106,7 +106,7 @@ fn poll_read<R: AsyncRead>(stream: Pin<&mut R>, context: &mut Context, buf: &mut
 	}
 }
 
-impl<R> crate::TransportReadHalf for StreamReadHalf<R>
+impl<R> crate::transport::TransportReadHalf for StreamReadHalf<R>
 where
 	R: AsyncRead + Send + Unpin,
 {
@@ -159,7 +159,7 @@ where
 	}
 }
 
-impl<W> crate::TransportWriteHalf for StreamWriteHalf<W>
+impl<W> crate::transport::TransportWriteHalf for StreamWriteHalf<W>
 where
 	W: AsyncWrite + Send + Unpin,
 {

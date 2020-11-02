@@ -6,7 +6,12 @@
 - Added `Server::bind` function.
 
 ### Changed
-- Use `Vec<u8>` for body data instead of `Box<[u8]>`.
+- Changed body date to use `Vec<u8>` instead of `Box<[u8]>`.
+- Moved transport traits and implementations to `transport` module.
+- Moved some traits to `util` module.
+
+### Removed
+- Made `RequestTracker` a private implementation detail.
 
 ### Changed
 - Renamed `into_transport_default()` to `into_default_transport()`.
