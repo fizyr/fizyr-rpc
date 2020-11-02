@@ -2,12 +2,12 @@
 #[derive(Debug, Clone)]
 pub struct StreamBody {
 	/// The message data.
-	pub data: Box<[u8]>,
+	pub data: Vec<u8>,
 }
 
 impl StreamBody {
 	/// Create a new stream body.
-	fn new(data: Box<[u8]>) -> Self {
+	fn new(data: Vec<u8>) -> Self {
 		Self { data }
 	}
 }
@@ -20,7 +20,7 @@ impl crate::Body for StreamBody {
 
 impl<T> From<T> for StreamBody
 where
-	Box<[u8]>: From<T>,
+	Vec<u8>: From<T>,
 {
 	fn from(other: T) -> Self {
 		Self { data: other.into() }

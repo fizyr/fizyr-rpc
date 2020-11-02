@@ -113,7 +113,7 @@ mod test {
 			assert!(let Ok(()) = write_a.write_msg(&MessageHeader::request(i * 2, 10), &body).await);
 			let_assert!(Ok(message) = read_b.read_msg().await);
 			assert!(message.header == MessageHeader::request(i * 2, 10));
-			assert!(message.body.data.as_ref() == b"Hello peer_b!");
+			assert!(message.body.data == b"Hello peer_b!");
 			assert!(message.body.fds.len() == 2);
 			let_assert!(Ok(blob_0) = read_blob(&message.body.fds[0]));
 			let_assert!(Ok(blob_1) = read_blob(&message.body.fds[1]));
@@ -123,7 +123,7 @@ mod test {
 			assert!(let Ok(()) = write_b.write_msg(&MessageHeader::request(i * 2 + 1, 11), &b"Hello peer_a!"[..].into()).await);
 			let_assert!(Ok(message) = read_a.read_msg().await);
 			assert!(message.header == MessageHeader::request(i * 2 + 1, 11));
-			assert!(message.body.data.as_ref() == b"Hello peer_a!");
+			assert!(message.body.data == b"Hello peer_a!");
 		}
 	}
 
