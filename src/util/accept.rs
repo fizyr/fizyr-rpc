@@ -21,6 +21,15 @@ pub trait Listener {
 	}
 }
 
+/// Trait for creating a new listener bound to a specific address.
+pub trait Bind<'a, Address: 'a>: Sized + Listener {
+	/// The type of the future returned by `Self::bind`.
+	type Future: Future<Output = std::io::Result<Self>>;
+
+	/// Create a new listener bound to an address.
+	fn bind(address: Address) -> Self::Future;
+}
+
 pub struct Accept<'a, L: ?Sized> {
 	inner: &'a mut L,
 }

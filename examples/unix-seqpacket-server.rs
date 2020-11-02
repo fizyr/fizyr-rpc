@@ -1,7 +1,6 @@
-use fizyr_rpc::Server;
+use fizyr_rpc::UnixSeqpacketServer;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use tokio_seqpacket::UnixSeqpacketListener;
 
 #[derive(StructOpt)]
 #[structopt(setting = structopt::clap::AppSettings::ColoredHelp)]
@@ -20,11 +19,10 @@ async fn main() {
 }
 
 async fn do_main(options: &Options) -> Result<(), String> {
-	// Create a listening socket for the server.
-	let socket = UnixSeqpacketListener::bind(&options.socket).map_err(|e| format!("failed to bind to {}: {}", options.socket.display(), e))?;
-
 	// Wrap the socket in an RPC server.
-	let mut server = Server::new(socket, Default::default());
+	let mut server = UnixSeqpacketServer::bind(&options.socket, Default::default())
+		.await
+		.map_err(|e| format!("failed to bind to {}: {}", options.socket.display(), e))?;
 	eprintln!("listening on {}", options.socket.display());
 
 	// Run the accept loop.

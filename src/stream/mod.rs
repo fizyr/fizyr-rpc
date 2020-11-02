@@ -50,6 +50,20 @@ mod impl_unix_stream {
 		}
 	}
 
+	impl<'a, Address> crate::util::Bind<'a, Address> for tokio::net::UnixListener
+	where
+		Address: AsRef<std::path::Path> + 'a,
+	{
+		// TODO: Use more efficient custom future?
+		type Future = Pin<Box<dyn Future<Output = std::io::Result<Self>> + 'a>>;
+
+		fn bind(address: Address) -> Self::Future {
+			Box::pin(async {
+				Self::bind(address)
+			})
+		}
+	}
+
 	/// Helper struct to provide the read half types with a lifetime.
 	pub struct ReadHalfType;
 
@@ -108,6 +122,17 @@ mod impl_tcp {
 				let socket = tokio::net::TcpStream::connect(address).await?;
 				Ok(Self::new(socket, config))
 			})
+		}
+	}
+
+	impl<'a, Address> crate::util::Bind<'a, Address> for tokio::net::TcpListener
+	where
+		Address: tokio::net::ToSocketAddrs + 'a,
+	{
+		type Future = Pin<Box<dyn Future<Output = std::io::Result<Self>> + 'a>>;
+
+		fn bind(address: Address) -> Self::Future {
+			Box::pin(Self::bind(address))
 		}
 	}
 

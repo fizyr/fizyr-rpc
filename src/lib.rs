@@ -149,6 +149,10 @@ pub type TcpTransport = StreamTransport<tokio::net::TcpStream>;
 #[cfg(feature = "tcp")]
 pub type TcpPeer = Peer<TcpTransport>;
 
+/// Server for TCP sockets.
+#[cfg(feature = "tcp")]
+pub type TcpServer = Server<tokio::net::TcpListener>;
+
 /// Message transport for Unix stream sockets.
 #[cfg(feature = "unix-stream")]
 pub type UnixStreamTransport = StreamTransport<tokio::net::UnixStream>;
@@ -157,6 +161,10 @@ pub type UnixStreamTransport = StreamTransport<tokio::net::UnixStream>;
 #[cfg(feature = "unix-stream")]
 pub type UnixStreamPeer = Peer<UnixStreamTransport>;
 
+/// Server for Unix stream sockets.
+#[cfg(feature = "unix-stream")]
+pub type UnixStreamServer = Server<tokio::net::UnixListener>;
+
 /// Message transport for Unix seqpacket sockets.
 #[cfg(feature = "unix-seqpacket")]
 pub type UnixSeqpacketTransport = UnixTransport<tokio_seqpacket::UnixSeqpacket>;
@@ -164,3 +172,7 @@ pub type UnixSeqpacketTransport = UnixTransport<tokio_seqpacket::UnixSeqpacket>;
 /// Peer using the Unix seqpacket transport.
 #[cfg(feature = "unix-seqpacket")]
 pub type UnixSeqpacketPeer = Peer<UnixSeqpacketTransport>;
+
+/// Server for Unix seqpacket sockets.
+#[cfg(feature = "unix-seqpacket")]
+pub type UnixSeqpacketServer = Server<tokio_seqpacket::UnixSeqpacketListener>;

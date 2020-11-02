@@ -3,6 +3,7 @@
 ## v0.2.0 - unreleased
 ### Added
 - Added `Peer::connect` function.
+- Added `Server::bind` function.
 
 ### Changed
 - Renamed `into_transport_default()` to `into_default_transport()`.
