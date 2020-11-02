@@ -1,6 +1,10 @@
 # Changelog
 
-## v0.2.0 - unreleased
+## v0.2.1 - unreleased
+### Fixed
+- Fixed link in README.
+
+## v0.2.0 - 2020-09-03
 ### Added
 - Added `Peer::connect` function.
 - Added `Server::bind` function.
@@ -22,11 +26,11 @@
 
 ## v0.1.3 - 2020-10-13
 ### Fixed
-- Fix link of `docs.rs` badge in README.
+- Fixed link of `docs.rs` badge in README.
 
 ## v0.1.2 - 2020-10-13
 ### Fixed
-- Fix links to documentation in README.
+- Fixed links to documentation in README.
 
 ## v0.1.1 - 2020-10-13
 ### Fixed
