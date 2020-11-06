@@ -11,7 +11,7 @@ struct Options {
 	socket: PathBuf,
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
 	if let Err(e) = do_main(&Options::from_args()).await {
 		eprintln!("Error: {}", e);

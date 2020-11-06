@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.0 - unreleased
+### Changed
+- Update to tokio 0.3.
+
 ## v0.2.1 - 2020-09-03
 ### Fixed
 - Fixed link in README.

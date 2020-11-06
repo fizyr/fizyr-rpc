@@ -61,7 +61,7 @@ impl Listener for tokio::net::TcpListener {
 
 #[cfg(feature = "unix-stream")]
 impl Listener for tokio::net::UnixListener {
-	type Address = std::os::unix::net::SocketAddr;
+	type Address = tokio::net::unix::SocketAddr;
 	type Connection = tokio::net::UnixStream;
 
 	fn poll_accept(self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
