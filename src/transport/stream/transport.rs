@@ -98,11 +98,12 @@ impl<W> StreamWriteHalf<W> {
 
 /// Wrapper around [`AsyncRead::poll_read`] that turns zero-sized reads into ConnectionAborted errors.
 fn poll_read<R: AsyncRead>(stream: Pin<&mut R>, context: &mut Context, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-	match stream.poll_read(context, buf) {
-		Poll::Pending => Poll::Pending,
-		Poll::Ready(Ok(0)) => Poll::Ready(Err(std::io::ErrorKind::ConnectionAborted.into())),
-		Poll::Ready(Ok(n)) => Poll::Ready(Ok(n)),
-		Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+	let mut buf = tokio::io::ReadBuf::new(buf);
+	ready!(stream.poll_read(context, &mut buf))?;
+	if buf.filled().is_empty() {
+		Poll::Ready(Err(std::io::ErrorKind::ConnectionAborted.into()))
+	} else {
+		Poll::Ready(Ok(buf.filled().len()))
 	}
 }
 
