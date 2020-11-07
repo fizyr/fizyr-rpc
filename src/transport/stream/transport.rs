@@ -100,7 +100,7 @@ impl<W> StreamWriteHalf<W> {
 fn poll_read<R: AsyncRead>(stream: Pin<&mut R>, context: &mut Context, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
 	let mut buf = tokio::io::ReadBuf::new(buf);
 	ready!(stream.poll_read(context, &mut buf))?;
-	if buf.filled().len() == 0 {
+	if buf.filled().is_empty() {
 		Poll::Ready(Err(std::io::ErrorKind::ConnectionAborted.into()))
 	} else {
 		Poll::Ready(Ok(buf.filled().len()))
