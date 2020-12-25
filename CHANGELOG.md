@@ -2,7 +2,7 @@
 
 ## v0.3.0 - unreleased
 ### Changed
-- Update to tokio 0.3.
+- Update to tokio 1.0 and tokio-seqpacket 0.4.
 - Remove meaningless addresses from Accept implementation for Unix sockets.
 
 ## v0.2.1 - 2020-09-03

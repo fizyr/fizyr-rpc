@@ -82,7 +82,7 @@ impl<W> UnixWriteHalf<W> {
 }
 
 #[cfg(feature = "unix-seqpacket")]
-impl crate::transport::TransportReadHalf for UnixReadHalf<tokio_seqpacket::ReadHalf<'_>> {
+impl crate::transport::TransportReadHalf for UnixReadHalf<&tokio_seqpacket::UnixSeqpacket> {
 	type Body = UnixBody;
 
 	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, ReadMessageError>> {
@@ -129,7 +129,7 @@ impl crate::transport::TransportReadHalf for UnixReadHalf<tokio_seqpacket::ReadH
 }
 
 #[cfg(feature = "unix-seqpacket")]
-impl crate::transport::TransportWriteHalf for UnixWriteHalf<tokio_seqpacket::WriteHalf<'_>> {
+impl crate::transport::TransportWriteHalf for UnixWriteHalf<&tokio_seqpacket::UnixSeqpacket> {
 	type Body = UnixBody;
 
 	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), WriteMessageError>> {

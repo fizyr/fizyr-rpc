@@ -18,8 +18,8 @@ mod impl_unix_seqpacket {
 		type ReadHalf = ReadHalfType;
 		type WriteHalf = WriteHalfType;
 
-		fn split<'a>(&'a mut self) -> (UnixReadHalf<tokio_seqpacket::ReadHalf<'a>>, UnixWriteHalf<tokio_seqpacket::WriteHalf<'a>>) {
-			let (read_half, write_half) = self.socket.split();
+		fn split<'a>(&'a mut self) -> (UnixReadHalf<&'a tokio_seqpacket::UnixSeqpacket>, UnixWriteHalf<&'a tokio_seqpacket::UnixSeqpacket>) {
+			let (read_half, write_half) = (&self.socket, &self.socket);
 			let read_half = UnixReadHalf::new(read_half, self.config.max_body_len_read, self.config.max_fds_read);
 			let write_half = UnixWriteHalf::new(write_half, self.config.max_body_len_write, self.config.max_fds_write);
 			(read_half, write_half)
@@ -72,12 +72,12 @@ mod impl_unix_seqpacket {
 
 	impl<'a> crate::transport::ReadHalfType<'a> for ReadHalfType {
 		type Body = UnixBody;
-		type ReadHalf = UnixReadHalf<tokio_seqpacket::ReadHalf<'a>>;
+		type ReadHalf = UnixReadHalf<&'a tokio_seqpacket::UnixSeqpacket>;
 	}
 
 	impl<'a> crate::transport::WriteHalfType<'a> for WriteHalfType {
 		type Body = UnixBody;
-		type WriteHalf = UnixWriteHalf<tokio_seqpacket::WriteHalf<'a>>;
+		type WriteHalf = UnixWriteHalf<&'a tokio_seqpacket::UnixSeqpacket>;
 	}
 }
 
