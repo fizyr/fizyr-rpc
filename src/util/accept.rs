@@ -80,7 +80,7 @@ impl Listener for tokio_seqpacket::UnixSeqpacketListener {
 	type Connection = tokio_seqpacket::UnixSeqpacket;
 
 	fn poll_accept(self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
-		let (socket, _address) = ready!(self.get_mut().poll_accept( context))?;
+		let socket = ready!(self.get_mut().poll_accept(context))?;
 		Poll::Ready(Ok((socket, ())))
 	}
 }

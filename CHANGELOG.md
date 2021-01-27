@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+### Changed
+- Update to tokio-seqpacket 0.5.
+
 ## v0.3.0 - 2020-12-25
 ### Changed
 - Update to tokio 1.0 and tokio-seqpacket 0.4.
