@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.3.0 - unreleased
+## v0.3.0 - 2020-12-25
 ### Changed
 - Update to tokio 1.0 and tokio-seqpacket 0.4.
 - Remove meaningless addresses from Accept implementation for Unix sockets.
