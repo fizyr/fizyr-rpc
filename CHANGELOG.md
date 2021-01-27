@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.1 - 2021-01-27
 ### Changed
 - Update to tokio-seqpacket 0.5.
 
