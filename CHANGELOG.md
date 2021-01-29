@@ -5,6 +5,9 @@
 - Renamed `ReceivedRequest::next_message()` to `recv_update()`.
 - Split `SentRequest::next_message()` in `recv_update()` and `recv_response()`.
 
+### Removed
+- Removed `error::ProcessIncomingMessageError` from public the API.
+
 ## v0.3.1 - 2021-01-27
 ### Changed
 - Update to tokio-seqpacket 0.5.

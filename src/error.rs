@@ -152,17 +152,6 @@ impl std::fmt::Display for UnexpectedMessageType {
 	}
 }
 
-/// An error occurred while processing an incoming message.
-#[derive(Debug, Clone, Error)]
-#[error("{0}")]
-pub enum ProcessIncomingMessageError {
-	/// The incoming request message has a request ID that is already associated with an open request.
-	DuplicateRequestId(#[from] DuplicateRequestId),
-
-	/// The incoming update or response message has a request ID that is not associated with an open request.
-	UnknownRequestId(#[from] UnknownRequestId),
-}
-
 /// An error occurred while reading an incoming message.
 #[derive(Debug, Error)]
 #[error("{0}")]
@@ -221,16 +210,6 @@ impl SendRequestError {
 			e.kind() == std::io::ErrorKind::ConnectionAborted
 		} else {
 			false
-		}
-	}
-}
-
-// Allow a ProcessIncomingMessageError to be converted to a NextMessageError automatically.
-impl From<ProcessIncomingMessageError> for NextMessageError {
-	fn from(other: ProcessIncomingMessageError) -> Self {
-		match other {
-			ProcessIncomingMessageError::DuplicateRequestId(e) => e.into(),
-			ProcessIncomingMessageError::UnknownRequestId(e) => e.into(),
 		}
 	}
 }

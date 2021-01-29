@@ -1,5 +1,6 @@
-use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
+use thiserror::Error;
 use tokio::sync::mpsc;
 
 use crate::error;
@@ -9,6 +10,27 @@ use crate::Message;
 use crate::MessageType;
 use crate::ReceivedRequest;
 use crate::SentRequest;
+
+/// An error occurred while processing an incoming message.
+#[derive(Debug, Clone, Error)]
+#[error("{0}")]
+pub enum ProcessIncomingMessageError {
+	/// The incoming request message has a request ID that is already associated with an open request.
+	DuplicateRequestId(#[from] error::DuplicateRequestId),
+
+	/// The incoming update or response message has a request ID that is not associated with an open request.
+	UnknownRequestId(#[from] error::UnknownRequestId),
+}
+
+// Allow a ProcessIncomingMessageError to be converted to a NextMessageError automatically.
+impl From<ProcessIncomingMessageError> for error::NextMessageError {
+	fn from(other: ProcessIncomingMessageError) -> Self {
+		match other {
+			ProcessIncomingMessageError::DuplicateRequestId(e) => e.into(),
+			ProcessIncomingMessageError::UnknownRequestId(e) => e.into(),
+		}
+	}
+}
 
 /// Tracker that manages open requests.
 ///
@@ -123,7 +145,7 @@ impl<Body> RequestTracker<Body> {
 	/// Returns an error
 	///  * if an incoming request message uses an already claimed request ID
 	///  * if an incoming update or response message does not match an open request
-	pub async fn process_incoming_message(&mut self, message: Message<Body>) -> Result<Option<Incoming<Body>>, error::ProcessIncomingMessageError> {
+	pub async fn process_incoming_message(&mut self, message: Message<Body>) -> Result<Option<Incoming<Body>>, ProcessIncomingMessageError> {
 		match message.header.message_type {
 			MessageType::Request => {
 				let received_request = self.register_received_request(message.header.request_id, message.header.service_id, message.body)?;
@@ -241,7 +263,7 @@ mod test {
 
 		// The received request is now dropped, so lets check that new incoming message cause an error.
 		let_assert!(
-			Err(error::ProcessIncomingMessageError::UnknownRequestId(e)) =
+			Err(ProcessIncomingMessageError::UnknownRequestId(e)) =
 				tracker.process_incoming_message(Message::requester_update(1, 11, Body)).await
 		);
 		assert!(e.request_id == 1);
@@ -285,7 +307,7 @@ mod test {
 		// After receiving the response, the entry should be removed from the tracker.
 		// So no more incoming messages for the request should be accepted.
 		let_assert!(
-			Err(error::ProcessIncomingMessageError::UnknownRequestId(e)) = tracker
+			Err(ProcessIncomingMessageError::UnknownRequestId(e)) = tracker
 				.process_incoming_message(Message::responder_update(sent_request.request_id(), 15, Body))
 				.await
 		);
