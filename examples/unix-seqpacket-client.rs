@@ -31,18 +31,25 @@ async fn do_main(options: &Options) -> Result<(), String> {
 		.map_err(|e| format!("failed to send request: {}", e))?;
 
 	loop {
-		// Receive the next message.
-		// This could be an update or the final response message.
-		let message = request.next_message().await.map_err(|e| format!("failed to read message: {}", e))?;
-
-		// Ignore anything but the response.
-		if message.header.message_type.is_response() {
-			// Parse the message body as UTF-8, print it and exit the loop.
-			let message = std::str::from_utf8(&message.body.data).map_err(|_| "invalid UTF-8 in response")?;
-			eprintln!("Received response: {}", message);
-			break;
-		}
+		let update = request
+			.recv_update()
+			.await
+			.map_err(|e| format!("failed to read message: {}", e))?;
+		let update = match update {
+			Some(x) => x,
+			None => break,
+		};
+		let message = std::str::from_utf8(&update.body.data).map_err(|_| "invalid UTF-8 in update")?;
+		eprintln!("Received update: {}", message);
 	}
+
+	let response = request
+		.recv_response()
+		.await
+		.map_err(|e| format!("failed to read message: {}", e))?;
+	// Parse the message body as UTF-8, print it and exit the loop.
+	let message = std::str::from_utf8(&response.body.data).map_err(|_| "invalid UTF-8 in response")?;
+	eprintln!("Received response: {}", message);
 
 	Ok(())
 }

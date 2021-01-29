@@ -126,6 +126,32 @@ pub struct UnknownRequestId {
 	pub request_id: u32,
 }
 
+/// The received message had an unexpected type.
+#[derive(Debug, Clone, Error)]
+pub struct UnexpectedMessageType {
+	/// The actual type of the received message.
+	pub value: crate::MessageType,
+
+	/// The expected type of the received message.
+	pub expected: crate::MessageType,
+}
+
+impl std::fmt::Display for UnexpectedMessageType {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		// NOTE: we can use the same string for requester and responder updates,
+		// because they can never get mixed up.
+		// If that would happen, it means the message got routed wrong because it went in the wrong direction.
+		let to_str = |kind| match kind {
+			crate::MessageType::Request => "a request message",
+			crate::MessageType::Response => "a response message",
+			crate::MessageType::RequesterUpdate => "an update message",
+			crate::MessageType::ResponderUpdate => "an update message",
+			crate::MessageType::Stream => "a streaming message",
+		};
+		write!(f, "unexpected message type: expected {}, got {}", to_str(self.expected), to_str(self.value))
+	}
+}
+
 /// An error occurred while processing an incoming message.
 #[derive(Debug, Clone, Error)]
 #[error("{0}")]
@@ -158,6 +184,9 @@ pub enum NextMessageError {
 
 	/// The incoming update or response message has a request ID that is not associated with an open request.
 	UnknownRequestId(#[from] UnknownRequestId),
+
+	/// The received message has an unexpected message type.
+	UnexpectedMessageType(#[from] UnexpectedMessageType),
 }
 
 impl NextMessageError {

@@ -232,8 +232,8 @@ mod test {
 		assert!(let Ok(None) = tracker.process_incoming_message(Message::requester_update(1, 10, Body)).await);
 
 		// Receive the update.
-		let_assert!(Ok(message) = received_request.next_message().await);
-		assert!(message.header == MessageHeader::requester_update(1, 10));
+		let_assert!(Ok(update) = received_request.recv_update().await);
+		assert!(update.header == MessageHeader::requester_update(1, 10));
 
 		// Send and update and response.
 		let_assert!(Ok(()) = received_request.send_update(3, Body).await);
@@ -271,7 +271,7 @@ mod test {
 
 		// Simulate and receive a responder update.
 		assert!(let Ok(None) = tracker.process_incoming_message(Message::responder_update(sent_request.request_id(), 12, Body)).await);
-		let_assert!(Ok(update) = sent_request.next_message().await);
+		let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
 		assert!(update.header == MessageHeader::responder_update(sent_request.request_id(), 12));
 
 		// Send an update.
@@ -279,7 +279,7 @@ mod test {
 
 		// Simulate and receive a response update.
 		assert!(let Ok(None) = tracker.process_incoming_message(Message::response(sent_request.request_id(), 14, Body)).await);
-		let_assert!(Ok(update) = sent_request.next_message().await);
+		let_assert!(Ok(update) = sent_request.recv_response().await);
 		assert!(update.header == MessageHeader::response(sent_request.request_id(), 14));
 
 		// After receiving the response, the entry should be removed from the tracker.

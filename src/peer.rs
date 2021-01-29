@@ -512,19 +512,19 @@ mod test {
 
 		// Send an update from A and receive it on B.
 		let_assert!(Ok(()) = sent_request.send_update(3, &[4][..]).await);
-		let_assert!(Ok(update) = received_request.next_message().await);
+		let_assert!(Ok(update) = received_request.recv_update().await);
 		assert!(update.header == MessageHeader::requester_update(request_id, 3));
 		assert!(update.body.as_ref() == &[4]);
 
 		// Send an update from B and receive it on A.
 		let_assert!(Ok(()) = received_request.send_update(5, &[6][..]).await);
-		let_assert!(Ok(update) = sent_request.next_message().await);
+		let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
 		assert!(update.header == MessageHeader::responder_update(request_id, 5));
 		assert!(update.body.as_ref() == &[6]);
 
 		// Send the response from B and receive it on A.
 		let_assert!(Ok(()) = received_request.send_response(7, &[8][..]).await);
-		let_assert!(Ok(response) = sent_request.next_message().await);
+		let_assert!(Ok(response) = sent_request.recv_response().await);
 		assert!(response.header == MessageHeader::response(request_id, 7));
 		assert!(response.body.as_ref() == &[8]);
 
@@ -534,5 +534,71 @@ mod test {
 
 		assert!(let Ok(()) = task_a.await);
 		assert!(let Ok(()) = task_b.await);
+	}
+
+	#[tokio::test]
+	async fn peeked_response_is_not_gone() {
+		let_assert!(Ok((peer_a, peer_b)) = UnixStream::pair());
+		let mut handle_a = Peer::spawn(StreamTransport::new(peer_a, Default::default()));
+		let mut handle_b = Peer::spawn(StreamTransport::new(peer_b, Default::default()));
+
+		// Send a request from A.
+		let_assert!(Ok(mut sent_request) = handle_a.send_request(1, &[2][..]).await);
+		let request_id = sent_request.request_id();
+
+		// Receive the request on B.
+		let_assert!(Ok(Incoming::Request(mut received_request)) = handle_b.next_message().await);
+
+		// Send two updates and a response from B to A.
+		let_assert!(Ok(()) = received_request.send_update(5, &b"Hello world!"[..]).await);
+		let_assert!(Ok(()) = received_request.send_update(6, &b"Hello world!"[..]).await);
+		let_assert!(Ok(()) = received_request.send_response(7, &b"Goodbye!"[..]).await);
+
+		// Try to receive three responses.
+		// This should stuff the response in the internal peek buffer.
+		assert!(let Ok(Some(_)) = sent_request.recv_update().await);
+		assert!(let Ok(Some(_)) = sent_request.recv_update().await);
+		assert!(let Ok(None) = sent_request.recv_update().await);
+
+		// Now receive the response, which should be returned intact from the peek buffer exactly once.
+		let_assert!(Ok(response) = sent_request.recv_response().await);
+		assert!(let Err(_) = sent_request.recv_response().await);
+
+		assert!(response.header == MessageHeader::response(request_id, 7));
+		assert!(response.body.as_ref() == b"Goodbye!");
+	}
+
+	#[tokio::test]
+	async fn peeked_update_is_not_gone() {
+		use crate::error::NextMessageError;
+
+		let_assert!(Ok((peer_a, peer_b)) = UnixStream::pair());
+		let mut handle_a = Peer::spawn(StreamTransport::new(peer_a, Default::default()));
+		let mut handle_b = Peer::spawn(StreamTransport::new(peer_b, Default::default()));
+
+		// Send a request from A.
+		let_assert!(Ok(mut sent_request) = handle_a.send_request(1, &[2][..]).await);
+		let request_id = sent_request.request_id();
+
+		// Receive the request on B.
+		let_assert!(Ok(Incoming::Request(mut received_request)) = handle_b.next_message().await);
+
+		// Send one update and a response from B to A.
+		let_assert!(Ok(()) = received_request.send_update(5, &b"Hello world!"[..]).await);
+		let_assert!(Ok(()) = received_request.send_response(6, &b"Goodbye!"[..]).await);
+
+		// Trying to read a response should stuff the update in the internal peek buffer.
+		assert!(let Err(NextMessageError::UnexpectedMessageType(_)) = sent_request.recv_response().await);
+
+		// Now we should receive the update intact from the peek buffer exactly once.
+		let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
+		assert!(update.header == MessageHeader::responder_update(request_id, 5));
+		assert!(update.body.as_ref() == b"Hello world!");
+		assert!(let Ok(None) = sent_request.recv_update().await);
+
+		// Now receive the response.
+		let_assert!(Ok(response) = sent_request.recv_response().await);
+		assert!(response.header == MessageHeader::response(request_id, 6));
+		assert!(response.body.as_ref() == b"Goodbye!");
 	}
 }

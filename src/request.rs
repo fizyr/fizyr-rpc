@@ -14,6 +14,7 @@ pub struct SentRequest<Body> {
 	service_id: i32,
 	incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
+	peek_buffer: Option<Message<Body>>,
 }
 
 /// A handle for a received request.
@@ -59,6 +60,7 @@ impl<Body> SentRequest<Body> {
 			service_id,
 			incoming_rx,
 			command_tx,
+			peek_buffer: None,
 		}
 	}
 
@@ -72,15 +74,51 @@ impl<Body> SentRequest<Body> {
 		self.service_id
 	}
 
-	/// Receive the next message from the request.
+	/// Receive the next update message of the request from the remote peer.
 	///
-	/// This could be an update message or a response message.
-	// TODO: change return type to eliminate impossible message types?
-	pub async fn next_message(&mut self) -> Result<Message<Body>, error::NextMessageError> {
-		Ok(self.incoming_rx.recv().await.ok_or_else(error::connection_aborted)?)
+	/// This function returns `Ok(None)` if the final response is received instead of an update message.
+	/// If that happens, the response message can be read using [`Self::response`].
+	pub async fn recv_update(&mut self) -> Result<Option<Message<Body>>, error::NextMessageError> {
+		let message = self.recv_message().await?;
+		if message.header.message_type.is_responder_update() {
+			Ok(Some(message))
+		} else {
+			self.peek_buffer = Some(message);
+			Ok(None)
+		}
 	}
 
-	/// Send an update for the request.
+	/// Receive the final response of the request from the remote peer.
+	///
+	/// This function returns an [`InvalidMessageType`][error::InvalidMessageType] if the received message is an update message.
+	/// If that happens, the update message can be read using [`Self::next_update`].
+	/// To ensure that there are no update messages left, keep calling [`Self::next_update`] untill it returns `Ok(None)`.
+	pub async fn recv_response(&mut self) -> Result<Message<Body>, error::NextMessageError> {
+		let message = self.recv_message().await?;
+		let kind = message.header.message_type;
+		if kind.is_response() {
+			Ok(message)
+		} else {
+			self.peek_buffer = Some(message);
+			Err(error::UnexpectedMessageType {
+				value: kind,
+				expected: crate::MessageType::Response,
+			}.into())
+		}
+	}
+
+	/// Receive the next message of the request from the remote peer.
+	///
+	/// This could be an update message or a response message.
+	async fn recv_message(&mut self) -> Result<Message<Body>, error::NextMessageError> {
+		if let Some(message) = self.peek_buffer.take() {
+			Ok(message)
+		} else {
+			Ok(self.incoming_rx.recv().await.ok_or_else(error::connection_aborted)?)
+		}
+	}
+
+	/// Send an update for the request to the remote peer.
 	pub async fn send_update(&mut self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
 		use crate::peer::SendRawMessage;
 		let body = body.into();
@@ -126,21 +164,18 @@ impl<Body> ReceivedRequest<Body> {
 		&self.body
 	}
 
-	/// Receive the next message from the request.
-	///
-	/// This can only be an update message.
-	// TODO: change return type to eliminate impossible message types?
-	pub async fn next_message(&mut self) -> Result<Message<Body>, error::ReadMessageError> {
+	/// Receive the next update message of the request from the remote peer.
+	pub async fn recv_update(&mut self) -> Result<Message<Body>, error::ReadMessageError> {
 		Ok(self.incoming_rx.recv().await.ok_or_else(error::connection_aborted)?)
 	}
 
-	/// Send an update for the request.
+	/// Send an update for the request to the remote peer.
 	pub async fn send_update(&mut self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
 		let body = body.into();
 		self.send_raw_message(Message::responder_update(self.request_id, service_id, body)).await
 	}
 
-	/// Send the final response.
+	/// Send the final response for the request to the remote peer.
 	pub async fn send_response(mut self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
 		let body = body.into();
 		self.send_raw_message(Message::response(self.request_id, service_id, body)).await

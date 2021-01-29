@@ -63,18 +63,14 @@
 //! let mut peer = TcpPeer::connect("localhost:1337", StreamConfig::default()).await?;
 //! let mut request = peer.send_request(1, &b"Hello World!"[..]).await?;
 //!
-//! loop {
-//!     let message = request.next_message().await?;
-//!     let body = std::str::from_utf8(&message.body)?;
-//!
-//!     if message.header.message_type.is_responder_update() {
-//!         eprintln!("Received update: {}", body);
-//!     } else if message.header.message_type.is_response() {
-//!         eprintln!("Received response: {}", body);
-//!         break;
-//!     }
+//! while let Some(update) = request.recv_update().await? {
+//!     let body = std::str::from_utf8(&update.body)?;
+//!     eprintln!("Received update: {}", body);
 //! }
 //!
+//! let response = request.recv_response().await?;
+//! let body = std::str::from_utf8(&response.body)?;
+//! eprintln!("Received response: {}", body);
 //! # Ok(())
 //! # }
 //! ```
