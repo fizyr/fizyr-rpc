@@ -155,7 +155,7 @@ impl std::fmt::Display for UnexpectedMessageType {
 /// An error occurred while reading an incoming message.
 #[derive(Debug, Error)]
 #[error("{0}")]
-pub enum NextMessageError {
+pub enum RecvMessageError {
 	/// An I/O error occurred.
 	Io(#[from] std::io::Error),
 
@@ -178,7 +178,7 @@ pub enum NextMessageError {
 	UnexpectedMessageType(#[from] UnexpectedMessageType),
 }
 
-impl NextMessageError {
+impl RecvMessageError {
 	/// Check if the error is an I/O error indicating that the connection was aborted by the remote peer.
 	pub fn is_connection_aborted(&self) -> bool {
 		if let Self::Io(e) = &self {
@@ -214,8 +214,8 @@ impl SendRequestError {
 	}
 }
 
-// Allow a ReadMessageError to be converted to a NextMessageError automatically.
-impl From<ReadMessageError> for NextMessageError {
+// Allow a ReadMessageError to be converted to a RecvMessageError automatically.
+impl From<ReadMessageError> for RecvMessageError {
 	fn from(other: ReadMessageError) -> Self {
 		match other {
 			ReadMessageError::Io(e) => e.into(),

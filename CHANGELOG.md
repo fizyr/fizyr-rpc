@@ -4,6 +4,7 @@
 ### Changed
 - Renamed `ReceivedRequest::next_message()` to `recv_update()`.
 - Split `SentRequest::next_message()` in `recv_update()` and `recv_response()`.
+- Renamed `NextMessageError` to `RecvMessageError`.
 
 ### Removed
 - Removed `error::ProcessIncomingMessageError` from public the API.

@@ -30,7 +30,7 @@ pub struct PeerHandle<Body> {
 /// Any open requests will also be terminated.
 pub struct PeerReadHandle<Body> {
 	/// Channel for incoming request and stream messages.
-	incoming_rx: mpsc::UnboundedReceiver<Result<Incoming<Body>, error::NextMessageError>>,
+	incoming_rx: mpsc::UnboundedReceiver<Result<Incoming<Body>, error::RecvMessageError>>,
 
 	/// Channel for sending commands to the peer loop.
 	///
@@ -70,7 +70,7 @@ pub struct PeerCloseHandle<Body> {
 impl<Body> PeerHandle<Body> {
 	/// Create a new peer handle from the separate channels.
 	pub(crate) fn new(
-		incoming_rx: mpsc::UnboundedReceiver<Result<Incoming<Body>, error::NextMessageError>>,
+		incoming_rx: mpsc::UnboundedReceiver<Result<Incoming<Body>, error::RecvMessageError>>,
 		command_tx: mpsc::UnboundedSender<Command<Body>>,
 	) -> Self {
 		let read_handle = PeerReadHandle {
@@ -94,7 +94,7 @@ impl<Body> PeerHandle<Body> {
 	///
 	/// Errors for invalid incoming messages are also reported by this function.
 	/// For example: incoming update messages that are not associated with a received request will be reported as an error here.
-	pub async fn next_message(&mut self) -> Result<Incoming<Body>, error::NextMessageError> {
+	pub async fn next_message(&mut self) -> Result<Incoming<Body>, error::RecvMessageError> {
 		self.read_handle.next_message().await
 	}
 
@@ -127,7 +127,7 @@ impl<Body> PeerReadHandle<Body> {
 	///
 	/// Errors for invalid incoming messages are also reported by this function.
 	/// For example: incoming update messages that are not associated with a received request will be reported as an error here.
-	pub async fn next_message(&mut self) -> Result<Incoming<Body>, error::NextMessageError> {
+	pub async fn next_message(&mut self) -> Result<Incoming<Body>, error::RecvMessageError> {
 		self.incoming_rx.recv().await.ok_or_else(error::connection_aborted)?
 	}
 

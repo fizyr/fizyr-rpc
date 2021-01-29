@@ -22,8 +22,8 @@ pub enum ProcessIncomingMessageError {
 	UnknownRequestId(#[from] error::UnknownRequestId),
 }
 
-// Allow a ProcessIncomingMessageError to be converted to a NextMessageError automatically.
-impl From<ProcessIncomingMessageError> for error::NextMessageError {
+// Allow a ProcessIncomingMessageError to be converted to a RecvMessageError automatically.
+impl From<ProcessIncomingMessageError> for error::RecvMessageError {
 	fn from(other: ProcessIncomingMessageError) -> Self {
 		match other {
 			ProcessIncomingMessageError::DuplicateRequestId(e) => e.into(),

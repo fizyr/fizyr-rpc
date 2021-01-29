@@ -46,7 +46,7 @@ pub struct Peer<Transport: crate::transport::Transport> {
 	command_rx: mpsc::UnboundedReceiver<Command<Transport::Body>>,
 
 	/// Sending end of the channel for incoming requests and stream messages.
-	incoming_tx: mpsc::UnboundedSender<Result<Incoming<Transport::Body>, error::NextMessageError>>,
+	incoming_tx: mpsc::UnboundedSender<Result<Incoming<Transport::Body>, error::RecvMessageError>>,
 
 	/// The number of [`PeerWriteHandle`][crate::PeerWriteHandle] objects for this peer.
 	///
@@ -223,7 +223,7 @@ where
 	command_rx: &'a mut mpsc::UnboundedReceiver<Command<W::Body>>,
 
 	/// The channel for sending incoming messages to the [`PeerHandle`].
-	incoming_tx: &'a mut mpsc::UnboundedSender<Result<Incoming<W::Body>, error::NextMessageError>>,
+	incoming_tx: &'a mut mpsc::UnboundedSender<Result<Incoming<W::Body>, error::RecvMessageError>>,
 
 	/// Flag to indicate if the peer read handle has already been stopped.
 	read_handle_dropped: &'a mut bool,
@@ -374,7 +374,7 @@ where
 	}
 
 	/// Send an incoming message to the PeerHandle.
-	async fn send_incoming(&mut self, incoming: Result<Incoming<W::Body>, error::NextMessageError>) -> Result<(), ()> {
+	async fn send_incoming(&mut self, incoming: Result<Incoming<W::Body>, error::RecvMessageError>) -> Result<(), ()> {
 		if self.incoming_tx.send(incoming).is_err() {
 			*self.read_handle_dropped = true;
 			Err(())
@@ -570,7 +570,7 @@ mod test {
 
 	#[tokio::test]
 	async fn peeked_update_is_not_gone() {
-		use crate::error::NextMessageError;
+		use crate::error::RecvMessageError;
 
 		let_assert!(Ok((peer_a, peer_b)) = UnixStream::pair());
 		let mut handle_a = Peer::spawn(StreamTransport::new(peer_a, Default::default()));
@@ -588,7 +588,7 @@ mod test {
 		let_assert!(Ok(()) = received_request.send_response(6, &b"Goodbye!"[..]).await);
 
 		// Trying to read a response should stuff the update in the internal peek buffer.
-		assert!(let Err(NextMessageError::UnexpectedMessageType(_)) = sent_request.recv_response().await);
+		assert!(let Err(RecvMessageError::UnexpectedMessageType(_)) = sent_request.recv_response().await);
 
 		// Now we should receive the update intact from the peek buffer exactly once.
 		let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
