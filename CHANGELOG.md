@@ -10,12 +10,12 @@
 
 ## v0.3.1 - 2021-01-27
 ### Changed
-- Update to tokio-seqpacket 0.5.
+- Updated to tokio-seqpacket 0.5.
 
 ## v0.3.0 - 2020-12-25
 ### Changed
-- Update to tokio 1.0 and tokio-seqpacket 0.4.
-- Remove meaningless addresses from Accept implementation for Unix sockets.
+- Updated to tokio 1.0 and tokio-seqpacket 0.4.
+- Removed meaningless addresses from Accept implementation for Unix sockets.
 
 ## v0.2.1 - 2020-09-03
 ### Fixed
@@ -30,12 +30,10 @@
 - Changed body date to use `Vec<u8>` instead of `Box<[u8]>`.
 - Moved transport traits and implementations to `transport` module.
 - Moved some traits to `util` module.
+- Renamed `into_transport_default()` to `into_default_transport()`.
 
 ### Removed
 - Made `RequestTracker` a private implementation detail.
-
-### Changed
-- Renamed `into_transport_default()` to `into_default_transport()`.
 
 ## v0.1.4 - 2020-10-04
 ### Fixed
