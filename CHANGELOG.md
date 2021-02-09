@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.4.0 - 2021-02-09
 ### Changed
 - Renamed `ReceivedRequest::next_message()` to `recv_update()`.
 - Split `SentRequest::next_message()` in `recv_update()` and `recv_response()`.
