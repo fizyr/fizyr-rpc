@@ -129,7 +129,7 @@ mod test {
 
 	fn make_blob(name: &str, data: &[u8]) -> filedesc::FileDesc {
 		use std::io::{Seek, Write};
-		let_assert!(Ok(fd) = memfd::MemfdOptions::new().close_on_exec(true).create(name));
+		let_assert!(Ok(fd) = memfile::MemFile::create_default(name));
 		let mut file = fd.into_file();
 		let_assert!(Ok(_) = file.write_all(data));
 		assert!(let Ok(_) = file.seek(std::io::SeekFrom::Start(0)));

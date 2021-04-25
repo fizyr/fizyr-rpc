@@ -34,7 +34,7 @@ assert2 = "0.3.3"
 tokio = { version = "1.0.0", features = ["macros"] }
 fizyr-rpc = { path = ".", features = ["unix-seqpacket", "unix-stream", "tcp"] }
 structopt = "0.3.18"
-memfd = "0.3.0"
+memfile = "0.2.0"
 
 [package.metadata.docs.rs]
 features = ["tcp", "unix-stream", "unix-seqpacket"]
