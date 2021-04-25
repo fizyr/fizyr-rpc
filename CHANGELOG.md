@@ -2,8 +2,8 @@
 
 ## v0.4.1 - 2021-04-25
 ### Fixed
-- Fix reading messages with empty body with the `StreamTransport`.
-- Fix documentation on how to receive messages on a `SentRequest`.
+- Fixed reading messages with empty body with the `StreamTransport`.
+- Fixed documentation on how to receive messages on a `SentRequest`.
 
 ## v0.4.0 - 2021-02-09
 ### Changed
