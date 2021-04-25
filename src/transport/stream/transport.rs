@@ -145,18 +145,13 @@ where
 			this.bytes_read += ready!(poll_read(stream, context, &mut this.body_buffer[body_read..]))?;
 			let body_read = this.bytes_read - FRAMED_HEADER_LEN;
 			assert!(body_read <= this.body_buffer.len());
-
-			// Check if we have the whole body.
-			if body_read == this.body_buffer.len() {
-				// Reset internal state and return the read message.
-				let header = this.parsed_header;
-				let body = std::mem::replace(&mut this.body_buffer, Vec::new());
-				this.bytes_read = 0;
-				return Poll::Ready(Ok(Message::new(header, body.into())));
-			}
 		}
 
-		unreachable!()
+		// Reset internal state and return the read message.
+		let header = this.parsed_header;
+		let body = std::mem::replace(&mut this.body_buffer, Vec::new());
+		this.bytes_read = 0;
+		Poll::Ready(Ok(Message::new(header, body.into())))
 	}
 }
 

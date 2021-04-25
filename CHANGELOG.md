@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.4.1 - 2021-04-25
+### Fixed
+- Fix reading messages with empty body with the `StreamTransport`.
+
 ## v0.4.0 - 2021-02-09
 ### Changed
 - Renamed `ReceivedRequest::next_message()` to `recv_update()`.
