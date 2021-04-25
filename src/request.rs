@@ -77,7 +77,7 @@ impl<Body> SentRequest<Body> {
 	/// Receive the next update message of the request from the remote peer.
 	///
 	/// This function returns `Ok(None)` if the final response is received instead of an update message.
-	/// If that happens, the response message can be read using [`Self::response`].
+	/// If that happens, the response message can be read using [`Self::recv_response`].
 	pub async fn recv_update(&mut self) -> Result<Option<Message<Body>>, error::RecvMessageError> {
 		let message = self.recv_message().await?;
 		if message.header.message_type.is_responder_update() {
@@ -91,8 +91,8 @@ impl<Body> SentRequest<Body> {
 	/// Receive the final response of the request from the remote peer.
 	///
 	/// This function returns an [`InvalidMessageType`][error::InvalidMessageType] if the received message is an update message.
-	/// If that happens, the update message can be read using [`Self::next_update`].
-	/// To ensure that there are no update messages left, keep calling [`Self::next_update`] untill it returns `Ok(None)`.
+	/// If that happens, the update message can be read using [`Self::recv_update`].
+	/// To ensure that there are no update messages left, keep calling [`Self::recv_update`] untill it returns `Ok(None)`.
 	pub async fn recv_response(&mut self) -> Result<Message<Body>, error::RecvMessageError> {
 		let message = self.recv_message().await?;
 		let kind = message.header.message_type;
