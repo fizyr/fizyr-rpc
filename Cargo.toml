@@ -38,3 +38,6 @@ memfile = "0.2.0"
 
 [package.metadata.docs.rs]
 features = ["tcp", "unix-stream", "unix-seqpacket"]
+
+[workspace]
+members = ["derive", "derive-macros"]
