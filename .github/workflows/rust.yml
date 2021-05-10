@@ -22,14 +22,18 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --all-features --color=always
+          args: --workspace --all-targets --all-features --color=always
+        env:
+          RUSTFLAGS: -Dwarnings
       - name: Clippy
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --release --all-features
+          args: --workspace --all-targets --all-features
       - name: Test
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all-features --color=always
+          args: --workspace --all-targets --all-features --color=always
+        env:
+          RUSTFLAGS: -Dwarnings
