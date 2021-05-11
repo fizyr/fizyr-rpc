@@ -1,0 +1,7 @@
+[package]
+name = "macros-tests"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+fizyr-rpc = { path = "..", features = ["macros", "unix-stream"] }

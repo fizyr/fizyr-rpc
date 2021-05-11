@@ -27,6 +27,10 @@ impl UnixBody {
 }
 
 impl crate::Body for UnixBody {
+	fn empty() -> Self {
+		Self::from(Vec::new())
+	}
+
 	fn from_error(message: &str) -> Self {
 		Self::from(message.as_bytes())
 	}

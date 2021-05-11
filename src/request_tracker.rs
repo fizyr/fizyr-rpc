@@ -224,6 +224,10 @@ mod test {
 	struct Body;
 
 	impl crate::Body for Body {
+		fn empty() -> Self {
+			Self
+		}
+
 		fn from_error(_message: &str) -> Self {
 			Self
 		}

@@ -1,21 +1,20 @@
 pub fn generate_interface(tokens: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-	let raw: raw::InterfaceDefinition = match syn::parse2(tokens) {
+	let raw: raw::InterfaceInput = match syn::parse2(tokens) {
 		Ok(x) => x,
 		Err(e) => return e.into_compile_error(),
 	};
 
+	let mut tokens = proc_macro2::TokenStream::new();
 	let mut errors = Vec::new();
-	let interface = cooked::InterfaceDefinition::from_raw(&mut errors, raw);
+	let interface = cooked::InterfaceDefinition::from_raw(&mut errors, raw.interface);
 	if !errors.is_empty() {
-		let mut error_tokens = proc_macro2::TokenStream::new();
 		for error in errors {
-			error_tokens.extend(error.into_compile_error());
+			tokens.extend(error.into_compile_error());
 		}
-		return error_tokens;
 	}
 
-	eprintln!("{:#?}", interface);
-	proc_macro2::TokenStream::new()
+	tokens.extend(crate::client::generate_client(&raw.fizyr_rpc, &interface));
+	tokens
 }
 
 /// Second stage parsing types.
@@ -28,7 +27,7 @@ pub fn generate_interface(tokens: proc_macro2::TokenStream) -> proc_macro2::Toke
 ///
 /// The cooked type can still be used for code generation to minimize the impact
 /// on code using the generated type, but the errors MUST be emitted too.
-mod cooked {
+pub mod cooked {
 	use crate::util::{parse_doc_attr_contents, parse_eq_attr_contents, WithSpan};
 
 	#[derive(Debug)]
@@ -71,6 +70,7 @@ mod cooked {
 	#[derive(Debug)]
 	pub struct UpdateDefinition {
 		pub service_id: WithSpan<i32>,
+		pub name: syn::Ident,
 		pub body_type: Box<syn::Type>,
 	}
 
@@ -202,22 +202,28 @@ mod cooked {
 					match parse_update_attr(attr.tokens) {
 						Err(e) => errors.push(e),
 						Ok(update) => {
+							// Emit an error but add the duplicate anyway.
 							if request_updates.iter().any(|x| x.service_id.value == update.service_id.value) {
 								errors.push(syn::Error::new(update.service_id.span, "duplicate service ID for request update"));
-							} else {
-								request_updates.push(update)
 							}
+							if request_updates.iter().any(|x| x.name == update.name) {
+								errors.push(syn::Error::new(update.service_id.span, "duplicate name for request update"));
+							}
+							request_updates.push(update)
 						},
 					}
 				} else if attr.path.is_ident("response_update") {
 					match parse_update_attr(attr.tokens) {
 						Err(e) => errors.push(e),
 						Ok(update) => {
+							// Emit an error but add the duplicate anyway.
 							if response_updates.iter().any(|x| x.service_id.value == update.service_id.value) {
 								errors.push(syn::Error::new(update.service_id.span, "duplicate service ID for response update"));
-							} else {
-								response_updates.push(update)
 							}
+							if response_updates.iter().any(|x| x.name == update.name) {
+								errors.push(syn::Error::new(update.service_id.span, "duplicate name for request update"));
+							}
+							response_updates.push(update)
 						},
 					}
 				} else {
@@ -248,8 +254,11 @@ mod cooked {
 		struct UpdateAttr {
 			_paren_token: syn::token::Paren,
 			service_id: syn::LitInt,
-			_comma_token: syn::token::Comma,
+			_comma_token1: syn::token::Comma,
+			name: syn::Ident,
+			_comma_token2: syn::token::Comma,
 			body_type: Box<syn::Type>,
+			_comma_token3: Option<syn::token::Comma>,
 		}
 
 		impl syn::parse::Parse for UpdateAttr {
@@ -259,16 +268,22 @@ mod cooked {
 				Ok(Self {
 					_paren_token: syn::parenthesized!(contents in input),
 					service_id: contents.parse()?,
-					_comma_token: contents.parse()?,
+					_comma_token1: contents.parse()?,
+					name: contents.parse()?,
+					_comma_token2: contents.parse()?,
 					body_type: contents.parse()?,
+					_comma_token3: contents.parse()?,
 				})
 			}
 		}
 
 		let parsed: UpdateAttr = syn::parse2(tokens)?;
 		let service_id = WithSpan::new(parsed.service_id.span(), parsed.service_id.base10_parse()?);
-		let body_type = parsed.body_type;
-		Ok(UpdateDefinition { service_id, body_type })
+		Ok(UpdateDefinition {
+			service_id,
+			name: parsed.name,
+			body_type: parsed.body_type,
+		})
 	}
 }
 
@@ -277,6 +292,13 @@ mod cooked {
 /// The types in this modules still contain potentially invalid data.
 /// We want to fully parse this raw form before continuing to more detailed error checking.
 mod raw {
+	#[derive(Debug)]
+	pub struct InterfaceInput {
+		pub fizyr_rpc: syn::Ident,
+		pub _semi: syn::token::Semi,
+		pub interface: InterfaceDefinition,
+	}
+
 	#[derive(Debug)]
 	pub struct InterfaceDefinition {
 		pub attrs: Vec<syn::Attribute>,
@@ -306,6 +328,16 @@ mod raw {
 	pub struct ResponseType {
 		pub arrow: syn::token::RArrow,
 		pub ty: Box<syn::Type>,
+	}
+
+	impl syn::parse::Parse for InterfaceInput {
+		fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+			Ok(Self {
+				fizyr_rpc: input.parse()?,
+				_semi: input.parse()?,
+				interface: input.parse()?,
+			})
+		}
 	}
 
 	impl syn::parse::Parse for InterfaceDefinition {
