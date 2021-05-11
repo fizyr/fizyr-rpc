@@ -13,6 +13,10 @@ impl StreamBody {
 }
 
 impl crate::Body for StreamBody {
+	fn empty() -> Self {
+		Self::new(Vec::new())
+	}
+
 	fn from_error(message: &str) -> Self {
 		Self::new(message.as_bytes().into())
 	}

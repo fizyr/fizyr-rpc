@@ -1,4 +1,5 @@
 use proc_macro2::{Span, TokenStream};
+use quote::ToTokens;
 use syn::parse::{Parse, ParseStream};
 
 /// A span and a value.
@@ -17,9 +18,10 @@ impl<T> WithSpan<T> {
 	}
 }
 
-impl<T> syn::spanned::Spanned for WithSpan<T> {
-	fn span(&self) -> Span {
-		self.span
+impl<T: ToTokens> ToTokens for WithSpan<T> {
+	fn to_tokens(&self, tokens: &mut TokenStream) {
+		let value = &self.value;
+		quote::quote_spanned!(self.span => #value).to_tokens(tokens);
 	}
 }
 
