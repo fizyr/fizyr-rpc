@@ -5,10 +5,16 @@ fizyr_rpc::interface! {
 		fn ping();
 
 		#[service_id = 1]
-		#[response_update(10, state, RecordState)]
-		#[request_update(11, nevermind, ())]
 		/// Record an image.
-		fn record();
+		fn record() {
+			#[service_id = 10]
+			#[request_update]
+			nevermind: (),
+
+			#[service_id = 11]
+			#[response_update]
+			state: RecordState,
+		}
 	}
 }
 

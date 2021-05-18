@@ -5,7 +5,7 @@ use syn::parse::{Parse, ParseStream};
 /// A span and a value.
 ///
 /// Mainly used to keep spans around for generating errors later on.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WithSpan<T> {
 	pub span: Span,
 	pub value: T,
@@ -27,7 +27,7 @@ impl<T: ToTokens> ToTokens for WithSpan<T> {
 
 /// Keep parsing a type until the stream is depleted.
 ///
-/// The type is parsed as-is without expecting any intermediate puncuation.
+/// The type is parsed as-is without expecting any intermediate punctuation.
 pub fn parse_repeated<T: Parse>(input: ParseStream) -> syn::Result<Vec<T>> {
 	let mut result = Vec::new();
 	while !input.is_empty() {

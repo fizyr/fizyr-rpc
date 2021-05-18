@@ -4,29 +4,30 @@ use proc_macro2::{Span, TokenStream};
 
 /// Generate a client struct for the given interface.
 pub fn generate_client(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) -> TokenStream {
-	let module = syn::Path::from(interface.name.clone());
-	let client_name = interface.client_struct
-		.clone()
-		.unwrap_or(syn::Ident::new("Client", Span::call_site()));
-
 	let mut item_tokens = TokenStream::new();
 	let mut impl_tokens = TokenStream::new();
 
-	let mod_doc = format!("Support types for the {} RPC interface.", interface.name);
-	let client_doc = format!("RPC client for the {} interface.", interface.name);
+	let interface_name = interface.name();
+	let interface_doc = if interface.doc().is_empty() {
+		let text = format!("Support types for the {} RPC interface.", interface.name());
+		quote!(#[doc = #text])
+	} else {
+		to_doc_attrs(interface.doc())
+	};
+	let client_doc = format!("RPC client for the {} interface.", interface.name());
 	generate_services(&mut item_tokens, &mut impl_tokens, fizyr_rpc, interface);
 
 	let tokens = quote! {
-		#[doc = #mod_doc]
-		pub mod #module {
+		#interface_doc
+		pub mod #interface_name {
 			use super::*; // TODO: Can we use spans to resolve types rather than bringing things into scope? D:
 
 			#[doc = #client_doc]
-			pub struct #client_name<P: #fizyr_rpc::macros::Protocol> {
+			pub struct Client<P: #fizyr_rpc::macros::Protocol> {
 				peer: #fizyr_rpc::PeerWriteHandle<P::Body>,
 			}
 
-			impl<P: #fizyr_rpc::macros::Protocol> #client_name<P> {
+			impl<P: #fizyr_rpc::macros::Protocol> Client<P> {
 				/// Create a new interface-specific RPC client from a raw write handle.
 				fn new(peer: #fizyr_rpc::PeerWriteHandle<P::Body>) -> Self {
 					Self { peer }
@@ -59,13 +60,13 @@ pub fn generate_client(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) 
 				#impl_tokens
 			}
 
-			impl<P: #fizyr_rpc::macros::Protocol> ::core::convert::From<#fizyr_rpc::PeerWriteHandle<P::Body>> for #client_name<P> {
+			impl<P: #fizyr_rpc::macros::Protocol> ::core::convert::From<#fizyr_rpc::PeerWriteHandle<P::Body>> for Client<P> {
 				fn from(other: #fizyr_rpc::PeerWriteHandle<P::Body>) -> Self {
 					Self::new(other)
 				}
 			}
 
-			impl<P: #fizyr_rpc::macros::Protocol> ::core::convert::From<#fizyr_rpc::PeerHandle<P::Body>> for #client_name<P> {
+			impl<P: #fizyr_rpc::macros::Protocol> ::core::convert::From<#fizyr_rpc::PeerHandle<P::Body>> for Client<P> {
 				fn from(other: #fizyr_rpc::PeerHandle<P::Body>) -> Self {
 					let (_read, write) = other.split();
 					Self::new(write)
@@ -81,23 +82,23 @@ pub fn generate_client(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) 
 
 /// Generate the support types and function definitions for each service.
 fn generate_services(item_tokens: &mut TokenStream, impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) {
-	for service in &interface.services {
-		let service_name = &service.name;
-		let service_doc = to_doc_attrs(&service.doc);
-		let service_id = &service.service_id;
+	for service in interface.services() {
+		let service_name = service.name();
+		let service_doc = to_doc_attrs(&service.doc());
+		let service_id = service.service_id();
 
-		let request_param = service.request_type.as_ref().map(|x| quote!(request: #x));
-		let request_type = service.request_type.as_ref().map(|x| quote!(#x)).unwrap_or_else(|| quote!(()));
-		let request_body = if service.request_type.is_some() {
+		let request_param = service.request_type().map(|x| quote!(request: #x));
+		let request_type = service.request_type().map(|x| quote!(#x)).unwrap_or_else(|| quote!(()));
+		let request_body = if service.request_type().is_some() {
 			quote!(P::encode_body(request))
 		} else {
 			quote!(P::encode_body(()))
 		};
 
-		let response_type = service.response_type.as_ref().map(|x| quote!(#x)).unwrap_or_else(|| quote!(()));
+		let response_type = service.response_type().map(|x| quote!(#x)).unwrap_or_else(|| quote!(()));
 
 		// Service without updates, so directly return the response (asynchronously).
-		if service.request_updates.is_empty() && service.response_updates.is_empty() {
+		if service.request_updates().is_empty() && service.response_updates().is_empty() {
 			impl_tokens.extend(quote! {
 				#service_doc
 				pub async fn #service_name(&self, #request_param) -> Result<#response_type, #fizyr_rpc::error::ServiceCallError>
@@ -128,7 +129,7 @@ fn generate_services(item_tokens: &mut TokenStream, impl_tokens: &mut TokenStrea
 				}
 			});
 
-			let mod_doc = format!("Support types for the {} service.", service.name);
+			let mod_doc = format!("Support types for the {} service.", service.name());
 			item_tokens.extend(quote! {
 				#[doc = #mod_doc]
 				pub mod #service_name {
@@ -145,10 +146,10 @@ fn generate_services(item_tokens: &mut TokenStream, impl_tokens: &mut TokenStrea
 /// Only used for service calls that have update messages.
 /// Otherwise, the return type of a service call will simply the the response message.
 fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, service: &ServiceDefinition) {
-	let service_name = &service.name;
-	let response_type = service.response_type.as_ref().map(|x| quote!(#x)).unwrap_or_else(|| quote!(()));
+	let service_name = service.name();
+	let response_type = service.response_type().map(|x| quote!(#x)).unwrap_or_else(|| quote!(()));
 
-	let doc_recv_update = match service.response_updates.is_empty() {
+	let doc_recv_update = match service.response_updates().is_empty() {
 		true => quote! {
 			/// This service call does not support update messages, so there is no way to retrieve it.
 		},
@@ -158,7 +159,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		},
 	};
 
-	let struct_doc = format!("A sent request for the {} service.", service.name);
+	let struct_doc = format!("A sent request for the {} service.", service.name());
 
 	item_tokens.extend(quote! {
 		#[doc = #struct_doc]
@@ -183,15 +184,15 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		}
 	});
 
-	if !service.request_updates.is_empty() {
+	if !service.request_updates().is_empty() {
 		let mut impl_tokens = TokenStream::new();
 
 		generate_message_enum(
 			item_tokens,
 			fizyr_rpc,
-			&service.request_updates,
+			service.request_updates(),
 			&syn::Ident::new("RequestUpdate", Span::call_site()),
-			&format!("A request update for the {} service", service.name),
+			&format!("A request update for the {} service", service.name()),
 		);
 		quote! {
 			/// Send a request update to the remote peer.
@@ -205,11 +206,11 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			}
 		};
 
-		for update in &service.request_updates {
-			let send_name = syn::Ident::new(&format!("send_{}_update", update.name), Span::call_site());
-			let body_type = &update.body_type;
-			let service_id = &update.service_id;
-			let doc = format!("Send a {} update to the remote peer.", update.name);
+		for update in service.request_updates() {
+			let send_name = syn::Ident::new(&format!("send_{}_update", update.name()), Span::call_site());
+			let body_type = update.body_type();
+			let service_id = update.service_id();
+			let doc = format!("Send a {} update to the remote peer.", update.name());
 			let body_arg;
 			let body_val;
 			if is_unit_type(body_type) {
@@ -239,13 +240,13 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		});
 	}
 
-	if !service.response_updates.is_empty() {
+	if !service.response_updates().is_empty() {
 		generate_message_enum(
 			item_tokens,
 			fizyr_rpc,
-			&service.response_updates,
+			service.response_updates(),
 			&syn::Ident::new("ResponseUpdate", Span::call_site()),
-			&format!("A response update for the {} service", service.name),
+			&format!("A response update for the {} service", service.name()),
 		);
 		item_tokens.extend(quote! {
 			impl<P: #fizyr_rpc::macros::Protocol> SentRequest<P> {
@@ -278,12 +279,14 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 	let mut decode_all = TokenStream::new();
 	let mut encode_all = TokenStream::new();
 	for update in updates {
-		let variant_name = to_upper_camel_case(&update.name.to_string());
-		let variant_name = syn::Ident::new(&variant_name, update.name.span());
-		let body_type = update.body_type.as_ref();
+		let variant_name = to_upper_camel_case(&update.name().to_string());
+		let variant_name = syn::Ident::new(&variant_name, update.name().span());
+		let variant_doc = to_doc_attrs(update.doc());
+		let body_type = update.body_type();
 
-		let service_id = &update.service_id;
+		let service_id = update.service_id();
 		variants.extend(quote!{
+			#variant_doc
 			#variant_name(#body_type),
 		});
 
