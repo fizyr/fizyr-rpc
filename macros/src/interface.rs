@@ -29,52 +29,71 @@ pub fn generate_interface(tokens: proc_macro2::TokenStream) -> proc_macro2::Toke
 /// on code using the generated type, but the errors MUST be emitted too.
 pub mod cooked {
 	use crate::util::{parse_doc_attr_contents, parse_eq_attr_contents, WithSpan};
+	use proc_macro2::Span;
 
 	#[derive(Debug)]
 	pub struct InterfaceDefinition {
-		pub name: syn::Ident,
-		pub doc: Vec<WithSpan<String>>,
-		pub services: Vec<ServiceDefinition>,
-		pub request_enum: Option<syn::Ident>,
-		pub client_struct: Option<syn::Ident>,
-		pub server_struct: Option<syn::Ident>,
+		name: syn::Ident,
+		doc: Vec<WithSpan<String>>,
+		services: Vec<ServiceDefinition>,
 	}
 
 	#[derive(Debug)]
 	pub struct InterfaceAttributes {
 		doc: Vec<WithSpan<String>>,
-		request_enum: Option<syn::Ident>,
-		client_struct: Option<syn::Ident>,
-		server_struct: Option<syn::Ident>,
 	}
 
 	#[derive(Debug)]
 	pub struct ServiceDefinition {
-		pub service_id: WithSpan<i32>,
-		pub name: syn::Ident,
-		pub doc: Vec<WithSpan<String>>,
-		pub request_type: Option<Box<syn::Type>>,
-		pub response_type: Option<Box<syn::Type>>,
-		pub request_updates: Vec<UpdateDefinition>,
-		pub response_updates: Vec<UpdateDefinition>,
+		service_id: WithSpan<i32>,
+		name: syn::Ident,
+		doc: Vec<WithSpan<String>>,
+		request_type: Option<Box<syn::Type>>,
+		response_type: Option<Box<syn::Type>>,
+		request_updates: Vec<UpdateDefinition>,
+		response_updates: Vec<UpdateDefinition>,
 	}
 
 	#[derive(Debug)]
 	struct ServiceAttributes {
 		service_id: WithSpan<i32>,
 		doc: Vec<WithSpan<String>>,
-		request_updates: Vec<UpdateDefinition>,
-		response_updates: Vec<UpdateDefinition>,
 	}
 
 	#[derive(Debug)]
 	pub struct UpdateDefinition {
-		pub service_id: WithSpan<i32>,
-		pub name: syn::Ident,
-		pub body_type: Box<syn::Type>,
+		service_id: Option<WithSpan<i32>>,
+		doc: Vec<WithSpan<String>>,
+		name: syn::Ident,
+		body_type: Box<syn::Type>,
+	}
+
+	#[derive(Debug)]
+	pub struct UpdateAttributes {
+		doc: Vec<WithSpan<String>>,
+		service_id: Option<WithSpan<i32>>,
+		kind: Option<UpdateKind>,
+	}
+
+	#[derive(Debug)]
+	enum UpdateKind {
+		RequestUpdate,
+		ResponseUpdate,
 	}
 
 	impl InterfaceDefinition {
+		pub fn name(&self) -> &syn::Ident {
+			&self.name
+		}
+
+		pub fn doc(&self) -> &[WithSpan<String>] {
+			&self.doc
+		}
+
+		pub fn services(&self) -> &[ServiceDefinition] {
+			&self.services
+		}
+
 		pub fn from_raw(errors: &mut Vec<syn::Error>, raw: super::raw::InterfaceDefinition) -> Self {
 			let attrs = InterfaceAttributes::from_raw(errors, raw.attrs);
 			let services = raw.services.into_iter().map(|raw| ServiceDefinition::from_raw(errors, raw)).collect();
@@ -82,9 +101,6 @@ pub mod cooked {
 				name: raw.name,
 				doc: attrs.doc,
 				services,
-				request_enum: attrs.request_enum,
-				client_struct: attrs.client_struct,
-				server_struct: attrs.server_struct,
 			}
 		}
 	}
@@ -92,9 +108,6 @@ pub mod cooked {
 	impl InterfaceAttributes {
 		fn from_raw(errors: &mut Vec<syn::Error>, attrs: Vec<syn::Attribute>) -> Self {
 			let mut doc = Vec::new();
-			let mut request_enum = None;
-			let mut client_struct = None;
-			let mut server_struct = None;
 
 			for attr in attrs {
 				if attr.path.is_ident("doc") {
@@ -102,73 +115,94 @@ pub mod cooked {
 						Ok(x) => doc.push(x),
 						Err(e) => errors.push(e),
 					}
-				} else if attr.path.is_ident("request_enum") {
-					match parse_eq_attr_contents::<syn::Ident>(attr.tokens) {
-						Err(e) => errors.push(e),
-						Ok(ident) => {
-							if request_enum.is_some() {
-								errors.push(syn::Error::new_spanned(
-									&attr.path,
-									format!("duplicate `{}' attribute", attr.path.segments[0].ident),
-								))
-							} else {
-								request_enum = Some(ident);
-							}
-						},
-					}
-				} else if attr.path.is_ident("client_struct") {
-					match parse_eq_attr_contents::<syn::Ident>(attr.tokens) {
-						Err(e) => errors.push(e),
-						Ok(ident) => {
-							if client_struct.is_some() {
-								errors.push(syn::Error::new_spanned(
-									&attr.path,
-									format!("duplicate `{}' attribute", attr.path.segments[0].ident),
-								))
-							} else {
-								client_struct = Some(ident);
-							}
-						},
-					}
-				} else if attr.path.is_ident("server_struct") {
-					match parse_eq_attr_contents::<syn::Ident>(attr.tokens) {
-						Err(e) => errors.push(e),
-						Ok(ident) => {
-							if server_struct.is_some() {
-								errors.push(syn::Error::new_spanned(
-									&attr.path,
-									format!("duplicate `{}' attribute", attr.path.segments[0].ident),
-								))
-							} else {
-								server_struct = Some(ident);
-							}
-						},
-					}
 				} else {
 					errors.push(syn::Error::new_spanned(attr.path, "unknown attribute"));
 				}
 			}
 
-			Self {
-				doc,
-				request_enum,
-				client_struct,
-				server_struct,
-			}
+			Self { doc }
 		}
 	}
 
 	impl ServiceDefinition {
+		pub fn service_id(&self) -> WithSpan<i32> {
+			self.service_id.clone()
+		}
+
+		pub fn name(&self) -> &syn::Ident {
+			&self.name
+		}
+
+		pub fn doc(&self) -> &[WithSpan<String>] {
+			&self.doc
+		}
+
+		pub fn request_type(&self) -> Option<&syn::Type> {
+			self.request_type.as_deref()
+		}
+
+		pub fn response_type(&self) -> Option<&syn::Type> {
+			self.response_type.as_deref()
+		}
+
+		pub fn request_updates(&self) -> &[UpdateDefinition] {
+			&self.request_updates
+		}
+
+		pub fn response_updates(&self) -> &[UpdateDefinition] {
+			&self.response_updates
+		}
+
 		fn from_raw(errors: &mut Vec<syn::Error>, raw: super::raw::ServiceDefinition) -> Self {
 			let attrs = ServiceAttributes::from_raw(errors, raw.name.span(), raw.attrs);
+			let mut request_updates = Vec::new();
+			let mut response_updates = Vec::new();
+			if let super::raw::MaybeServiceBody::Body(body) = raw.body {
+				for update in body.updates {
+					match UpdateDefinition::from_raw(errors, update) {
+						(Some(UpdateKind::RequestUpdate), update) => request_updates.push(update),
+						(Some(UpdateKind::ResponseUpdate), update) => response_updates.push(update),
+						(None, _) => (),
+					}
+				}
+			}
+
+			for (i, a) in request_updates.iter().enumerate() {
+				if let Some(id_a) = &a.service_id {
+					for b in &request_updates[i + 1..] {
+						if let Some(id_b) = &b.service_id {
+							if id_b.value == id_a.value {
+								errors.push(syn::Error::new(id_b.span, "duplicate service ID"));
+							}
+						}
+					}
+				} else {
+					errors.push(syn::Error::new_spanned(&a.name, "missing `#[service_id = ...]' attribute"));
+				}
+			}
+
+			for (i, a) in response_updates.iter().enumerate() {
+				if let Some(id_a) = &a.service_id {
+					for b in &response_updates[i + 1..] {
+						if let Some(id_b) = &b.service_id {
+							if id_b.value == id_a.value {
+								errors.push(syn::Error::new(id_b.span, "duplicate service ID"));
+							}
+						}
+					}
+				} else {
+					errors.push(syn::Error::new_spanned(&a.name, "missing `#[service_id = ...]' attribute"));
+				}
+			}
+
 			Self {
 				service_id: attrs.service_id,
 				name: raw.name,
 				doc: attrs.doc,
 				request_type: raw.request_type.ty,
 				response_type: raw.response_type.map(|x| x.ty),
-				request_updates: attrs.request_updates,
-				response_updates: attrs.response_updates,
+				request_updates,
+				response_updates,
 			}
 		}
 	}
@@ -177,8 +211,6 @@ pub mod cooked {
 		fn from_raw(errors: &mut Vec<syn::Error>, name_span: proc_macro2::Span, attrs: Vec<syn::Attribute>) -> Self {
 			let mut service_id = None;
 			let mut doc = Vec::new();
-			let mut request_updates: Vec<UpdateDefinition> = Vec::new();
-			let mut response_updates: Vec<UpdateDefinition> = Vec::new();
 
 			for attr in attrs {
 				if attr.path.is_ident("service_id") {
@@ -198,34 +230,6 @@ pub mod cooked {
 						Err(e) => errors.push(e),
 						Ok(x) => doc.push(x),
 					}
-				} else if attr.path.is_ident("request_update") {
-					match parse_update_attr(attr.tokens) {
-						Err(e) => errors.push(e),
-						Ok(update) => {
-							// Emit an error but add the duplicate anyway.
-							if request_updates.iter().any(|x| x.service_id.value == update.service_id.value) {
-								errors.push(syn::Error::new(update.service_id.span, "duplicate service ID for request update"));
-							}
-							if request_updates.iter().any(|x| x.name == update.name) {
-								errors.push(syn::Error::new(update.service_id.span, "duplicate name for request update"));
-							}
-							request_updates.push(update)
-						},
-					}
-				} else if attr.path.is_ident("response_update") {
-					match parse_update_attr(attr.tokens) {
-						Err(e) => errors.push(e),
-						Ok(update) => {
-							// Emit an error but add the duplicate anyway.
-							if response_updates.iter().any(|x| x.service_id.value == update.service_id.value) {
-								errors.push(syn::Error::new(update.service_id.span, "duplicate service ID for response update"));
-							}
-							if response_updates.iter().any(|x| x.name == update.name) {
-								errors.push(syn::Error::new(update.service_id.span, "duplicate name for request update"));
-							}
-							response_updates.push(update)
-						},
-					}
 				} else {
 					errors.push(syn::Error::new_spanned(attr.path, "unknown attribute"));
 				}
@@ -239,8 +243,91 @@ pub mod cooked {
 			Self {
 				service_id,
 				doc,
-				request_updates,
-				response_updates,
+			}
+		}
+	}
+
+	impl UpdateDefinition {
+		pub fn service_id(&self) -> WithSpan<i32> {
+			self.service_id.clone().unwrap_or_else(|| WithSpan::new(Span::call_site(), 0))
+		}
+
+		pub fn name(&self) -> &syn::Ident {
+			&self.name
+		}
+
+		pub fn doc(&self) -> &[WithSpan<String>] {
+			&self.doc
+		}
+
+		pub fn body_type(&self) -> &syn::Type {
+			&self.body_type
+		}
+
+		fn from_raw(errors: &mut Vec<syn::Error>, raw: super::raw::UpdateDefinition) -> (Option<UpdateKind>, Self) {
+			let name = raw.name;
+			let attrs = UpdateAttributes::from_raw(errors, raw.attrs);
+
+			(attrs.kind, Self {
+				service_id: attrs.service_id,
+				doc: attrs.doc,
+				name,
+				body_type: raw.body_type,
+			})
+		}
+	}
+
+	impl UpdateAttributes {
+		fn from_raw(errors: &mut Vec<syn::Error>, attrs: Vec<syn::Attribute>) -> Self {
+			let mut doc = Vec::new();
+			let mut kind = None;
+			let mut service_id = None;
+
+			for attr in attrs {
+				if attr.path.is_ident("doc") {
+					match parse_doc_attr_contents(attr.tokens) {
+						Ok(x) => doc.push(x),
+						Err(e) => errors.push(e),
+					}
+				} else if attr.path.is_ident("service_id") {
+					if service_id.is_some() {
+						errors.push(syn::Error::new_spanned(&attr.path, "duplicate `service_id' attribute"));
+					}
+					match parse_i32_attr_contents(attr.tokens) {
+						Err(e) => errors.push(e),
+						Ok(id) => {
+							if service_id.is_none() {
+								service_id = Some(id);
+							}
+						},
+					}
+				} else if attr.path.is_ident("request_update") {
+					if let Some(token) = attr.tokens.into_iter().next() {
+						errors.push(syn::Error::new_spanned(token, "unexpected token"));
+					}
+					if kind.is_some() {
+						errors.push(syn::Error::new_spanned(&attr.path, "duplicate update type attribute"));
+					} else {
+						kind = Some(UpdateKind::RequestUpdate);
+					}
+				} else if attr.path.is_ident("response_update") {
+					if let Some(token) = attr.tokens.into_iter().next() {
+						errors.push(syn::Error::new_spanned(token, "unexpected token"));
+					}
+					if kind.is_some() {
+						errors.push(syn::Error::new_spanned(&attr.path, "duplicate update type attribute"));
+					} else {
+						kind = Some(UpdateKind::ResponseUpdate);
+					}
+				} else {
+					errors.push(syn::Error::new_spanned(attr.path, "unknown attribute"));
+				}
+			}
+
+			Self {
+				doc,
+				kind,
+				service_id,
 			}
 		}
 	}
@@ -248,42 +335,6 @@ pub mod cooked {
 	fn parse_i32_attr_contents(tokens: proc_macro2::TokenStream) -> syn::Result<WithSpan<i32>> {
 		let int: syn::LitInt = parse_eq_attr_contents(tokens)?;
 		Ok(WithSpan::new(int.span(), int.base10_parse()?))
-	}
-
-	fn parse_update_attr(tokens: proc_macro2::TokenStream) -> syn::Result<UpdateDefinition> {
-		struct UpdateAttr {
-			_paren_token: syn::token::Paren,
-			service_id: syn::LitInt,
-			_comma_token1: syn::token::Comma,
-			name: syn::Ident,
-			_comma_token2: syn::token::Comma,
-			body_type: Box<syn::Type>,
-			_comma_token3: Option<syn::token::Comma>,
-		}
-
-		impl syn::parse::Parse for UpdateAttr {
-			#[allow(clippy::eval_order_dependence)]
-			fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-				let contents;
-				Ok(Self {
-					_paren_token: syn::parenthesized!(contents in input),
-					service_id: contents.parse()?,
-					_comma_token1: contents.parse()?,
-					name: contents.parse()?,
-					_comma_token2: contents.parse()?,
-					body_type: contents.parse()?,
-					_comma_token3: contents.parse()?,
-				})
-			}
-		}
-
-		let parsed: UpdateAttr = syn::parse2(tokens)?;
-		let service_id = WithSpan::new(parsed.service_id.span(), parsed.service_id.base10_parse()?);
-		Ok(UpdateDefinition {
-			service_id,
-			name: parsed.name,
-			body_type: parsed.body_type,
-		})
 	}
 }
 
@@ -295,7 +346,7 @@ mod raw {
 	#[derive(Debug)]
 	pub struct InterfaceInput {
 		pub fizyr_rpc: syn::Ident,
-		pub _semi: syn::token::Semi,
+		pub _semi_token: syn::token::Semi,
 		pub interface: InterfaceDefinition,
 	}
 
@@ -304,7 +355,7 @@ mod raw {
 		pub attrs: Vec<syn::Attribute>,
 		pub visibility: syn::Visibility,
 		pub name: syn::Ident,
-		pub _brace: syn::token::Brace,
+		pub _brace_token: syn::token::Brace,
 		pub services: Vec<ServiceDefinition>,
 	}
 
@@ -315,7 +366,27 @@ mod raw {
 		pub name: syn::Ident,
 		pub request_type: RequestType,
 		pub response_type: Option<ResponseType>,
-		pub _semi_token: syn::token::Semi,
+		pub body: MaybeServiceBody,
+	}
+
+	#[derive(Debug)]
+	pub enum MaybeServiceBody {
+		NoBody(syn::token::Semi),
+		Body(ServiceBody),
+	}
+
+	#[derive(Debug)]
+	pub struct ServiceBody {
+		pub _brace_token: syn::token::Brace,
+		pub updates: syn::punctuated::Punctuated<UpdateDefinition, syn::token::Comma>,
+	}
+
+	#[derive(Debug)]
+	pub struct UpdateDefinition {
+		pub attrs: Vec<syn::Attribute>,
+		pub name: syn::Ident,
+		pub _colon_token: syn::token::Colon,
+		pub body_type: Box<syn::Type>,
 	}
 
 	#[derive(Debug)]
@@ -334,7 +405,7 @@ mod raw {
 		fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
 			Ok(Self {
 				fizyr_rpc: input.parse()?,
-				_semi: input.parse()?,
+				_semi_token: input.parse()?,
 				interface: input.parse()?,
 			})
 		}
@@ -348,8 +419,8 @@ mod raw {
 				attrs: input.call(syn::Attribute::parse_outer)?,
 				visibility: input.parse()?,
 				name: input.parse()?,
-				_brace: syn::braced!(services in input),
-				services: crate::util::parse_repeated(&services)?,
+				_brace_token: syn::braced!(services in input),
+				services: services.call(crate::util::parse_repeated)?,
 			})
 		}
 	}
@@ -363,7 +434,7 @@ mod raw {
 				name: input.parse()?,
 				request_type: input.parse()?,
 				response_type: parse_response_type(input)?,
-				_semi_token: input.parse()?,
+				body: input.parse()?,
 			})
 		}
 	}
@@ -375,6 +446,42 @@ mod raw {
 			Ok(Self {
 				paren_token: syn::parenthesized!(request_type in input),
 				ty: if request_type.is_empty() { None } else { Some(request_type.parse()?) },
+			})
+		}
+	}
+
+	impl syn::parse::Parse for MaybeServiceBody {
+		#[allow(clippy::eval_order_dependence)]
+		fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+			if input.peek(syn::token::Semi) {
+				Ok(Self::NoBody(input.parse()?))
+			} else if input.peek(syn::token::Brace) {
+				Ok(Self::Body(input.parse()?))
+			} else {
+				Err(input.error("expected semicolon or service body"))
+			}
+		}
+	}
+
+	impl syn::parse::Parse for ServiceBody {
+		#[allow(clippy::eval_order_dependence)]
+		fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+			let braced;
+			Ok(Self {
+				_brace_token: syn::braced!(braced in input),
+				updates: braced.call(syn::punctuated::Punctuated::parse_terminated)?,
+			})
+		}
+	}
+
+	impl syn::parse::Parse for UpdateDefinition {
+		#[allow(clippy::eval_order_dependence)]
+		fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+			Ok(Self {
+				attrs: input.call(syn::Attribute::parse_outer)?,
+				name: input.parse()?,
+				_colon_token: input.parse()?,
+				body_type: input.parse()?,
 			})
 		}
 	}
