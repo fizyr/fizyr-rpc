@@ -32,6 +32,30 @@ pub fn generate_client(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) 
 					Self { peer }
 				}
 
+				/// Connect to a remote server.
+				///
+				/// See [`fizyr_rpc::Peer::connect`](https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Peer.html#method.connect) for more details.
+				async fn connect<'a, Transport, Address>(address: Address, config: Transport::Config) -> std::io::Result<Self>
+				where
+					Address: 'a,
+					Transport: #fizyr_rpc::transport::Transport<Body = P::Body> + #fizyr_rpc::util::Connect<'a, Address>,
+				{
+					Ok(#fizyr_rpc::Peer::<Transport>::connect(address, config).await?.into())
+				}
+
+				/// Close the connection with the remote peer.
+				pub fn close(self) {
+					self.peer.close()
+				}
+
+				/// Make a close handle for the peer.
+				///
+				/// The close handle can be used to close the connection with the remote peer.
+				/// It can be cloned and moved around independently.
+				pub fn close_handle(&self) -> #fizyr_rpc::PeerCloseHandle<P::Body> {
+					self.peer.close_handle()
+				}
+
 				#impl_tokens
 			}
 
