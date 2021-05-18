@@ -152,6 +152,14 @@ impl std::fmt::Display for UnexpectedMessageType {
 	}
 }
 
+/// The received message had an unexpected service ID.
+#[derive(Debug, Clone, Error)]
+#[error("unexpected service ID: {actual_service_id}")]
+pub struct UnexpectedServiceId {
+	/// The actual service ID of the received message.
+	pub actual_service_id: i32,
+}
+
 /// An error occurred while reading an incoming message.
 #[derive(Debug, Error)]
 #[error("{0}")]
@@ -176,6 +184,12 @@ pub enum RecvMessageError {
 
 	/// The received message has an unexpected message type.
 	UnexpectedMessageType(#[from] UnexpectedMessageType),
+
+	/// The received message has an unexpected service ID.
+	UnexpectedServiceId(#[from] UnexpectedServiceId),
+
+	/// Failed to decode the message.
+	DecodeBody(Box<dyn std::error::Error + Send>),
 }
 
 impl RecvMessageError {
@@ -201,6 +215,9 @@ pub enum SendRequestError {
 
 	/// No free request ID was found.
 	NoFreeRequestIdFound(#[from] NoFreeRequestIdFound),
+
+	/// Failed to encode the message.
+	EncodeBody(Box<dyn std::error::Error + Send>),
 }
 
 impl SendRequestError {
@@ -212,6 +229,42 @@ impl SendRequestError {
 			false
 		}
 	}
+}
+
+/// An error occurred while sending a request.
+#[derive(Debug, Error)]
+#[error("{0}")]
+pub enum SendUpdateError {
+	/// An I/O error occurred.
+	Io(#[from] std::io::Error),
+
+	/// The payload of the message is too large to send.
+	PayloadTooLarge(#[from] PayloadTooLarge),
+
+	/// Failed to encode the message.
+	EncodeBody(Box<dyn std::error::Error + Send>),
+}
+
+impl SendUpdateError {
+	/// Check if the error is an I/O error indicating that the connection was aborted by the remote peer.
+	pub fn is_connection_aborted(&self) -> bool {
+		if let Self::Io(e) = &self {
+			e.kind() == std::io::ErrorKind::ConnectionAborted
+		} else {
+			false
+		}
+	}
+}
+
+/// An error occurred while performing a service call.
+#[derive(Debug, Error)]
+#[error("{0}")]
+pub enum ServiceCallError {
+	/// Failed to encode or send the request.
+	SendRequest(#[from] SendRequestError),
+
+	/// Failed to receive or decode the response.
+	ReceiveResponse(#[from] RecvMessageError),
 }
 
 // Allow a ReadMessageError to be converted to a RecvMessageError automatically.
@@ -228,6 +281,16 @@ impl From<ReadMessageError> for RecvMessageError {
 
 // Allow a WriteMessageError to be converted to a SendRequestError automatically.
 impl From<WriteMessageError> for SendRequestError {
+	fn from(other: WriteMessageError) -> Self {
+		match other {
+			WriteMessageError::Io(e) => e.into(),
+			WriteMessageError::PayloadTooLarge(e) => e.into(),
+		}
+	}
+}
+
+// Allow a WriteMessageError to be converted to a SendUpdateError automatically.
+impl From<WriteMessageError> for SendUpdateError {
 	fn from(other: WriteMessageError) -> Self {
 		match other {
 			WriteMessageError::Io(e) => e.into(),

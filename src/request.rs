@@ -119,7 +119,7 @@ impl<Body> SentRequest<Body> {
 	}
 
 	/// Send an update for the request to the remote peer.
-	pub async fn send_update(&mut self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendUpdateError> {
 		use crate::peer::SendRawMessage;
 		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();
@@ -127,7 +127,8 @@ impl<Body> SentRequest<Body> {
 		self.command_tx
 			.send(SendRawMessage { message, result_tx }.into())
 			.map_err(|_| error::connection_aborted())?;
-		result_rx.await.map_err(|_| error::connection_aborted())?
+		result_rx.await.map_err(|_| error::connection_aborted())??;
+		Ok(())
 	}
 }
 
