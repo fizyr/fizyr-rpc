@@ -46,6 +46,7 @@ pub trait FromMessage<P: Protocol + ?Sized>: Sized {
 }
 
 #[macro_export]
+/// Define an RPC interface.
 macro_rules! interface {
 	($($tokens:tt)*) => {
 		$crate::macros::interface_impl!{$crate; $($tokens)*}
