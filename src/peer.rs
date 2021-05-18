@@ -102,7 +102,7 @@ impl<Transport: crate::transport::Transport> Peer<Transport> {
 		handle
 	}
 
-	/// Connect to a remote peer.
+	/// Connect to a remote server.
 	///
 	/// Similar to [`Self::spawn()`], this spawns a background task for the peer.
 	///

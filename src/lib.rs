@@ -114,6 +114,7 @@ pub use message::HEADER_LEN;
 pub use message::MAX_PAYLOAD_LEN;
 pub use peer::Peer;
 pub use peer_handle::PeerHandle;
+pub use peer_handle::PeerCloseHandle;
 pub use peer_handle::PeerReadHandle;
 pub use peer_handle::PeerWriteHandle;
 pub use request::Incoming;
