@@ -149,7 +149,7 @@ where
 
 		// Reset internal state and return the read message.
 		let header = this.parsed_header;
-		let body = std::mem::replace(&mut this.body_buffer, Vec::new());
+		let body = std::mem::take(&mut this.body_buffer);
 		this.bytes_read = 0;
 		Poll::Ready(Ok(Message::new(header, body.into())))
 	}
