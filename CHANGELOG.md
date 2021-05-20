@@ -1,5 +1,9 @@
 # Changelog
 
+## main
+### Fixed
+- Fixed bug where a sent request was untracked once a response to a received request was sent.
+
 ## v0.4.1 - 2021-04-25
 ### Fixed
 - Fixed reading messages with empty body with the `StreamTransport`.

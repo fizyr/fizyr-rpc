@@ -311,7 +311,7 @@ where
 	async fn send_raw_message(&mut self, command: crate::peer::SendRawMessage<W::Body>) -> LoopFlow {
 		// Remove tracked received requests when we send a response.
 		if command.message.header.message_type.is_response() {
-			let _: Result<_, _> = self.request_tracker.remove_sent_request(command.message.header.request_id);
+			let _: Result<_, _> = self.request_tracker.remove_received_request(command.message.header.request_id);
 		}
 
 		// TODO: replace SendRawMessage with specific command for different message types.
