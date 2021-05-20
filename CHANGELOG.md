@@ -1,6 +1,8 @@
 # Changelog
 
 ## main
+
+## v0.4.2 - 2021-05-20
 ### Fixed
 - Fixed bug where a sent request was untracked once a response to a received request was sent.
 
