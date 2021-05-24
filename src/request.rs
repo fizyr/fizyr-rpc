@@ -130,6 +130,19 @@ impl<Body> SentRequest<Body> {
 		result_rx.await.map_err(|_| error::connection_aborted())??;
 		Ok(())
 	}
+
+	/// Put a message back in the peek buffer.
+	///
+	/// Do not call this function,
+	/// it is not convered by the version number API stability guarantee.
+	///
+	/// # Panics
+	/// This function panics if there already is a message in the peek buffer.
+	#[doc(hidden)]
+	pub fn _unpeek_message(&mut self, message: Message<Body>) {
+		assert!(self.peek_buffer.is_none());
+		self.peek_buffer = Some(message);
+	}
 }
 
 impl<Body> ReceivedRequest<Body> {
