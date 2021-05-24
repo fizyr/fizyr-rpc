@@ -21,7 +21,7 @@ async fn main() {
 
 async fn do_main(options: &Options) -> Result<(), String> {
 	// Connect to a remote server.
-	let mut peer = UnixSeqpacketPeer::connect(&options.socket, Default::default()).await
+	let peer = UnixSeqpacketPeer::connect(&options.socket, Default::default()).await
 		.map_err(|e| format!("failed to connect to {}: {}", options.socket.display(), e))?;
 
 	// Send a request to the remote peer.

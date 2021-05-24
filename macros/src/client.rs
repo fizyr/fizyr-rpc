@@ -20,7 +20,7 @@ pub fn generate_client(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) 
 	let tokens = quote! {
 		#interface_doc
 		pub mod #interface_name {
-			use super::*; // TODO: Can we use spans to resolve types rather than bringing things into scope? D:
+			use super::*;
 
 			#[doc = #client_doc]
 			pub struct Client<P: #fizyr_rpc::macros::Protocol> {
@@ -381,7 +381,7 @@ fn to_doc_attrs(docs: &[crate::util::WithSpan<String>]) -> TokenStream {
 
 fn is_unit_type(ty: &syn::Type) -> bool {
 	if let syn::Type::Tuple(ty) = ty {
-		ty.elems.len() == 0
+		ty.elems.is_empty()
 	} else {
 		false
 	}

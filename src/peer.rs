@@ -497,7 +497,7 @@ mod test {
 	async fn test_peer() {
 		let_assert!(Ok((peer_a, peer_b)) = UnixStream::pair());
 
-		let (peer_a, mut handle_a) = Peer::new(StreamTransport::new(peer_a, Default::default()));
+		let (peer_a, handle_a) = Peer::new(StreamTransport::new(peer_a, Default::default()));
 		let (peer_b, mut handle_b) = Peer::new(StreamTransport::new(peer_b, Default::default()));
 
 		let task_a = tokio::spawn(peer_a.run());
@@ -539,7 +539,7 @@ mod test {
 	#[tokio::test]
 	async fn peeked_response_is_not_gone() {
 		let_assert!(Ok((peer_a, peer_b)) = UnixStream::pair());
-		let mut handle_a = Peer::spawn(StreamTransport::new(peer_a, Default::default()));
+		let handle_a = Peer::spawn(StreamTransport::new(peer_a, Default::default()));
 		let mut handle_b = Peer::spawn(StreamTransport::new(peer_b, Default::default()));
 
 		// Send a request from A.
@@ -573,7 +573,7 @@ mod test {
 		use crate::error::RecvMessageError;
 
 		let_assert!(Ok((peer_a, peer_b)) = UnixStream::pair());
-		let mut handle_a = Peer::spawn(StreamTransport::new(peer_a, Default::default()));
+		let handle_a = Peer::spawn(StreamTransport::new(peer_a, Default::default()));
 		let mut handle_b = Peer::spawn(StreamTransport::new(peer_b, Default::default()));
 
 		// Send a request from A.
