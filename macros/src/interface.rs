@@ -63,16 +63,16 @@ pub mod cooked {
 	#[derive(Debug)]
 	pub struct UpdateDefinition {
 		service_id: Option<WithSpan<i32>>,
-		doc: Vec<WithSpan<String>>,
 		name: syn::Ident,
+		doc: Vec<WithSpan<String>>,
 		body_type: Box<syn::Type>,
 	}
 
 	#[derive(Debug)]
 	pub struct UpdateAttributes {
-		doc: Vec<WithSpan<String>>,
 		service_id: Option<WithSpan<i32>>,
 		kind: Option<UpdateKind>,
+		doc: Vec<WithSpan<String>>,
 	}
 
 	#[derive(Debug)]
@@ -270,8 +270,8 @@ pub mod cooked {
 
 			(attrs.kind, Self {
 				service_id: attrs.service_id,
-				doc: attrs.doc,
 				name,
+				doc: attrs.doc,
 				body_type: raw.body_type,
 			})
 		}
@@ -325,9 +325,9 @@ pub mod cooked {
 			}
 
 			Self {
-				doc,
-				kind,
 				service_id,
+				kind,
+				doc,
 			}
 		}
 	}
