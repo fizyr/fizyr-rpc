@@ -171,15 +171,30 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			/// Receive the final response.
 			///
 			/// If an update message is received instead of the final response an error is returned.
+			/// The update message will remain in the message queue and must be read before the response can be received.
 			#doc_recv_update
 			pub async fn recv_response(&mut self) -> Result<#response_type, #fizyr_rpc::error::RecvMessageError>
 			where
 				#response_type: #fizyr_rpc::macros::Decode<P>,
 			{
 				let response = self.request.recv_response().await?;
-				// TODO: throw away update message if interface doesn't define any.
 				let decoded = P::decode_body(response.body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)?;
 				Ok(decoded)
+			}
+
+			/// Get the raw request.
+			pub fn inner(&self) -> &#fizyr_rpc::SentRequest<P::Body> {
+				&self.request
+			}
+
+			/// Get an exclusive reference to the raw request.
+			pub fn inner_mut(&self) -> &#fizyr_rpc::SentRequest<P::Body> {
+				&self.request
+			}
+
+			/// Consume this object to get the raw request.
+			pub fn into_inner(self) -> #fizyr_rpc::SentRequest<P::Body> {
+				self.request
 			}
 		}
 	});
