@@ -222,7 +222,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		};
 
 		for update in service.request_updates() {
-			let send_name = syn::Ident::new(&format!("send_{}_update", update.name()), Span::call_site());
+			let function_name = syn::Ident::new(&format!("send_{}_update", update.name()), Span::call_site());
 			let body_type = update.body_type();
 			let service_id = update.service_id();
 			let doc = format!("Send a {} update to the remote peer.", update.name());
@@ -237,7 +237,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			}
 			impl_tokens.extend(quote! {
 				#[doc = #doc]
-				pub async fn #send_name(&self, #body_arg) -> Result<(), #fizyr_rpc::error::SendUpdateError>
+				pub async fn #function_name(&self, #body_arg) -> Result<(), #fizyr_rpc::error::SendUpdateError>
 				where
 					#body_type: #fizyr_rpc::macros::Encode<P>,
 				{
@@ -263,24 +263,66 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			&syn::Ident::new("ResponseUpdate", Span::call_site()),
 			&format!("A response update for the {} service", service.name()),
 		);
+
+		let mut impl_tokens = TokenStream::new();
+		impl_tokens.extend(quote! {
+			/// Receive a request update from the remote peer.
+			///
+			/// Once the final response is received,
+			/// this function will keep returning `Ok(None)`.
+			/// Use [`Self::recv_response`] to receive the response.
+			pub async fn recv_update(&mut self, timeout: std::time::Duration) -> Result<Option<#service_name::ResponseUpdate>, #fizyr_rpc::error::RecvMessageError>
+			where
+				#service_name::ResponseUpdate: #fizyr_rpc::macros::FromMessage<P>,
+			{
+				use #fizyr_rpc::macros::FromMessage;
+				let update = match self.request.recv_update().await? {
+					Some(x) => x,
+					None => return Ok(None),
+				};
+				Ok(Some(P::decode_message(update)?))
+			}
+		});
+
+		for update in service.response_updates() {
+			let function_name = syn::Ident::new(&format!("recv_{}_update", update.name()), Span::call_site());
+			let body_type = update.body_type();
+			let service_id = update.service_id();
+			let doc = format!("Receive a {} update from the remote peer.", update.name());
+			impl_tokens.extend(quote! {
+				#[doc = #doc]
+				///
+				/// If the received message is a response message or a different update message, this function returns an error.
+				/// The message will remain in the read queue and can still be received by another `recv_*` function.
+				/// As long as the message is in the read queue, this function will keep returning an error.
+				pub async fn #function_name(&mut self) -> Result<#body_type, #fizyr_rpc::error::RecvMessageError>
+				where
+					#body_type: #fizyr_rpc::macros::Decode<P>,
+				{
+					let update = match self.request.recv_update().await? {
+						None => return Err(#fizyr_rpc::error::UnexpectedMessageType {
+							value: #fizyr_rpc::MessageType::Response,
+							expected: #fizyr_rpc::MessageType::ResponderUpdate,
+						}.into()),
+						Some(x) => x,
+					};
+
+					let actual_service_id = update.header.service_id;
+
+					if actual_service_id != #service_id {
+						// Put the message back in the read queue so that a different `recv_*` call can read it.
+						self.request._unpeek_message(update);
+						return Err(#fizyr_rpc::error::UnexpectedServiceId { actual_service_id }.into());
+					}
+
+					P::decode_body(update.body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)
+				}
+			})
+		}
+
 		item_tokens.extend(quote! {
 			impl<P: #fizyr_rpc::macros::Protocol> SentRequest<P> {
-				/// Receive a request update from the remote peer.
-				///
-				/// Once the final response is received,
-				/// this function will keep returning `Ok(None)`.
-				/// Use [`Self::recv_response`] to receive the response.
-				pub async fn recv_update(&mut self, timeout: std::time::Duration) -> Result<Option<#service_name::ResponseUpdate>, #fizyr_rpc::error::RecvMessageError>
-				where
-					#service_name::ResponseUpdate: #fizyr_rpc::macros::FromMessage<P>,
-				{
-					use #fizyr_rpc::macros::FromMessage;
-					let update = match self.request.recv_update().await? {
-						Some(x) => x,
-						None => return Ok(None),
-					};
-					Ok(Some(P::decode_message(update)?))
-				}
+				#impl_tokens
 			}
 		});
 	}
