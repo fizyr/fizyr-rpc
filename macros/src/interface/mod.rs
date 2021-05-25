@@ -16,6 +16,6 @@ pub fn generate_interface(tokens: proc_macro2::TokenStream) -> proc_macro2::Toke
 		}
 	}
 
-	tokens.extend(generate::generate_client(&raw.fizyr_rpc, &interface));
+	tokens.extend(generate::generate_interface(&raw.fizyr_rpc, &interface));
 	tokens
 }

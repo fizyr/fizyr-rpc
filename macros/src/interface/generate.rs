@@ -4,9 +4,9 @@ use proc_macro2::{Span, TokenStream};
 use super::parse::cooked::{InterfaceDefinition, ServiceDefinition, UpdateDefinition};
 
 /// Generate a client struct for the given interface.
-pub fn generate_client(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) -> TokenStream {
+pub fn generate_interface(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) -> TokenStream {
 	let mut item_tokens = TokenStream::new();
-	let mut impl_tokens = TokenStream::new();
+	let mut client_impl_tokens = TokenStream::new();
 
 	let interface_name = interface.name();
 	let interface_doc = if interface.doc().is_empty() {
@@ -15,64 +15,14 @@ pub fn generate_client(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) 
 	} else {
 		to_doc_attrs(interface.doc())
 	};
-	let client_doc = format!("RPC client for the {} interface.", interface.name());
-	generate_services(&mut item_tokens, &mut impl_tokens, fizyr_rpc, interface);
+
+	generate_services(&mut item_tokens, &mut client_impl_tokens, fizyr_rpc, interface);
+	generate_client(&mut item_tokens, fizyr_rpc, interface, client_impl_tokens);
 
 	let tokens = quote! {
 		#interface_doc
 		pub mod #interface_name {
 			use super::*;
-
-			#[doc = #client_doc]
-			pub struct Client<P: #fizyr_rpc::macros::Protocol> {
-				peer: #fizyr_rpc::PeerWriteHandle<P::Body>,
-			}
-
-			impl<P: #fizyr_rpc::macros::Protocol> Client<P> {
-				/// Create a new interface-specific RPC client from a raw write handle.
-				fn new(peer: #fizyr_rpc::PeerWriteHandle<P::Body>) -> Self {
-					Self { peer }
-				}
-
-				/// Connect to a remote server.
-				///
-				/// See [`fizyr_rpc::Peer::connect`](https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Peer.html#method.connect) for more details.
-				async fn connect<'a, Transport, Address>(address: Address, config: Transport::Config) -> std::io::Result<Self>
-				where
-					Address: 'a,
-					Transport: #fizyr_rpc::transport::Transport<Body = P::Body> + #fizyr_rpc::util::Connect<'a, Address>,
-				{
-					Ok(#fizyr_rpc::Peer::<Transport>::connect(address, config).await?.into())
-				}
-
-				/// Close the connection with the remote peer.
-				pub fn close(self) {
-					self.peer.close()
-				}
-
-				/// Make a close handle for the peer.
-				///
-				/// The close handle can be used to close the connection with the remote peer.
-				/// It can be cloned and moved around independently.
-				pub fn close_handle(&self) -> #fizyr_rpc::PeerCloseHandle<P::Body> {
-					self.peer.close_handle()
-				}
-
-				#impl_tokens
-			}
-
-			impl<P: #fizyr_rpc::macros::Protocol> ::core::convert::From<#fizyr_rpc::PeerWriteHandle<P::Body>> for Client<P> {
-				fn from(other: #fizyr_rpc::PeerWriteHandle<P::Body>) -> Self {
-					Self::new(other)
-				}
-			}
-
-			impl<P: #fizyr_rpc::macros::Protocol> ::core::convert::From<#fizyr_rpc::PeerHandle<P::Body>> for Client<P> {
-				fn from(other: #fizyr_rpc::PeerHandle<P::Body>) -> Self {
-					let (_read, write) = other.split();
-					Self::new(write)
-				}
-			}
 
 			#item_tokens
 		}
@@ -81,8 +31,67 @@ pub fn generate_client(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) 
 	tokens
 }
 
+/// Generate a client struct.
+///
+/// `extra_impl` is used to add additional functions to the main `impl` block.
+fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition, extra_impl: TokenStream) {
+	let client_doc = format!("RPC client for the {} interface.", interface.name());
+	item_tokens.extend(quote! {
+		#[doc = #client_doc]
+		pub struct Client<P: #fizyr_rpc::macros::Protocol> {
+			peer: #fizyr_rpc::PeerWriteHandle<P::Body>,
+		}
+
+		impl<P: #fizyr_rpc::macros::Protocol> Client<P> {
+			/// Create a new interface-specific RPC client from a raw write handle.
+			fn new(peer: #fizyr_rpc::PeerWriteHandle<P::Body>) -> Self {
+				Self { peer }
+			}
+
+			/// Connect to a remote server.
+			///
+			/// See [`fizyr_rpc::Peer::connect`](https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Peer.html#method.connect) for more details.
+			async fn connect<'a, Transport, Address>(address: Address, config: Transport::Config) -> std::io::Result<Self>
+			where
+				Address: 'a,
+				Transport: #fizyr_rpc::transport::Transport<Body = P::Body> + #fizyr_rpc::util::Connect<'a, Address>,
+			{
+				Ok(#fizyr_rpc::Peer::<Transport>::connect(address, config).await?.into())
+			}
+
+			/// Close the connection with the remote peer.
+			pub fn close(self) {
+				self.peer.close()
+			}
+
+			/// Make a close handle for the peer.
+			///
+			/// The close handle can be used to close the connection with the remote peer.
+			/// It can be cloned and moved around independently.
+			pub fn close_handle(&self) -> #fizyr_rpc::PeerCloseHandle<P::Body> {
+				self.peer.close_handle()
+			}
+
+			#extra_impl
+		}
+
+		impl<P: #fizyr_rpc::macros::Protocol> ::core::convert::From<#fizyr_rpc::PeerWriteHandle<P::Body>> for Client<P> {
+			fn from(other: #fizyr_rpc::PeerWriteHandle<P::Body>) -> Self {
+				Self::new(other)
+			}
+		}
+
+		impl<P: #fizyr_rpc::macros::Protocol> ::core::convert::From<#fizyr_rpc::PeerHandle<P::Body>> for Client<P> {
+			fn from(other: #fizyr_rpc::PeerHandle<P::Body>) -> Self {
+				let (_read, write) = other.split();
+				Self::new(write)
+			}
+		}
+	})
+}
+
 /// Generate the support types and function definitions for each service.
-fn generate_services(item_tokens: &mut TokenStream, impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) {
+fn generate_services(item_tokens: &mut TokenStream, client_impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) {
 	for service in interface.services() {
 		let service_name = service.name();
 		let service_doc = to_doc_attrs(&service.doc());
@@ -100,7 +109,7 @@ fn generate_services(item_tokens: &mut TokenStream, impl_tokens: &mut TokenStrea
 
 		// Service without updates, so directly return the response (asynchronously).
 		if service.request_updates().is_empty() && service.response_updates().is_empty() {
-			impl_tokens.extend(quote! {
+			client_impl_tokens.extend(quote! {
 				#service_doc
 				pub async fn #service_name(&self, #request_param) -> Result<#response_type, #fizyr_rpc::error::ServiceCallError>
 				where
@@ -117,7 +126,7 @@ fn generate_services(item_tokens: &mut TokenStream, impl_tokens: &mut TokenStrea
 		} else {
 			let mut service_item_tokens = TokenStream::new();
 			generate_sent_request(&mut service_item_tokens, &fizyr_rpc, service);
-			impl_tokens.extend(quote! {
+			client_impl_tokens.extend(quote! {
 				#service_doc
 				pub async fn #service_name(&self, #request_param) -> Result<#service_name::SentRequest<P>, #fizyr_rpc::error::SendRequestError>
 				where
