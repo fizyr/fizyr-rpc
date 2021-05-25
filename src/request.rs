@@ -132,8 +132,8 @@ impl<Body> SentRequest<Body> {
 
 	/// Put a message back in the peek buffer.
 	///
-	/// Do not call this function,
-	/// it is not convered by the version number API stability guarantee.
+	/// Do not use this function.
+	/// It is not convered by the version number API stability guarantee.
 	///
 	/// # Panics
 	/// This function panics if there already is a message in the peek buffer.

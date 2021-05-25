@@ -15,6 +15,7 @@ pub trait ToMessageBody<Body> {
 
 pub trait Protocol {
 	type Body: crate::Body;
+	type Transport: crate::transport::Transport<Body = Self::Body>;
 
 	fn encode_body<T: Encode<Self>>(value: T) -> Result<Self::Body, Box<dyn std::error::Error + Send>> {
 		value.encode()
