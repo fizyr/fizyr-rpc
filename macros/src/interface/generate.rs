@@ -1,6 +1,7 @@
-use crate::interface::cooked::{InterfaceDefinition, ServiceDefinition, UpdateDefinition};
 use quote::quote;
 use proc_macro2::{Span, TokenStream};
+
+use super::parse::cooked::{InterfaceDefinition, ServiceDefinition, UpdateDefinition};
 
 /// Generate a client struct for the given interface.
 pub fn generate_client(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) -> TokenStream {

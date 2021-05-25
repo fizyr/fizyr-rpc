@@ -1,22 +1,3 @@
-pub fn generate_interface(tokens: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-	let raw: raw::InterfaceInput = match syn::parse2(tokens) {
-		Ok(x) => x,
-		Err(e) => return e.into_compile_error(),
-	};
-
-	let mut tokens = proc_macro2::TokenStream::new();
-	let mut errors = Vec::new();
-	let interface = cooked::InterfaceDefinition::from_raw(&mut errors, raw.interface);
-	if !errors.is_empty() {
-		for error in errors {
-			tokens.extend(error.into_compile_error());
-		}
-	}
-
-	tokens.extend(crate::client::generate_client(&raw.fizyr_rpc, &interface));
-	tokens
-}
-
 /// Second stage parsing types.
 ///
 /// These types never contain invalid data.
@@ -342,7 +323,7 @@ pub mod cooked {
 ///
 /// The types in this modules still contain potentially invalid data.
 /// We want to fully parse this raw form before continuing to more detailed error checking.
-mod raw {
+pub mod raw {
 	#[derive(Debug)]
 	pub struct InterfaceInput {
 		pub fizyr_rpc: syn::Ident,
