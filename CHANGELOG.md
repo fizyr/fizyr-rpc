@@ -3,6 +3,7 @@
 ## main
 ### Changed
 - Renamed `PeerHandle::next_message()` to `recv_message()`.
+- Moved message body out of `ReceivedRequest`.
 
 ## v0.4.2 - 2021-05-20
 ### Fixed

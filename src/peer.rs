@@ -359,7 +359,7 @@ where
 			// `msg` must be Ok(), because we checked it before.
 			Err(mpsc::error::SendError(msg)) => match msg.unwrap() {
 				// Respond to requests with an error.
-				Incoming::Request(request) => {
+				Incoming::Request(request, _body) => {
 					let error_msg = format!("unexpected request for service {}", request.service_id());
 					let response = Message::error_response(request.request_id(), &error_msg);
 					if self.write_message(&response).await.is_err() {
@@ -508,7 +508,7 @@ mod test {
 		let request_id = sent_request.request_id();
 
 		// Receive the request on B.
-		let_assert!(Ok(Incoming::Request(mut received_request)) = handle_b.recv_message().await);
+		let_assert!(Ok(Incoming::Request(mut received_request, _body)) = handle_b.recv_message().await);
 
 		// Send an update from A and receive it on B.
 		let_assert!(Ok(()) = sent_request.send_update(3, &[4][..]).await);
@@ -547,7 +547,7 @@ mod test {
 		let request_id = sent_request.request_id();
 
 		// Receive the request on B.
-		let_assert!(Ok(Incoming::Request(mut received_request)) = handle_b.recv_message().await);
+		let_assert!(Ok(Incoming::Request(mut received_request, _body)) = handle_b.recv_message().await);
 
 		// Send two updates and a response from B to A.
 		let_assert!(Ok(()) = received_request.send_update(5, &b"Hello world!"[..]).await);
@@ -581,7 +581,7 @@ mod test {
 		let request_id = sent_request.request_id();
 
 		// Receive the request on B.
-		let_assert!(Ok(Incoming::Request(mut received_request)) = handle_b.recv_message().await);
+		let_assert!(Ok(Incoming::Request(mut received_request, _body)) = handle_b.recv_message().await);
 
 		// Send one update and a response from B to A.
 		let_assert!(Ok(()) = received_request.send_update(5, &b"Hello world!"[..]).await);
