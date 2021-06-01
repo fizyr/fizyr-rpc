@@ -24,8 +24,8 @@ pub trait Protocol {
 		T::decode(body)
 	}
 
-	fn encode_message<T: ToMessage<Self>>(value: T) -> Result<(i32, Self::Body), Box<dyn std::error::Error + Send>> {
-		value.to_message()
+	fn encode_message<T: IntoMessage<Self>>(value: T) -> Result<(i32, Self::Body), Box<dyn std::error::Error + Send>> {
+		value.into_message()
 	}
 
 	fn decode_message<T: FromMessage<Self>>(message: crate::Message<Self::Body>) -> Result<T, error::FromMessageError> {
@@ -41,8 +41,8 @@ pub trait Decode<P: Protocol + ?Sized>: Sized {
 	fn decode(body: P::Body) -> Result<Self, Box<dyn std::error::Error + Send>>;
 }
 
-pub trait ToMessage<P: Protocol + ?Sized> {
-	fn to_message(self) -> Result<(i32, P::Body), Box<dyn std::error::Error + Send>>;
+pub trait IntoMessage<P: Protocol + ?Sized> {
+	fn into_message(self) -> Result<(i32, P::Body), Box<dyn std::error::Error + Send>>;
 }
 
 pub trait FromMessage<P: Protocol + ?Sized>: Sized {

@@ -342,7 +342,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, updates: &[UpdateDefinition], enum_name: &syn::Ident, enum_doc: &str) {
 	let mut variants = TokenStream::new();
 	let mut from_message = TokenStream::new();
-	let mut to_message = TokenStream::new();
+	let mut into_message = TokenStream::new();
 	let mut decode_all = TokenStream::new();
 	let mut encode_all = TokenStream::new();
 	for update in updates {
@@ -365,7 +365,7 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			#body_type: #fizyr_rpc::macros::Decode<P>,
 		));
 
-		to_message.extend(quote! {
+		into_message.extend(quote! {
 			Self::#variant_name(update) => Ok((#service_id, P::encode_body(update)?)),
 		});
 
@@ -392,13 +392,13 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			}
 		}
 
-		impl<P: #fizyr_rpc::macros::Protocol> #fizyr_rpc::macros::ToMessage<P> for #enum_name
+		impl<P: #fizyr_rpc::macros::Protocol> #fizyr_rpc::macros::IntoMessage<P> for #enum_name
 		where
 			#encode_all
 		{
-			fn to_message(self) -> Result<(i32, P::Body), Box<dyn std::error::Error + Send>> {
+			fn into_message(self) -> Result<(i32, P::Body), Box<dyn std::error::Error + Send>> {
 				match self {
-					#to_message
+					#into_message
 				}
 			}
 		}
