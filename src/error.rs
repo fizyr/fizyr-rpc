@@ -154,10 +154,10 @@ impl std::fmt::Display for UnexpectedMessageType {
 
 /// The received message had an unexpected service ID.
 #[derive(Debug, Clone, Error)]
-#[error("unexpected service ID: {actual_service_id}")]
+#[error("unexpected service ID: {service_id}")]
 pub struct UnexpectedServiceId {
-	/// The actual service ID of the received message.
-	pub actual_service_id: i32,
+	/// The unrecognized/unexpected service ID.
+	pub service_id: i32,
 }
 
 /// An error occurred while reading an incoming message.

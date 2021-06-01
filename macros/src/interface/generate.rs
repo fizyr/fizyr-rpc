@@ -317,12 +317,12 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 						Some(x) => x,
 					};
 
-					let actual_service_id = update.header.service_id;
+					let service_id = update.header.service_id;
 
-					if actual_service_id != #service_id {
+					if service_id != #service_id {
 						// Put the message back in the read queue so that a different `recv_*` call can read it.
 						self.request._unpeek_message(update);
-						return Err(#fizyr_rpc::error::UnexpectedServiceId { actual_service_id }.into());
+						return Err(#fizyr_rpc::error::UnexpectedServiceId { service_id }.into());
 					}
 
 					P::decode_body(update.body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)
@@ -387,7 +387,7 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			fn from_message(message: #fizyr_rpc::Message<P::Body>) -> Result<Self, #fizyr_rpc::macros::error::FromMessageError> {
 				match message.header.service_id {
 					#from_message
-					actual_service_id => Err(#fizyr_rpc::error::UnexpectedServiceId { actual_service_id }.into()),
+					service_id => Err(#fizyr_rpc::error::UnexpectedServiceId { service_id }.into()),
 				}
 			}
 		}
