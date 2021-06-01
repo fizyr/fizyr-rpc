@@ -145,7 +145,7 @@ fn generate_services(item_tokens: &mut TokenStream, impl_tokens: &mut TokenStrea
 /// Generate a type for the sent request for a specific service.
 ///
 /// Only used for service calls that have update messages.
-/// Otherwise, the return type of a service call will simply the the response message.
+/// Otherwise, the return type of a service call will simply be the response message.
 fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, service: &ServiceDefinition) {
 	let service_name = service.name();
 	let response_type = service.response_type().map(|x| quote!(#x)).unwrap_or_else(|| quote!(()));
