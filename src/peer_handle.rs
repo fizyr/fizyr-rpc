@@ -90,12 +90,12 @@ impl<Body> PeerHandle<Body> {
 		(self.read_handle, self.write_handle)
 	}
 
-	/// Get the next request or stream message from the remote peer.
+	/// Receive the next request or stream message from the remote peer.
 	///
 	/// Errors for invalid incoming messages are also reported by this function.
 	/// For example: incoming update messages that are not associated with a received request will be reported as an error here.
-	pub async fn next_message(&mut self) -> Result<Incoming<Body>, error::RecvMessageError> {
-		self.read_handle.next_message().await
+	pub async fn recv_message(&mut self) -> Result<Incoming<Body>, error::RecvMessageError> {
+		self.read_handle.recv_message().await
 	}
 
 	/// Send a new request to the remote peer.
@@ -123,11 +123,11 @@ impl<Body> PeerHandle<Body> {
 }
 
 impl<Body> PeerReadHandle<Body> {
-	/// Get the next request or stream message from the remote peer.
+	/// Receive the next request or stream message from the remote peer.
 	///
 	/// Errors for invalid incoming messages are also reported by this function.
 	/// For example: incoming update messages that are not associated with a received request will be reported as an error here.
-	pub async fn next_message(&mut self) -> Result<Incoming<Body>, error::RecvMessageError> {
+	pub async fn recv_message(&mut self) -> Result<Incoming<Body>, error::RecvMessageError> {
 		self.incoming_rx.recv().await.ok_or_else(error::connection_aborted)?
 	}
 
