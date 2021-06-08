@@ -1,23 +1,31 @@
 fizyr_rpc::interface! {
-	pub camera {
-		#[service_id = 0]
+	interface camera {
 		/// Ping the server.
-		fn ping();
+		service 0 ping: () -> (),
 
-		#[service_id = 1]
 		/// Record an image.
-		fn record() {
-			#[service_id = 10]
-			#[request_update]
-			nevermind: (),
-
-			#[service_id = 11]
-			#[response_update]
-			state: RecordState,
+		service 1 record: () -> () {
+			request_update 10 cancel: CancelReason,
+			response_update 11 state: RecordState,
+			response_update 12 image: Image,
 		}
 	}
 }
 
 pub enum RecordState {
+	Recording,
+	Processing,
+	Done,
 }
 
+pub enum CancelReason {
+	BecauseISaidSo,
+	SomeDoofusObscuredTheCameraView,
+}
+
+pub struct Image {
+	pub width: u32,
+	pub height: u32,
+	pub format: u32,
+	pub data: Vec<u8>,
+}

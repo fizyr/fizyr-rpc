@@ -95,8 +95,6 @@ fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 ///
 /// `extra_impl` is used to add additional functions to the main `impl` block.
 fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) {
-	let unit_type = make_unit_type();
-
 	// Where clause for the `recv_message` function.
 	let mut recv_message_where = TokenStream::new();
 	// Match arms for decoding a request message.
@@ -106,7 +104,7 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 		let service_id = service.service_id();
 		let service_name = service.name();
 		let variant_name = syn::Ident::new(&to_upper_camel_case(&service_name.to_string()), Span::call_site());
-		let request_type = service.request_type().unwrap_or(&unit_type);
+		let request_type = service.request_type();
 		recv_message_where.extend(quote! {
 			#request_type: #fizyr_rpc::macros::Decode<P>,
 		});
@@ -185,7 +183,9 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 		}
 	});
 
-	generate_received_request_enum(item_tokens, fizyr_rpc, interface);
+	if !interface.services().is_empty() {
+		generate_received_request_enum(item_tokens, fizyr_rpc, interface);
+	}
 }
 
 /// Generate the support types and function definitions for each service.
@@ -197,20 +197,22 @@ fn generate_services(item_tokens: &mut TokenStream, client_impl_tokens: &mut Tok
 
 /// Generate the support types and function definitions for each service.
 fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, service: &ServiceDefinition) {
-	let unit_type = make_unit_type();
 	let service_name = service.name();
 	let service_doc = to_doc_attrs(&service.doc());
 	let service_id = service.service_id();
 
-	let request_param = service.request_type().map(|x| quote!(request: #x));
-	let request_type = service.request_type().unwrap_or(&unit_type);
-	let request_body = if service.request_type().is_some() {
-		quote!(P::encode_body(request))
+	let request_type = service.request_type();
+	let request_param;
+	let request_body;
+	if is_unit_type(request_type) {
+		request_param = None;
+		request_body = quote!(P::encode_body(()))
 	} else {
-		quote!(P::encode_body(()))
-	};
+		request_param = Some(quote!(request: #request_type));
+		request_body = quote!(P::encode_body(request))
+	}
 
-	let response_type = service.response_type().unwrap_or(&unit_type);
+	let response_type = service.response_type();
 	let mut service_item_tokens = TokenStream::new();
 
 	// Service without updates, so directly return the response (asynchronously).
@@ -263,9 +265,8 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 /// Only used for service calls that have update messages.
 /// Otherwise, the return type of a service call will simply be the response message.
 fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, service: &ServiceDefinition) {
-	let unit_type = make_unit_type();
 	let service_name = service.name();
-	let response_type = service.response_type().unwrap_or(&unit_type);
+	let response_type = service.response_type();
 
 	let doc_recv_update = match service.response_updates().is_empty() {
 		true => quote! {
@@ -546,8 +547,7 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 }
 
 fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, service: &ServiceDefinition) {
-	let unit_type = make_unit_type();
-	let response_type = service.response_type().unwrap_or(&unit_type);
+	let response_type = service.response_type();
 	let service_name = service.name();
 	let service_id = service.service_id();
 
@@ -624,12 +624,11 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 
 /// Generate an enum for all possible received requests for a server.
 fn generate_received_request_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) {
-	let unit_type = make_unit_type();
 	let mut variant_tokens = TokenStream::new();
 	for service in interface.services() {
 		let service_name = service.name();
 		let variant_name = syn::Ident::new(&to_upper_camel_case(&service_name.to_string()), Span::call_site());
-		let request_type = service.request_type().unwrap_or(&unit_type);
+		let request_type = service.request_type();
 		let doc = to_doc_attrs(service.doc());
 		variant_tokens.extend(quote! {
 			#doc
@@ -678,13 +677,4 @@ fn is_unit_type(ty: &syn::Type) -> bool {
 	} else {
 		false
 	}
-}
-
-fn make_unit_type() -> syn::Type {
-	syn::Type::Tuple(
-		syn::TypeTuple {
-			paren_token: syn::token::Paren(Span::call_site()),
-			elems: syn::punctuated::Punctuated::new(),
-		}
-	)
 }
