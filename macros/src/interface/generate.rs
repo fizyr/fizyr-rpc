@@ -20,13 +20,16 @@ pub fn generate_interface(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinitio
 	generate_services(&mut item_tokens, &mut client_impl_tokens, fizyr_rpc, interface);
 	generate_client(&mut item_tokens, fizyr_rpc, interface, client_impl_tokens);
 	generate_server(&mut item_tokens, fizyr_rpc, interface);
-	generate_message_enum(
-		&mut item_tokens,
-		fizyr_rpc,
-		&interface.streams(),
-		&syn::Ident::new("StreamMessage", Span::call_site()),
-		&format!("A stream message for the {} interface.", interface.name()),
-	);
+
+	if !interface.streams().is_empty() {
+		generate_message_enum(
+			&mut item_tokens,
+			fizyr_rpc,
+			&interface.streams(),
+			&syn::Ident::new("StreamMessage", Span::call_site()),
+			&format!("A stream message for the {} interface.", interface.name()),
+		);
+	}
 
 	let tokens = quote! {
 		#interface_doc
@@ -103,10 +106,66 @@ fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 ///
 /// `extra_impl` is used to add additional functions to the main `impl` block.
 fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) {
+	// Generic parameters for the `Incoming` enum.
+	let mut incoming_generics = TokenStream::new();
+	// Where clauses for the Incoming struct.
+	let mut incoming_where = TokenStream::new();
+	// Variants for the `Incoming` enum.
+	let mut incoming_variants = TokenStream::new();
 	// Where clause for the `recv_message` function.
 	let mut recv_message_where = TokenStream::new();
 	// Match arms for decoding a request message.
 	let mut decode_request_arms = TokenStream::new();
+	// Match arms for the receive_msg function.
+	let mut recv_message_arms = TokenStream::new();
+
+	if !interface.services().is_empty() {
+		incoming_generics.extend(quote!(P));
+		incoming_where.extend(quote! {
+			P: #fizyr_rpc::macros::Protocol,
+		});
+		incoming_variants.extend(quote! {
+			/// A request message.
+			Request(ReceivedRequest<P>),
+		});
+		recv_message_arms.extend(quote! {
+			#fizyr_rpc::Incoming::Request(request, body) => {
+				match request.service_id() {
+					#decode_request_arms
+					service_id => Err(#fizyr_rpc::error::UnexpectedServiceId { service_id }.into())
+				}
+			},
+		});
+	} else {
+		recv_message_arms.extend(quote! {
+			#fizyr_rpc::Incoming::Request(request, body) => {
+				let service_id = request.service_id();
+				Err(#fizyr_rpc::error::UnexpectedServiceId { service_id }.into())
+			},
+		});
+	}
+
+	if !interface.streams().is_empty() {
+		recv_message_where.extend(quote! {
+			StreamMessage: #fizyr_rpc::macros::FromMessage<P>,
+		});
+		incoming_variants.extend(quote! {
+			/// A stream message.
+			Stream(StreamMessage),
+		});
+		recv_message_arms.extend(quote! {
+			#fizyr_rpc::Incoming::Stream(raw) => {
+				Ok(Incoming::Stream(P::decode_message(raw)?))
+			},
+		});
+	} else {
+		recv_message_arms.extend(quote! {
+			#fizyr_rpc::Incoming::Stream(raw) => {
+				let service_id = raw.header.service_id;
+				Err(#fizyr_rpc::error::UnexpectedServiceId { service_id }.into())
+			},
+		});
+	}
 
 	for service in interface.services() {
 		let service_id = service.service_id();
@@ -152,21 +211,12 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 			}
 
 			/// Receive the next incoming message.
-			pub async fn recv_message(&mut self) -> Result<Incoming<P>, #fizyr_rpc::error::RecvMessageError>
+			pub async fn recv_message(&mut self) -> Result<Incoming<#incoming_generics>, #fizyr_rpc::error::RecvMessageError>
 			where
-				StreamMessage: #fizyr_rpc::macros::FromMessage<P>,
 				#recv_message_where
 			{
 				match self.peer.recv_message().await? {
-					#fizyr_rpc::Incoming::Stream(raw) => {
-						Ok(Incoming::Stream(P::decode_message(raw)?))
-					},
-					#fizyr_rpc::Incoming::Request(request, body) => {
-						match request.service_id() {
-							#decode_request_arms
-							service_id => Err(#fizyr_rpc::error::UnexpectedServiceId { service_id }.into())
-						}
-					},
+					#recv_message_arms
 				}
 			}
 		}
@@ -185,13 +235,11 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 		}
 
 		/// An incoming message from a remote peer.
-		pub enum Incoming<P: #fizyr_rpc::macros::Protocol> {
-			/// A request message.
-			Request(ReceivedRequest<P>),
-
-			/// A stream message.
-			Stream(StreamMessage),
-
+		pub enum Incoming<#incoming_generics>
+		where
+			#incoming_where
+		{
+			#incoming_variants
 		}
 	});
 
