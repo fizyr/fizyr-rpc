@@ -12,6 +12,18 @@ fizyr_rpc::interface! {
 	}
 }
 
+fizyr_rpc::interface! {
+	interface camera_state {
+		/// Notification of the record state of the camera.
+		stream 100 record_state: RecordState,
+	}
+}
+
+fizyr_rpc::interface! {
+	interface empty {
+	}
+}
+
 pub enum RecordState {
 	Recording,
 	Processing,
