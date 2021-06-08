@@ -1,7 +1,8 @@
 use quote::quote;
 use proc_macro2::{Span, TokenStream};
 
-use super::parse::cooked::{InterfaceDefinition, ServiceDefinition, UpdateDefinition};
+use super::parse::cooked::{InterfaceDefinition, ServiceDefinition, StreamDefinition, UpdateDefinition};
+use crate::util::WithSpan;
 
 /// Generate a client struct for the given interface.
 pub fn generate_interface(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) -> TokenStream {
@@ -19,6 +20,13 @@ pub fn generate_interface(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinitio
 	generate_services(&mut item_tokens, &mut client_impl_tokens, fizyr_rpc, interface);
 	generate_client(&mut item_tokens, fizyr_rpc, interface, client_impl_tokens);
 	generate_server(&mut item_tokens, fizyr_rpc, interface);
+	generate_message_enum(
+		&mut item_tokens,
+		fizyr_rpc,
+		&interface.streams(),
+		&syn::Ident::new("StreamMessage", Span::call_site()),
+		&format!("A stream message for the {} interface.", interface.name()),
+	);
 
 	let tokens = quote! {
 		#interface_doc
@@ -146,10 +154,13 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 			/// Receive the next incoming message.
 			pub async fn recv_message(&mut self) -> Result<Incoming<P>, #fizyr_rpc::error::RecvMessageError>
 			where
+				StreamMessage: #fizyr_rpc::macros::FromMessage<P>,
 				#recv_message_where
 			{
 				match self.peer.recv_message().await? {
-					#fizyr_rpc::Incoming::Stream(x) => Ok(Incoming::Stream(x)),
+					#fizyr_rpc::Incoming::Stream(raw) => {
+						Ok(Incoming::Stream(P::decode_message(raw)?))
+					},
 					#fizyr_rpc::Incoming::Request(request, body) => {
 						match request.service_id() {
 							#decode_request_arms
@@ -175,11 +186,12 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 
 		/// An incoming message from a remote peer.
 		pub enum Incoming<P: #fizyr_rpc::macros::Protocol> {
-			/// A raw streaming message.
-			Stream(#fizyr_rpc::Message<P::Body>),
-
 			/// A request message.
 			Request(ReceivedRequest<P>),
+
+			/// A stream message.
+			Stream(StreamMessage),
+
 		}
 	});
 
@@ -433,8 +445,8 @@ fn generate_recv_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 
 	for update in updates {
 		let function_name = syn::Ident::new(&format!("recv_{}_update", update.name()), Span::call_site());
-		let body_type = update.body_type();
 		let service_id = update.service_id();
+		let body_type = update.body_type();
 		let doc = format!("Receive a {} update from the remote peer.", update.name());
 		let mut doc = quote!(#[doc = #doc]);
 		doc.extend(match kind {
@@ -479,20 +491,63 @@ fn generate_recv_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 	}
 }
 
+trait MessageDefinition {
+	fn service_id(&self) -> &WithSpan<i32>;
+	fn name(&self) -> &syn::Ident;
+	fn doc(&self) -> &[WithSpan<String>];
+	fn body_type(&self) -> &syn::Type;
+}
+
+impl MessageDefinition for UpdateDefinition {
+	fn service_id(&self) -> &WithSpan<i32> {
+		self.service_id()
+	}
+
+	fn name(&self) -> &syn::Ident {
+		self.name()
+	}
+
+	fn doc(&self) -> &[WithSpan<String>] {
+		self.doc()
+	}
+
+	fn body_type(&self) -> &syn::Type {
+		self.body_type()
+	}
+}
+
+impl MessageDefinition for StreamDefinition {
+	fn service_id(&self) -> &WithSpan<i32> {
+		self.service_id()
+	}
+
+	fn name(&self) -> &syn::Ident {
+		self.name()
+	}
+
+	fn doc(&self) -> &[WithSpan<String>] {
+		self.doc()
+	}
+
+	fn body_type(&self) -> &syn::Type {
+		self.body_type()
+	}
+}
+
 /// Generate an enum with all possible body types for a message.
-fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, updates: &[UpdateDefinition], enum_name: &syn::Ident, enum_doc: &str) {
+fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, messages: &[impl MessageDefinition], enum_name: &syn::Ident, enum_doc: &str) {
 	let mut variants = TokenStream::new();
 	let mut from_message = TokenStream::new();
 	let mut into_message = TokenStream::new();
 	let mut decode_all = TokenStream::new();
 	let mut encode_all = TokenStream::new();
-	for update in updates {
-		let variant_name = to_upper_camel_case(&update.name().to_string());
-		let variant_name = syn::Ident::new(&variant_name, update.name().span());
-		let variant_doc = to_doc_attrs(update.doc());
-		let body_type = update.body_type();
+	for message in messages {
+		let variant_name = to_upper_camel_case(&message.name().to_string());
+		let variant_name = syn::Ident::new(&variant_name, message.name().span());
+		let variant_doc = to_doc_attrs(message.doc());
+		let body_type = message.body_type();
 
-		let service_id = update.service_id();
+		let service_id = message.service_id();
 		variants.extend(quote!{
 			#variant_doc
 			#variant_name(#body_type),
@@ -507,7 +562,7 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		));
 
 		into_message.extend(quote! {
-			Self::#variant_name(update) => Ok((#service_id, P::encode_body(update)?)),
+			Self::#variant_name(message) => Ok((#service_id, P::encode_body(message)?)),
 		});
 
 		encode_all.extend(quote!(

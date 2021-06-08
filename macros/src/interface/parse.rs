@@ -71,7 +71,6 @@ pub mod cooked {
 			&self.services
 		}
 
-		#[allow(dead_code)]
 		pub fn streams(&self) -> &[StreamDefinition] {
 			&self.streams
 		}
@@ -194,7 +193,6 @@ pub mod cooked {
 		}
 	}
 
-	#[allow(dead_code)]
 	impl StreamDefinition {
 		pub fn service_id(&self) -> &WithSpan<i32> {
 			&self.service_id
@@ -392,7 +390,7 @@ pub mod raw {
 					_comma: input.parse()?,
 				}))
 			} else {
-				return Err(input.error("expected `service' or `stream'"));
+				Err(input.error("expected `service' or `stream'"))
 			}
 		}
 	}
