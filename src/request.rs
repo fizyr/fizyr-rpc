@@ -118,7 +118,7 @@ impl<Body> SentRequest<Body> {
 	}
 
 	/// Send an update for the request to the remote peer.
-	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendUpdateError> {
+	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendMessageError> {
 		use crate::peer::SendRawMessage;
 		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();

@@ -231,10 +231,10 @@ impl SendRequestError {
 	}
 }
 
-/// An error occurred while sending a request.
+/// An error occurred while sending an update or stream message.
 #[derive(Debug, Error)]
 #[error("{0}")]
-pub enum SendUpdateError {
+pub enum SendMessageError {
 	/// An I/O error occurred.
 	Io(#[from] std::io::Error),
 
@@ -245,7 +245,7 @@ pub enum SendUpdateError {
 	EncodeBody(Box<dyn std::error::Error + Send>),
 }
 
-impl SendUpdateError {
+impl SendMessageError {
 	/// Check if the error is an I/O error indicating that the connection was aborted by the remote peer.
 	pub fn is_connection_aborted(&self) -> bool {
 		if let Self::Io(e) = &self {
@@ -289,8 +289,8 @@ impl From<WriteMessageError> for SendRequestError {
 	}
 }
 
-// Allow a WriteMessageError to be converted to a SendUpdateError automatically.
-impl From<WriteMessageError> for SendUpdateError {
+// Allow a WriteMessageError to be converted to a SendMessageError automatically.
+impl From<WriteMessageError> for SendMessageError {
 	fn from(other: WriteMessageError) -> Self {
 		match other {
 			WriteMessageError::Io(e) => e.into(),

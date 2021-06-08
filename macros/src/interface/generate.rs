@@ -18,18 +18,9 @@ pub fn generate_interface(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinitio
 	};
 
 	generate_services(&mut item_tokens, &mut client_impl_tokens, fizyr_rpc, interface);
+	generate_streams(&mut item_tokens, &mut client_impl_tokens, fizyr_rpc, interface);
 	generate_client(&mut item_tokens, fizyr_rpc, interface, client_impl_tokens);
 	generate_server(&mut item_tokens, fizyr_rpc, interface);
-
-	if !interface.streams().is_empty() {
-		generate_message_enum(
-			&mut item_tokens,
-			fizyr_rpc,
-			&interface.streams(),
-			&syn::Ident::new("StreamMessage", Span::call_site()),
-			&format!("A stream message for the {} interface.", interface.name()),
-		);
-	}
 
 	let tokens = quote! {
 		#interface_doc
@@ -425,11 +416,11 @@ enum UpdateKind {
 fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, enum_type: &TokenStream, updates: &[UpdateDefinition]) {
 	quote! {
 		/// Send a request update to the remote peer.
-		pub async fn send_update(&self, update: #enum_type) -> Result<(), #fizyr_rpc::error::SendUpdateError>
+		pub async fn send_update(&self, update: #enum_type) -> Result<(), #fizyr_rpc::error::SendMessageError>
 		where
 			#enum_type: #fizyr_rpc::macros::ToMessage<P>,
 		{
-			let (service_id, body) = P::encode_message(update).map_err(#fizyr_rpc::error::SendUpdateError::EncodeBody)?;
+			let (service_id, body) = P::encode_message(update).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
 			self.request.send_update(service_id, body).await?;
 			Ok(())
 		}
@@ -451,11 +442,11 @@ fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 		}
 		impl_tokens.extend(quote! {
 			#[doc = #doc]
-			pub async fn #function_name(&self, #body_arg) -> Result<(), #fizyr_rpc::error::SendUpdateError>
+			pub async fn #function_name(&self, #body_arg) -> Result<(), #fizyr_rpc::error::SendMessageError>
 			where
 				#body_type: #fizyr_rpc::macros::Encode<P>,
 			{
-				let body = P::encode_body(#body_val).map_err(#fizyr_rpc::error::SendUpdateError::EncodeBody)?;
+				let body = P::encode_body(#body_val).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
 				self.request.send_update(#service_id, body).await?;
 				Ok(())
 			}
@@ -534,6 +525,44 @@ fn generate_recv_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 				}
 
 				P::decode_body(update.body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)
+			}
+		})
+	}
+}
+
+fn generate_streams(item_tokens: &mut TokenStream, client_impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) {
+	if !interface.streams().is_empty() {
+		generate_message_enum(
+			item_tokens,
+			fizyr_rpc,
+			&interface.streams(),
+			&syn::Ident::new("StreamMessage", Span::call_site()),
+			&format!("A stream message for the {} interface.", interface.name()),
+		);
+	}
+	for stream in interface.streams() {
+		let service_id = stream.service_id();
+		let fn_name = syn::Ident::new(&format!("send_{}", stream.name()), Span::call_site());
+		let fn_doc = format!("Send a {} stream message to the remote peer.", stream.name());
+		let body_arg;
+		let body_val;
+		let body_type = stream.body_type();
+		if is_unit_type(body_type) {
+			body_arg = None;
+			body_val = quote!(());
+		} else {
+			body_arg = Some(quote!(body: #body_type));
+			body_val = quote!(body);
+		}
+		client_impl_tokens.extend(quote! {
+			#[doc = #fn_doc]
+			pub async fn #fn_name(&self, #body_arg) -> Result<(), #fizyr_rpc::error::SendMessageError>
+			where
+				#body_type: #fizyr_rpc::macros::Encode<P>,
+			{
+				let encoded = P::encode_body(#body_val).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
+				self.peer.send_stream(#service_id, encoded).await?;
+				Ok(())
 			}
 		})
 	}
@@ -711,11 +740,11 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			}
 
 			/// Send the final response.
-			pub async fn send_response(self, response: #response_type) -> Result<(), #fizyr_rpc::error::SendUpdateError>
+			pub async fn send_response(self, response: #response_type) -> Result<(), #fizyr_rpc::error::SendMessageError>
 			where
 				#response_type: #fizyr_rpc::macros::Encode<P>,
 			{
-				let encoded = P::encode_body(response).map_err(#fizyr_rpc::error::SendUpdateError::EncodeBody)?;
+				let encoded = P::encode_body(response).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
 				let response = self.request.send_response(#service_id, encoded).await?;
 				Ok(())
 			}
