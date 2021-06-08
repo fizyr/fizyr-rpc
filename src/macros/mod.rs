@@ -3,16 +3,6 @@ pub use fizyr_rpc_macros::interface as interface_impl;
 
 pub mod error;
 
-pub trait FromMessageBody<Body>: Sized {
-	fn from_message_body(body: &Body) -> Result<Self, Box<dyn std::error::Error + Send>>;
-}
-
-pub trait ToMessageBody<Body> {
-	type Error;
-
-	fn to_message_body(&self) -> Result<Body, Self::Error>;
-}
-
 pub trait Protocol {
 	type Body: crate::Body;
 	type Transport: crate::transport::Transport<Body = Self::Body>;
