@@ -264,7 +264,7 @@ pub enum ServiceCallError {
 	SendRequest(#[from] SendRequestError),
 
 	/// Failed to receive or decode the response.
-	ReceiveResponse(#[from] RecvMessageError),
+	RecvResponse(#[from] RecvMessageError),
 }
 
 /// An error decoding a message.
