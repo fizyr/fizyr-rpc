@@ -631,7 +631,7 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		});
 
 		from_message.extend(quote! {
-			#service_id => Ok(Self::#variant_name(P::decode_body(message.body).map_err(#fizyr_rpc::macros::error::FromMessageError::DecodeBody)?)),
+			#service_id => Ok(Self::#variant_name(P::decode_body(message.body).map_err(#fizyr_rpc::error::FromMessageError::DecodeBody)?)),
 		});
 
 		decode_all.extend(quote!(
@@ -657,7 +657,7 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		where
 			#decode_all
 		{
-			fn from_message(message: #fizyr_rpc::Message<P::Body>) -> Result<Self, #fizyr_rpc::macros::error::FromMessageError> {
+			fn from_message(message: #fizyr_rpc::Message<P::Body>) -> Result<Self, #fizyr_rpc::error::FromMessageError> {
 				match message.header.service_id {
 					#from_message
 					service_id => Err(#fizyr_rpc::error::UnexpectedServiceId { service_id }.into()),

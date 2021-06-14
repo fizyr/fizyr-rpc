@@ -1,8 +1,6 @@
 #[doc(hidden)]
 pub use fizyr_rpc_macros::interface as interface_impl;
 
-pub mod error;
-
 pub trait Protocol {
 	type Body: crate::Body;
 	type Transport: crate::transport::Transport<Body = Self::Body>;
@@ -19,7 +17,7 @@ pub trait Protocol {
 		value.into_message()
 	}
 
-	fn decode_message<T: FromMessage<Self>>(message: crate::Message<Self::Body>) -> Result<T, error::FromMessageError> {
+	fn decode_message<T: FromMessage<Self>>(message: crate::Message<Self::Body>) -> Result<T, crate::error::FromMessageError> {
 		T::from_message(message)
 	}
 }
@@ -37,7 +35,7 @@ pub trait IntoMessage<P: Protocol + ?Sized> {
 }
 
 pub trait FromMessage<P: Protocol + ?Sized>: Sized {
-	fn from_message(message: crate::Message<P::Body>) -> Result<Self, error::FromMessageError>;
+	fn from_message(message: crate::Message<P::Body>) -> Result<Self, crate::error::FromMessageError>;
 }
 
 #[macro_export]

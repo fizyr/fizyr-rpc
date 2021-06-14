@@ -267,6 +267,17 @@ pub enum ServiceCallError {
 	ReceiveResponse(#[from] RecvMessageError),
 }
 
+/// An error decoding a message.
+#[derive(Debug, Error)]
+#[error("{0}")]
+pub enum FromMessageError {
+	/// The service ID was not recognized.
+	UnexpectedServiceId(#[from] crate::error::UnexpectedServiceId),
+
+	/// Failed to decode the message body.
+	DecodeBody(Box<dyn std::error::Error + Send>),
+}
+
 // Allow a ReadMessageError to be converted to a RecvMessageError automatically.
 impl From<ReadMessageError> for RecvMessageError {
 	fn from(other: ReadMessageError) -> Self {
@@ -295,6 +306,15 @@ impl From<WriteMessageError> for SendMessageError {
 		match other {
 			WriteMessageError::Io(e) => e.into(),
 			WriteMessageError::PayloadTooLarge(e) => e.into(),
+		}
+	}
+}
+
+impl From<FromMessageError> for crate::error::RecvMessageError {
+	fn from(other: FromMessageError) -> Self {
+		match other {
+			FromMessageError::UnexpectedServiceId(x) => x.into(),
+			FromMessageError::DecodeBody(e) => Self::DecodeBody(e),
 		}
 	}
 }
