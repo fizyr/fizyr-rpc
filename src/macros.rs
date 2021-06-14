@@ -1,7 +1,7 @@
 #[doc(hidden)]
 pub use fizyr_rpc_macros::interface as interface_impl;
 
-pub trait Protocol {
+pub trait Format {
 	type Body: crate::Body;
 	type Transport: crate::transport::Transport<Body = Self::Body>;
 
@@ -22,20 +22,20 @@ pub trait Protocol {
 	}
 }
 
-pub trait Encode<P: Protocol + ?Sized> {
-	fn encode(self) -> Result<P::Body, Box<dyn std::error::Error + Send>>;
+pub trait Encode<F: Format + ?Sized> {
+	fn encode(self) -> Result<F::Body, Box<dyn std::error::Error + Send>>;
 }
 
-pub trait Decode<P: Protocol + ?Sized>: Sized {
-	fn decode(body: P::Body) -> Result<Self, Box<dyn std::error::Error + Send>>;
+pub trait Decode<F: Format + ?Sized>: Sized {
+	fn decode(body: F::Body) -> Result<Self, Box<dyn std::error::Error + Send>>;
 }
 
-pub trait IntoMessage<P: Protocol + ?Sized> {
-	fn into_message(self) -> Result<(i32, P::Body), Box<dyn std::error::Error + Send>>;
+pub trait IntoMessage<F: Format + ?Sized> {
+	fn into_message(self) -> Result<(i32, F::Body), Box<dyn std::error::Error + Send>>;
 }
 
-pub trait FromMessage<P: Protocol + ?Sized>: Sized {
-	fn from_message(message: crate::Message<P::Body>) -> Result<Self, crate::error::FromMessageError>;
+pub trait FromMessage<F: Format + ?Sized>: Sized {
+	fn from_message(message: crate::Message<F::Body>) -> Result<Self, crate::error::FromMessageError>;
 }
 
 #[macro_export]

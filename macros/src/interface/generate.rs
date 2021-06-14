@@ -41,13 +41,13 @@ fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 	let client_doc = format!("RPC client for the {} interface.", interface.name());
 	item_tokens.extend(quote! {
 		#[doc = #client_doc]
-		pub struct Client<P: #fizyr_rpc::macros::Protocol> {
-			peer: #fizyr_rpc::PeerWriteHandle<P::Body>,
+		pub struct Client<F: #fizyr_rpc::macros::Format> {
+			peer: #fizyr_rpc::PeerWriteHandle<F::Body>,
 		}
 
-		impl<P: #fizyr_rpc::macros::Protocol> Client<P> {
+		impl<F: #fizyr_rpc::macros::Format> Client<F> {
 			/// Create a new interface-specific RPC client from a raw write handle.
-			pub fn new(peer: #fizyr_rpc::PeerWriteHandle<P::Body>) -> Self {
+			pub fn new(peer: #fizyr_rpc::PeerWriteHandle<F::Body>) -> Self {
 				Self { peer }
 			}
 
@@ -57,7 +57,7 @@ fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 			pub async fn connect<'a, Transport, Address>(address: Address, config: Transport::Config) -> std::io::Result<Self>
 			where
 				Address: 'a,
-				Transport: #fizyr_rpc::transport::Transport<Body = P::Body> + #fizyr_rpc::util::Connect<'a, Address>,
+				Transport: #fizyr_rpc::transport::Transport<Body = F::Body> + #fizyr_rpc::util::Connect<'a, Address>,
 			{
 				Ok(#fizyr_rpc::Peer::<Transport>::connect(address, config).await?.into())
 			}
@@ -71,21 +71,21 @@ fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 			///
 			/// The close handle can be used to close the connection with the remote peer.
 			/// It can be cloned and moved around independently.
-			pub fn close_handle(&self) -> #fizyr_rpc::PeerCloseHandle<P::Body> {
+			pub fn close_handle(&self) -> #fizyr_rpc::PeerCloseHandle<F::Body> {
 				self.peer.close_handle()
 			}
 
 			#extra_impl
 		}
 
-		impl<P: #fizyr_rpc::macros::Protocol> ::core::convert::From<#fizyr_rpc::PeerWriteHandle<P::Body>> for Client<P> {
-			fn from(other: #fizyr_rpc::PeerWriteHandle<P::Body>) -> Self {
+		impl<F: #fizyr_rpc::macros::Format> ::core::convert::From<#fizyr_rpc::PeerWriteHandle<F::Body>> for Client<F> {
+			fn from(other: #fizyr_rpc::PeerWriteHandle<F::Body>) -> Self {
 				Self::new(other)
 			}
 		}
 
-		impl<P: #fizyr_rpc::macros::Protocol> ::core::convert::From<#fizyr_rpc::PeerHandle<P::Body>> for Client<P> {
-			fn from(other: #fizyr_rpc::PeerHandle<P::Body>) -> Self {
+		impl<F: #fizyr_rpc::macros::Format> ::core::convert::From<#fizyr_rpc::PeerHandle<F::Body>> for Client<F> {
+			fn from(other: #fizyr_rpc::PeerHandle<F::Body>) -> Self {
 				let (_read, write) = other.split();
 				Self::new(write)
 			}
@@ -111,13 +111,13 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 	let mut recv_message_arms = TokenStream::new();
 
 	if !interface.services().is_empty() {
-		incoming_generics.extend(quote!(P));
+		incoming_generics.extend(quote!(F));
 		incoming_where.extend(quote! {
-			P: #fizyr_rpc::macros::Protocol,
+			F: #fizyr_rpc::macros::Format,
 		});
 		incoming_variants.extend(quote! {
 			/// A request message.
-			Request(ReceivedRequest<P>),
+			Request(ReceivedRequest<F>),
 		});
 		recv_message_arms.extend(quote! {
 			#fizyr_rpc::Incoming::Request(request, body) => {
@@ -138,7 +138,7 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 
 	if !interface.streams().is_empty() {
 		recv_message_where.extend(quote! {
-			StreamMessage: #fizyr_rpc::macros::FromMessage<P>,
+			StreamMessage: #fizyr_rpc::macros::FromMessage<F>,
 		});
 		incoming_variants.extend(quote! {
 			/// A stream message.
@@ -146,7 +146,7 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 		});
 		recv_message_arms.extend(quote! {
 			#fizyr_rpc::Incoming::Stream(raw) => {
-				Ok(Incoming::Stream(P::decode_message(raw)?))
+				Ok(Incoming::Stream(F::decode_message(raw)?))
 			},
 		});
 	} else {
@@ -164,11 +164,11 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 		let variant_name = syn::Ident::new(&to_upper_camel_case(&service_name.to_string()), Span::call_site());
 		let request_type = service.request_type();
 		recv_message_where.extend(quote! {
-			#request_type: #fizyr_rpc::macros::Decode<P>,
+			#request_type: #fizyr_rpc::macros::Decode<F>,
 		});
 		decode_request_arms.extend(quote! {
 			#service_id =>  {
-				let body = P::decode_body(body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)?;
+				let body = F::decode_body(body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)?;
 				let request = #service_name::ReceivedRequest { request };
 				Ok(Incoming::Request(ReceivedRequest::#variant_name(request, body)))
 			},
@@ -178,13 +178,13 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 	let server_doc = format!("RPC server for the {} interface.", interface.name());
 	item_tokens.extend(quote! {
 		#[doc = #server_doc]
-		pub struct Server<P: #fizyr_rpc::macros::Protocol> {
-			peer: #fizyr_rpc::PeerReadHandle<P::Body>,
+		pub struct Server<F: #fizyr_rpc::macros::Format> {
+			peer: #fizyr_rpc::PeerReadHandle<F::Body>,
 		}
 
-		impl<P: #fizyr_rpc::macros::Protocol> Server<P> {
+		impl<F: #fizyr_rpc::macros::Format> Server<F> {
 			/// Create a new interface-specific RPC server from a raw write handle.
-			fn new(peer: #fizyr_rpc::PeerReadHandle<P::Body>) -> Self {
+			fn new(peer: #fizyr_rpc::PeerReadHandle<F::Body>) -> Self {
 				Self { peer }
 			}
 
@@ -197,7 +197,7 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 			///
 			/// The close handle can be used to close the connection with the remote peer.
 			/// It can be cloned and moved around independently.
-			pub fn close_handle(&self) -> #fizyr_rpc::PeerCloseHandle<P::Body> {
+			pub fn close_handle(&self) -> #fizyr_rpc::PeerCloseHandle<F::Body> {
 				self.peer.close_handle()
 			}
 
@@ -212,14 +212,14 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 			}
 		}
 
-		impl<P: #fizyr_rpc::macros::Protocol> ::core::convert::From<#fizyr_rpc::PeerReadHandle<P::Body>> for Server<P> {
-			fn from(other: #fizyr_rpc::PeerReadHandle<P::Body>) -> Self {
+		impl<F: #fizyr_rpc::macros::Format> ::core::convert::From<#fizyr_rpc::PeerReadHandle<F::Body>> for Server<F> {
+			fn from(other: #fizyr_rpc::PeerReadHandle<F::Body>) -> Self {
 				Self::new(other)
 			}
 		}
 
-		impl<P: #fizyr_rpc::macros::Protocol> ::core::convert::From<#fizyr_rpc::PeerHandle<P::Body>> for Server<P> {
-			fn from(other: #fizyr_rpc::PeerHandle<P::Body>) -> Self {
+		impl<F: #fizyr_rpc::macros::Format> ::core::convert::From<#fizyr_rpc::PeerHandle<F::Body>> for Server<F> {
+			fn from(other: #fizyr_rpc::PeerHandle<F::Body>) -> Self {
 				let (read, _write) = other.split();
 				Self::new(read)
 			}
@@ -257,10 +257,10 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 	let request_body;
 	if is_unit_type(request_type) {
 		request_param = None;
-		request_body = quote!(P::encode_body(()))
+		request_body = quote!(F::encode_body(()))
 	} else {
 		request_param = Some(quote!(request: #request_type));
-		request_body = quote!(P::encode_body(request))
+		request_body = quote!(F::encode_body(request))
 	}
 
 	let response_type = service.response_type();
@@ -272,13 +272,13 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 			#service_doc
 			pub async fn #service_name(&self, #request_param) -> Result<#response_type, #fizyr_rpc::error::ServiceCallError>
 			where
-				#request_type: #fizyr_rpc::macros::Encode<P>,
-				#response_type: #fizyr_rpc::macros::Decode<P>,
+				#request_type: #fizyr_rpc::macros::Encode<F>,
+				#response_type: #fizyr_rpc::macros::Decode<F>,
 			{
 				let request_body = #request_body.map_err(#fizyr_rpc::error::SendRequestError::EncodeBody)?;
 				let mut request = self.peer.send_request(#service_id, request_body).await?;
 				let response = request.recv_response().await?;
-				let decoded = P::decode_body(response.body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)?;
+				let decoded = F::decode_body(response.body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)?;
 				Ok(decoded)
 			}
 		})
@@ -286,10 +286,10 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 		generate_sent_request(&mut service_item_tokens, &fizyr_rpc, service);
 		client_impl_tokens.extend(quote! {
 			#service_doc
-			pub async fn #service_name(&self, #request_param) -> Result<#service_name::SentRequest<P>, #fizyr_rpc::error::SendRequestError>
+			pub async fn #service_name(&self, #request_param) -> Result<#service_name::SentRequest<F>, #fizyr_rpc::error::SendRequestError>
 			where
-				#request_type: #fizyr_rpc::macros::Encode<P>,
-				#response_type: #fizyr_rpc::macros::Decode<P>,
+				#request_type: #fizyr_rpc::macros::Encode<F>,
+				#response_type: #fizyr_rpc::macros::Decode<F>,
 			{
 				let request_body = #request_body.map_err(#fizyr_rpc::error::SendRequestError::EncodeBody)?;
 				let mut request = self.peer.send_request(#service_id, request_body).await?;
@@ -333,11 +333,11 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 
 	item_tokens.extend(quote! {
 		#[doc = #struct_doc]
-		pub struct SentRequest<P: #fizyr_rpc::macros::Protocol> {
-			pub(super) request: #fizyr_rpc::SentRequest<P::Body>,
+		pub struct SentRequest<F: #fizyr_rpc::macros::Format> {
+			pub(super) request: #fizyr_rpc::SentRequest<F::Body>,
 		}
 
-		impl<P: #fizyr_rpc::macros::Protocol> SentRequest<P> {
+		impl<F: #fizyr_rpc::macros::Format> SentRequest<F> {
 			/// Receive the final response.
 			///
 			/// If an update message is received instead of the final response an error is returned.
@@ -345,25 +345,25 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			#doc_recv_update
 			pub async fn recv_response(&mut self) -> Result<#response_type, #fizyr_rpc::error::RecvMessageError>
 			where
-				#response_type: #fizyr_rpc::macros::Decode<P>,
+				#response_type: #fizyr_rpc::macros::Decode<F>,
 			{
 				let response = self.request.recv_response().await?;
-				let decoded = P::decode_body(response.body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)?;
+				let decoded = F::decode_body(response.body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)?;
 				Ok(decoded)
 			}
 
 			/// Get the raw request.
-			pub fn inner(&self) -> &#fizyr_rpc::SentRequest<P::Body> {
+			pub fn inner(&self) -> &#fizyr_rpc::SentRequest<F::Body> {
 				&self.request
 			}
 
 			/// Get an exclusive reference to the raw request.
-			pub fn inner_mut(&self) -> &#fizyr_rpc::SentRequest<P::Body> {
+			pub fn inner_mut(&self) -> &#fizyr_rpc::SentRequest<F::Body> {
 				&self.request
 			}
 
 			/// Consume this object to get the raw request.
-			pub fn into_inner(self) -> #fizyr_rpc::SentRequest<P::Body> {
+			pub fn into_inner(self) -> #fizyr_rpc::SentRequest<F::Body> {
 				self.request
 			}
 		}
@@ -382,7 +382,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		generate_send_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::RequestUpdate), service.request_updates());
 
 		item_tokens.extend(quote! {
-			impl<P: #fizyr_rpc::macros::Protocol> SentRequest<P> {
+			impl<F: #fizyr_rpc::macros::Format> SentRequest<F> {
 				#impl_tokens
 			}
 		});
@@ -400,7 +400,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		generate_recv_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::ResponseUpdate), service.response_updates(), UpdateKind::ResponseUpdate);
 
 		item_tokens.extend(quote! {
-			impl<P: #fizyr_rpc::macros::Protocol> SentRequest<P> {
+			impl<F: #fizyr_rpc::macros::Format> SentRequest<F> {
 				#impl_tokens
 			}
 		});
@@ -418,9 +418,9 @@ fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 		/// Send a request update to the remote peer.
 		pub async fn send_update(&self, update: #enum_type) -> Result<(), #fizyr_rpc::error::SendMessageError>
 		where
-			#enum_type: #fizyr_rpc::macros::ToMessage<P>,
+			#enum_type: #fizyr_rpc::macros::ToMessage<F>,
 		{
-			let (service_id, body) = P::encode_message(update).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
+			let (service_id, body) = F::encode_message(update).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
 			self.request.send_update(service_id, body).await?;
 			Ok(())
 		}
@@ -444,9 +444,9 @@ fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 			#[doc = #doc]
 			pub async fn #function_name(&self, #body_arg) -> Result<(), #fizyr_rpc::error::SendMessageError>
 			where
-				#body_type: #fizyr_rpc::macros::Encode<P>,
+				#body_type: #fizyr_rpc::macros::Encode<F>,
 			{
-				let body = P::encode_body(#body_val).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
+				let body = F::encode_body(#body_val).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
 				self.request.send_update(#service_id, body).await?;
 				Ok(())
 			}
@@ -471,14 +471,14 @@ fn generate_recv_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 		#doc
 		pub async fn recv_update(&mut self, timeout: std::time::Duration) -> Result<Option<#enum_type>, #fizyr_rpc::error::RecvMessageError>
 		where
-			#enum_type: #fizyr_rpc::macros::FromMessage<P>,
+			#enum_type: #fizyr_rpc::macros::FromMessage<F>,
 		{
 			use #fizyr_rpc::macros::FromMessage;
 			let update = match self.request.recv_update().await? {
 				Some(x) => x,
 				None => return Ok(None),
 			};
-			Ok(Some(P::decode_message(update)?))
+			Ok(Some(F::decode_message(update)?))
 		}
 	});
 
@@ -507,7 +507,7 @@ fn generate_recv_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 			#doc
 			pub async fn #function_name(&mut self) -> Result<#body_type, #fizyr_rpc::error::RecvMessageError>
 			where
-				#body_type: #fizyr_rpc::macros::Decode<P>,
+				#body_type: #fizyr_rpc::macros::Decode<F>,
 			{
 				let update = match self.request.recv_update().await? {
 					None => return Err(#fizyr_rpc::error::UnexpectedMessageType {
@@ -524,7 +524,7 @@ fn generate_recv_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 					return Err(#fizyr_rpc::error::UnexpectedServiceId { service_id }.into());
 				}
 
-				P::decode_body(update.body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)
+				F::decode_body(update.body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)
 			}
 		})
 	}
@@ -558,9 +558,9 @@ fn generate_streams(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 			#[doc = #fn_doc]
 			pub async fn #fn_name(&self, #body_arg) -> Result<(), #fizyr_rpc::error::SendMessageError>
 			where
-				#body_type: #fizyr_rpc::macros::Encode<P>,
+				#body_type: #fizyr_rpc::macros::Encode<F>,
 			{
-				let encoded = P::encode_body(#body_val).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
+				let encoded = F::encode_body(#body_val).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
 				self.peer.send_stream(#service_id, encoded).await?;
 				Ok(())
 			}
@@ -631,19 +631,19 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		});
 
 		from_message.extend(quote! {
-			#service_id => Ok(Self::#variant_name(P::decode_body(message.body).map_err(#fizyr_rpc::error::FromMessageError::DecodeBody)?)),
+			#service_id => Ok(Self::#variant_name(F::decode_body(message.body).map_err(#fizyr_rpc::error::FromMessageError::DecodeBody)?)),
 		});
 
 		decode_all.extend(quote!(
-			#body_type: #fizyr_rpc::macros::Decode<P>,
+			#body_type: #fizyr_rpc::macros::Decode<F>,
 		));
 
 		into_message.extend(quote! {
-			Self::#variant_name(message) => Ok((#service_id, P::encode_body(message)?)),
+			Self::#variant_name(message) => Ok((#service_id, F::encode_body(message)?)),
 		});
 
 		encode_all.extend(quote!(
-			#body_type: #fizyr_rpc::macros::Encode<P>,
+			#body_type: #fizyr_rpc::macros::Encode<F>,
 		));
 	}
 
@@ -653,11 +653,11 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			#variants
 		}
 
-		impl<P: #fizyr_rpc::macros::Protocol> #fizyr_rpc::macros::FromMessage<P> for #enum_name
+		impl<F: #fizyr_rpc::macros::Format> #fizyr_rpc::macros::FromMessage<F> for #enum_name
 		where
 			#decode_all
 		{
-			fn from_message(message: #fizyr_rpc::Message<P::Body>) -> Result<Self, #fizyr_rpc::error::FromMessageError> {
+			fn from_message(message: #fizyr_rpc::Message<F::Body>) -> Result<Self, #fizyr_rpc::error::FromMessageError> {
 				match message.header.service_id {
 					#from_message
 					service_id => Err(#fizyr_rpc::error::UnexpectedServiceId { service_id }.into()),
@@ -665,11 +665,11 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			}
 		}
 
-		impl<P: #fizyr_rpc::macros::Protocol> #fizyr_rpc::macros::IntoMessage<P> for #enum_name
+		impl<F: #fizyr_rpc::macros::Format> #fizyr_rpc::macros::IntoMessage<F> for #enum_name
 		where
 			#encode_all
 		{
-			fn into_message(self) -> Result<(i32, P::Body), Box<dyn std::error::Error + Send>> {
+			fn into_message(self) -> Result<(i32, F::Body), Box<dyn std::error::Error + Send>> {
 				match self {
 					#into_message
 				}
@@ -689,7 +689,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 		generate_send_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::RequestUpdate), service.response_updates());
 
 		item_tokens.extend(quote! {
-			impl<P: #fizyr_rpc::macros::Protocol> SentRequest<P> {
+			impl<F: #fizyr_rpc::macros::Format> SentRequest<F> {
 				#impl_tokens
 			}
 		});
@@ -700,16 +700,16 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 	}
 
 	item_tokens.extend(quote! {
-		pub struct ReceivedRequest<P: #fizyr_rpc::macros::Protocol> {
-			pub(super) request: #fizyr_rpc::ReceivedRequest<P::Body>,
+		pub struct ReceivedRequest<F: #fizyr_rpc::macros::Format> {
+			pub(super) request: #fizyr_rpc::ReceivedRequest<F::Body>,
 		}
 
-		impl<P: #fizyr_rpc::macros::Protocol> ReceivedRequest<P> {
+		impl<F: #fizyr_rpc::macros::Format> ReceivedRequest<F> {
 			/// Get the raw request.
 			///
 			/// Note that the request body has been consumed when it was parsed.
 			/// As a result, the raw request always has an empty body.
-			pub fn inner(&self) -> &#fizyr_rpc::ReceivedRequest<P::Body> {
+			pub fn inner(&self) -> &#fizyr_rpc::ReceivedRequest<F::Body> {
 				&self.request
 			}
 
@@ -717,7 +717,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			///
 			/// Note that the request body has been consumed when it was parsed.
 			/// As a result, the raw request always has an empty body.
-			pub fn inner_mut(&self) -> &#fizyr_rpc::ReceivedRequest<P::Body> {
+			pub fn inner_mut(&self) -> &#fizyr_rpc::ReceivedRequest<F::Body> {
 				&self.request
 			}
 
@@ -725,7 +725,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			///
 			/// Note that the request body has been consumed when it was parsed.
 			/// As a result, the raw request always has an empty body.
-			pub fn into_inner(self) -> #fizyr_rpc::ReceivedRequest<P::Body> {
+			pub fn into_inner(self) -> #fizyr_rpc::ReceivedRequest<F::Body> {
 				self.request
 			}
 
@@ -742,9 +742,9 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			/// Send the final response.
 			pub async fn send_response(self, response: #response_type) -> Result<(), #fizyr_rpc::error::SendMessageError>
 			where
-				#response_type: #fizyr_rpc::macros::Encode<P>,
+				#response_type: #fizyr_rpc::macros::Encode<F>,
 			{
-				let encoded = P::encode_body(response).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
+				let encoded = F::encode_body(response).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
 				let response = self.request.send_response(#service_id, encoded).await?;
 				Ok(())
 			}
@@ -764,14 +764,14 @@ fn generate_received_request_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn
 		let doc = to_doc_attrs(service.doc());
 		variant_tokens.extend(quote! {
 			#doc
-			#variant_name(#service_name::ReceivedRequest<P>, #request_type),
+			#variant_name(#service_name::ReceivedRequest<F>, #request_type),
 		})
 	}
 
 	let enum_doc = format!("Enum for all possible incoming requests of the {} interface.", interface.name());
 	item_tokens.extend(quote! {
 		#[doc = #enum_doc]
-		pub enum ReceivedRequest<P: #fizyr_rpc::macros::Protocol> {
+		pub enum ReceivedRequest<F: #fizyr_rpc::macros::Format> {
 			#variant_tokens
 		}
 	})
