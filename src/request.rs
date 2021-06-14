@@ -37,15 +37,6 @@ pub enum ReceivedMessage<Body> {
 	Stream(Message<Body>),
 }
 
-/// An outgoing request or stream message.
-pub enum Outgoing<Body> {
-	/// An outgoing request.
-	Request(SentRequest<Body>),
-
-	/// An outgoing stream message.
-	Stream(Message<Body>),
-}
-
 impl<Body> SentRequest<Body> {
 	/// Create a new sent request.
 	pub(crate) fn new(

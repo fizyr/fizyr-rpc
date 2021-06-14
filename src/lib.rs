@@ -118,7 +118,6 @@ pub use peer_handle::PeerCloseHandle;
 pub use peer_handle::PeerReadHandle;
 pub use peer_handle::PeerWriteHandle;
 pub use request::ReceivedMessage;
-pub use request::Outgoing;
 pub use request::ReceivedRequest;
 pub use request::SentRequest;
 pub use server::Server;
