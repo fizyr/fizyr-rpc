@@ -29,7 +29,7 @@ pub struct ReceivedRequest<Body> {
 }
 
 /// An incoming request or stream message.
-pub enum Incoming<Body> {
+pub enum ReceivedMessage<Body> {
 	/// An incoming request.
 	Request(ReceivedRequest<Body>, Body),
 
@@ -226,7 +226,7 @@ impl<Body> std::fmt::Debug for ReceivedRequest<Body> {
 	}
 }
 
-impl<Body> std::fmt::Debug for Incoming<Body> {
+impl<Body> std::fmt::Debug for ReceivedMessage<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
 			Self::Request(x, _body) => write!(f, "Request({:?})", x),

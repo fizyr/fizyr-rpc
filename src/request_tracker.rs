@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 
 use crate::error;
 use crate::peer::Command;
-use crate::Incoming;
+use crate::ReceivedMessage;
 use crate::Message;
 use crate::MessageType;
 use crate::ReceivedRequest;
@@ -145,11 +145,11 @@ impl<Body> RequestTracker<Body> {
 	/// Returns an error
 	///  * if an incoming request message uses an already claimed request ID
 	///  * if an incoming update or response message does not match an open request
-	pub async fn process_incoming_message(&mut self, message: Message<Body>) -> Result<Option<Incoming<Body>>, ProcessIncomingMessageError> {
+	pub async fn process_incoming_message(&mut self, message: Message<Body>) -> Result<Option<ReceivedMessage<Body>>, ProcessIncomingMessageError> {
 		match message.header.message_type {
 			MessageType::Request => {
 				let (received_request, body) = self.register_received_request(message.header.request_id, message.header.service_id, message.body)?;
-				Ok(Some(Incoming::Request(received_request, body)))
+				Ok(Some(ReceivedMessage::Request(received_request, body)))
 			},
 			MessageType::Response => {
 				self.process_incoming_response(message).await?;
@@ -163,7 +163,7 @@ impl<Body> RequestTracker<Body> {
 				self.process_incoming_responder_update(message).await?;
 				Ok(None)
 			},
-			MessageType::Stream => Ok(Some(Incoming::Stream(message))),
+			MessageType::Stream => Ok(Some(ReceivedMessage::Stream(message))),
 		}
 	}
 
@@ -254,7 +254,7 @@ mod test {
 		});
 
 		// Simulate an incoming request and an update.
-		let_assert!(Ok(Some(Incoming::Request(mut received_request, _body))) = tracker.process_incoming_message(Message::request(1, 2, Body)).await);
+		let_assert!(Ok(Some(ReceivedMessage::Request(mut received_request, _body))) = tracker.process_incoming_message(Message::request(1, 2, Body)).await);
 		assert!(let Ok(None) = tracker.process_incoming_message(Message::requester_update(1, 10, Body)).await);
 
 		// Receive the update.

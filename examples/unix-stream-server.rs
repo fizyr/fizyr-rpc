@@ -60,8 +60,8 @@ async fn handle_peer(mut peer: fizyr_rpc::PeerHandle<fizyr_rpc::StreamBody>) -> 
 
 		// Handle the incoming message.
 		match incoming {
-			fizyr_rpc::Incoming::Stream(msg) => eprintln!("unspported stream message received: {:?}", msg),
-			fizyr_rpc::Incoming::Request(request, body) => match request.service_id() {
+			fizyr_rpc::ReceivedMessage::Stream(msg) => eprintln!("unspported stream message received: {:?}", msg),
+			fizyr_rpc::ReceivedMessage::Request(request, body) => match request.service_id() {
 				1 => handle_hello(request, body).await?,
 				n => request
 					.send_error_response(&format!("unknown service ID: {}", n))

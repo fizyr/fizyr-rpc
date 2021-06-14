@@ -117,7 +117,7 @@ pub use peer_handle::PeerHandle;
 pub use peer_handle::PeerCloseHandle;
 pub use peer_handle::PeerReadHandle;
 pub use peer_handle::PeerWriteHandle;
-pub use request::Incoming;
+pub use request::ReceivedMessage;
 pub use request::Outgoing;
 pub use request::ReceivedRequest;
 pub use request::SentRequest;
@@ -171,3 +171,7 @@ pub type UnixSeqpacketPeer = Peer<UnixSeqpacketTransport>;
 /// Server for Unix seqpacket sockets.
 #[cfg(feature = "unix-seqpacket")]
 pub type UnixSeqpacketServer = Server<tokio_seqpacket::UnixSeqpacketListener>;
+
+#[doc(hidden)]
+#[deprecated(note = "This type was renamed to ReceivedMessage. Please use that instead.", since = "0.5.0")]
+pub type Incoming<Body> = ReceivedMessage<Body>;
