@@ -164,7 +164,7 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 		let variant_name = syn::Ident::new(&to_upper_camel_case(&service_name.to_string()), Span::call_site());
 		let request_type = service.request_type();
 		recv_message_where.extend(quote! {
-			#request_type: #fizyr_rpc::util::format::Decode<F>,
+			F: #fizyr_rpc::util::format::DecodeBody<#request_type>,
 		});
 		decode_request_arms.extend(quote! {
 			#service_id =>  {
@@ -272,8 +272,8 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 			#service_doc
 			pub async fn #service_name(&self, #request_param) -> Result<#response_type, #fizyr_rpc::error::ServiceCallError>
 			where
-				#request_type: #fizyr_rpc::util::format::Encode<F>,
-				#response_type: #fizyr_rpc::util::format::Decode<F>,
+				F: #fizyr_rpc::util::format::EncodeBody<#request_type>,
+				F: #fizyr_rpc::util::format::DecodeBody<#response_type>,
 			{
 				let request_body = #request_body.map_err(#fizyr_rpc::error::SendRequestError::EncodeBody)?;
 				let mut request = self.peer.send_request(#service_id, request_body).await?;
@@ -288,8 +288,8 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 			#service_doc
 			pub async fn #service_name(&self, #request_param) -> Result<#service_name::SentRequest<F>, #fizyr_rpc::error::SendRequestError>
 			where
-				#request_type: #fizyr_rpc::util::format::Encode<F>,
-				#response_type: #fizyr_rpc::util::format::Decode<F>,
+				F: #fizyr_rpc::util::format::EncodeBody<#request_type>,
+				F: #fizyr_rpc::util::format::DecodeBody<#response_type>,
 			{
 				let request_body = #request_body.map_err(#fizyr_rpc::error::SendRequestError::EncodeBody)?;
 				let mut request = self.peer.send_request(#service_id, request_body).await?;
@@ -345,7 +345,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			#doc_recv_update
 			pub async fn recv_response(&mut self) -> Result<#response_type, #fizyr_rpc::error::RecvMessageError>
 			where
-				#response_type: #fizyr_rpc::util::format::Decode<F>,
+				F: #fizyr_rpc::util::format::DecodeBody<#response_type>,
 			{
 				let response = self.request.recv_response().await?;
 				let decoded = F::decode_body(response.body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)?;
@@ -444,7 +444,7 @@ fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 			#[doc = #doc]
 			pub async fn #function_name(&self, #body_arg) -> Result<(), #fizyr_rpc::error::SendMessageError>
 			where
-				#body_type: #fizyr_rpc::util::format::Encode<F>,
+				F: #fizyr_rpc::util::format::EncodeBody<#body_type>,
 			{
 				let body = F::encode_body(#body_val).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
 				self.request.send_update(#service_id, body).await?;
@@ -507,7 +507,7 @@ fn generate_recv_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 			#doc
 			pub async fn #function_name(&mut self) -> Result<#body_type, #fizyr_rpc::error::RecvMessageError>
 			where
-				#body_type: #fizyr_rpc::util::format::Decode<F>,
+				F: #fizyr_rpc::util::format::DecodeBody<#body_type>,
 			{
 				let update = match self.request.recv_update().await? {
 					None => return Err(#fizyr_rpc::error::UnexpectedMessageType {
@@ -558,7 +558,7 @@ fn generate_streams(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 			#[doc = #fn_doc]
 			pub async fn #fn_name(&self, #body_arg) -> Result<(), #fizyr_rpc::error::SendMessageError>
 			where
-				#body_type: #fizyr_rpc::util::format::Encode<F>,
+				F: #fizyr_rpc::util::format::EncodeBody<#body_type>,
 			{
 				let encoded = F::encode_body(#body_val).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
 				self.peer.send_stream(#service_id, encoded).await?;
@@ -635,7 +635,7 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		});
 
 		decode_all.extend(quote!(
-			#body_type: #fizyr_rpc::util::format::Decode<F>,
+			F: #fizyr_rpc::util::format::DecodeBody<#body_type>,
 		));
 
 		into_message.extend(quote! {
@@ -643,7 +643,7 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		});
 
 		encode_all.extend(quote!(
-			#body_type: #fizyr_rpc::util::format::Encode<F>,
+			F: #fizyr_rpc::util::format::EncodeBody<#body_type>,
 		));
 	}
 
@@ -742,7 +742,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			/// Send the final response.
 			pub async fn send_response(self, response: #response_type) -> Result<(), #fizyr_rpc::error::SendMessageError>
 			where
-				#response_type: #fizyr_rpc::util::format::Encode<F>,
+				F: #fizyr_rpc::util::format::EncodeBody<#response_type>,
 			{
 				let encoded = F::encode_body(response).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
 				let response = self.request.send_response(#service_id, encoded).await?;
