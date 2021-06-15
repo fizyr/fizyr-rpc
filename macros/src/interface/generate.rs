@@ -352,8 +352,32 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 /// Otherwise, the return type of a service call will simply be the response message.
 fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, service: &ServiceDefinition) {
 	let service_name = service.name();
-	let response_type = service.response_type();
+	let mut impl_tokens = TokenStream::new();
 
+	if !service.request_updates().is_empty() {
+		generate_message_enum(
+			item_tokens,
+			fizyr_rpc,
+			service.request_updates(),
+			&syn::Ident::new("RequestUpdate", Span::call_site()),
+			&format!("A request update for the {} service", service.name()),
+		);
+		generate_send_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::RequestUpdate), service.request_updates());
+	}
+
+	if !service.response_updates().is_empty() {
+		generate_message_enum(
+			item_tokens,
+			fizyr_rpc,
+			service.response_updates(),
+			&syn::Ident::new("ResponseUpdate", Span::call_site()),
+			&format!("A response update for the {} service", service.name()),
+		);
+		generate_recv_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::ResponseUpdate), service.response_updates(), UpdateKind::ResponseUpdate);
+	}
+
+	let response_type = service.response_type();
+	let struct_doc = format!("A sent request for the {} service.", service.name());
 	let doc_recv_update = match service.response_updates().is_empty() {
 		true => quote! {
 			/// This service call does not support update messages, so there is no way to retrieve it.
@@ -363,8 +387,6 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			/// This function will keep returning an error until the update message is received.
 		},
 	};
-
-	let struct_doc = format!("A sent request for the {} service.", service.name());
 
 	item_tokens.extend(quote! {
 		#[doc = #struct_doc]
@@ -421,45 +443,10 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			pub fn service_id(&self) -> i32 {
 				self.request.service_id()
 			}
+
+			#impl_tokens
 		}
 	});
-
-	if !service.request_updates().is_empty() {
-		let mut impl_tokens = TokenStream::new();
-
-		generate_message_enum(
-			item_tokens,
-			fizyr_rpc,
-			service.request_updates(),
-			&syn::Ident::new("RequestUpdate", Span::call_site()),
-			&format!("A request update for the {} service", service.name()),
-		);
-		generate_send_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::RequestUpdate), service.request_updates());
-
-		item_tokens.extend(quote! {
-			impl<F: #fizyr_rpc::util::format::Format> SentRequest<F> {
-				#impl_tokens
-			}
-		});
-	}
-
-	if !service.response_updates().is_empty() {
-		generate_message_enum(
-			item_tokens,
-			fizyr_rpc,
-			service.response_updates(),
-			&syn::Ident::new("ResponseUpdate", Span::call_site()),
-			&format!("A response update for the {} service", service.name()),
-		);
-		let mut impl_tokens = TokenStream::new();
-		generate_recv_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::ResponseUpdate), service.response_updates(), UpdateKind::ResponseUpdate);
-
-		item_tokens.extend(quote! {
-			impl<F: #fizyr_rpc::util::format::Format> SentRequest<F> {
-				#impl_tokens
-			}
-		});
-	}
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -529,11 +516,10 @@ fn generate_recv_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 			#enum_type: #fizyr_rpc::util::format::FromMessage<F>,
 		{
 			use #fizyr_rpc::util::format::FromMessage;
-			let update = match self.request.recv_update().await? {
-				Some(x) => x,
-				None => return Ok(None),
-			};
-			Ok(Some(F::decode_message(update)?))
+			match self.request.recv_update().await {
+				Some(x) => Ok(Some(F::decode_message(x)?)),
+				None => Ok(None),
+			}
 		}
 	});
 
@@ -564,7 +550,7 @@ fn generate_recv_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 			where
 				F: #fizyr_rpc::util::format::DecodeBody<#body_type>,
 			{
-				let update = match self.request.recv_update().await? {
+				let update = match self.request.recv_update().await {
 					None => return Err(#fizyr_rpc::error::UnexpectedMessageType {
 						value: #fizyr_rpc::MessageType::Response,
 						expected: #fizyr_rpc::MessageType::ResponderUpdate,
@@ -740,18 +726,10 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 	let service_id = service.service_id();
 
 	let mut impl_tokens = TokenStream::new();
-
-	if !service.request_updates().is_empty() {
-		generate_send_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::RequestUpdate), service.response_updates());
-
-		item_tokens.extend(quote! {
-			impl<F: #fizyr_rpc::util::format::Format> SentRequest<F> {
-				#impl_tokens
-			}
-		});
-	}
-
 	if !service.response_updates().is_empty() {
+		generate_send_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::RequestUpdate), service.response_updates());
+	}
+	if !service.request_updates().is_empty() {
 		generate_recv_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::ResponseUpdate), service.request_updates(), UpdateKind::RequestUpdate);
 	}
 
@@ -815,7 +793,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 				Ok(())
 			}
 
-			//#impl_tokens
+			#impl_tokens
 		}
 	})
 }
