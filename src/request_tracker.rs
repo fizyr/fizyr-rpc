@@ -258,7 +258,7 @@ mod test {
 		assert!(let Ok(None) = tracker.process_incoming_message(Message::requester_update(1, 10, Body)).await);
 
 		// Receive the update.
-		let_assert!(Ok(update) = received_request.recv_update().await);
+		let_assert!(Some(update) = received_request.recv_update().await);
 		assert!(update.header == MessageHeader::requester_update(1, 10));
 
 		// Send and update and response.
@@ -297,7 +297,7 @@ mod test {
 
 		// Simulate and receive a responder update.
 		assert!(let Ok(None) = tracker.process_incoming_message(Message::responder_update(sent_request.request_id(), 12, Body)).await);
-		let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
+		let_assert!(Some(update) = sent_request.recv_update().await);
 		assert!(update.header == MessageHeader::responder_update(sent_request.request_id(), 12));
 
 		// Send an update.

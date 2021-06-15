@@ -512,13 +512,13 @@ mod test {
 
 		// Send an update from A and receive it on B.
 		let_assert!(Ok(()) = sent_request.send_update(3, &[4][..]).await);
-		let_assert!(Ok(update) = received_request.recv_update().await);
+		let_assert!(Some(update) = received_request.recv_update().await);
 		assert!(update.header == MessageHeader::requester_update(request_id, 3));
 		assert!(update.body.as_ref() == &[4]);
 
 		// Send an update from B and receive it on A.
 		let_assert!(Ok(()) = received_request.send_update(5, &[6][..]).await);
-		let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
+		let_assert!(Some(update) = sent_request.recv_update().await);
 		assert!(update.header == MessageHeader::responder_update(request_id, 5));
 		assert!(update.body.as_ref() == &[6]);
 
@@ -556,9 +556,9 @@ mod test {
 
 		// Try to receive three responses.
 		// This should stuff the response in the internal peek buffer.
-		assert!(let Ok(Some(_)) = sent_request.recv_update().await);
-		assert!(let Ok(Some(_)) = sent_request.recv_update().await);
-		assert!(let Ok(None) = sent_request.recv_update().await);
+		assert!(let Some(_) = sent_request.recv_update().await);
+		assert!(let Some(_) = sent_request.recv_update().await);
+		assert!(let None = sent_request.recv_update().await);
 
 		// Now receive the response, which should be returned intact from the peek buffer exactly once.
 		let_assert!(Ok(response) = sent_request.recv_response().await);
@@ -591,10 +591,10 @@ mod test {
 		assert!(let Err(RecvMessageError::UnexpectedMessageType(_)) = sent_request.recv_response().await);
 
 		// Now we should receive the update intact from the peek buffer exactly once.
-		let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
+		let_assert!(Some(update) = sent_request.recv_update().await);
 		assert!(update.header == MessageHeader::responder_update(request_id, 5));
 		assert!(update.body.as_ref() == b"Hello world!");
-		assert!(let Ok(None) = sent_request.recv_update().await);
+		assert!(let None = sent_request.recv_update().await);
 
 		// Now receive the response.
 		let_assert!(Ok(response) = sent_request.recv_response().await);
