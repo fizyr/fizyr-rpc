@@ -120,35 +120,6 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 	// Match arms for the receive_msg function.
 	let mut recv_message_arms = TokenStream::new();
 
-	if !interface.services().is_empty() {
-		received_msg_generics.extend(quote!(F));
-		received_msg_where.extend(quote! {
-			F: #fizyr_rpc::util::format::Format,
-		});
-		received_msg_variants.extend(quote! {
-			/// A request message.
-			Request(ReceivedRequest<F>),
-		});
-		received_msg_debug_arms.extend(quote! {
-			Self::Request(x) => ::core::write!(f, "Request({:?})", x),
-		});
-		recv_message_arms.extend(quote! {
-			#fizyr_rpc::ReceivedMessage::Request(request, body) => {
-				match request.service_id() {
-					#decode_request_arms
-					service_id => Err(#fizyr_rpc::error::UnexpectedServiceId { service_id }.into())
-				}
-			},
-		});
-	} else {
-		recv_message_arms.extend(quote! {
-			#fizyr_rpc::ReceivedMessage::Request(request, body) => {
-				let service_id = request.service_id();
-				Err(#fizyr_rpc::error::UnexpectedServiceId { service_id }.into())
-			},
-		});
-	}
-
 	if !interface.streams().is_empty() {
 		recv_message_where.extend(quote! {
 			StreamMessage: #fizyr_rpc::util::format::FromMessage<F>,
@@ -187,6 +158,35 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 				let body = F::decode_body(body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)?;
 				let request = #service_name::ReceivedRequest { request };
 				Ok(ReceivedMessage::Request(ReceivedRequest::#variant_name(request, body)))
+			},
+		});
+	}
+
+	if !interface.services().is_empty() {
+		received_msg_generics.extend(quote!(F));
+		received_msg_where.extend(quote! {
+			F: #fizyr_rpc::util::format::Format,
+		});
+		received_msg_variants.extend(quote! {
+			/// A request message.
+			Request(ReceivedRequest<F>),
+		});
+		received_msg_debug_arms.extend(quote! {
+			Self::Request(x) => ::core::write!(f, "Request({:?})", x),
+		});
+		recv_message_arms.extend(quote! {
+			#fizyr_rpc::ReceivedMessage::Request(request, body) => {
+				match request.service_id() {
+					#decode_request_arms
+					service_id => Err(#fizyr_rpc::error::UnexpectedServiceId { service_id }.into())
+				}
+			},
+		});
+	} else {
+		recv_message_arms.extend(quote! {
+			#fizyr_rpc::ReceivedMessage::Request(request, body) => {
+				let service_id = request.service_id();
+				Err(#fizyr_rpc::error::UnexpectedServiceId { service_id }.into())
 			},
 		});
 	}
