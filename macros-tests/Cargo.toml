@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-fizyr-rpc = { path = "..", features = ["macros", "unix-stream"] }
+fizyr-rpc = { path = "..", features = ["macros"]}
 serde = { version = "1.0.126", features = ["derive"] }
 serde_json = "1.0.64"
+
+[dev-dependencies]
+assert2 = "0.3.5"
+fizyr-rpc = { path = "..", features = ["unix-stream"] }
+tokio = { version = "1.0.0", features = ["macros", "net", "rt"] }
