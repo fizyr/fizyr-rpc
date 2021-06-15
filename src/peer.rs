@@ -547,7 +547,7 @@ mod test {
 		let request_id = sent_request.request_id();
 
 		// Receive the request on B.
-		let_assert!(Ok(ReceivedMessage::Request(mut received_request, _body)) = handle_b.recv_message().await);
+		let_assert!(Ok(ReceivedMessage::Request(received_request, _body)) = handle_b.recv_message().await);
 
 		// Send two updates and a response from B to A.
 		let_assert!(Ok(()) = received_request.send_update(5, &b"Hello world!"[..]).await);
@@ -581,7 +581,7 @@ mod test {
 		let request_id = sent_request.request_id();
 
 		// Receive the request on B.
-		let_assert!(Ok(ReceivedMessage::Request(mut received_request, _body)) = handle_b.recv_message().await);
+		let_assert!(Ok(ReceivedMessage::Request(received_request, _body)) = handle_b.recv_message().await);
 
 		// Send one update and a response from B to A.
 		let_assert!(Ok(()) = received_request.send_update(5, &b"Hello world!"[..]).await);
