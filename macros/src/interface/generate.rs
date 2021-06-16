@@ -727,10 +727,10 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 
 	let mut impl_tokens = TokenStream::new();
 	if !service.response_updates().is_empty() {
-		generate_send_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::RequestUpdate), service.response_updates());
+		generate_send_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::ResponseUpdate), service.response_updates());
 	}
 	if !service.request_updates().is_empty() {
-		generate_recv_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::ResponseUpdate), service.request_updates(), UpdateKind::RequestUpdate);
+		generate_recv_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::RequestUpdate), service.request_updates(), UpdateKind::RequestUpdate);
 	}
 
 	item_tokens.extend(quote! {
