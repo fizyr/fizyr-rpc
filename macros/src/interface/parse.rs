@@ -86,20 +86,41 @@ pub mod cooked {
 				}
 			}
 
-			for (i, a) in services.iter().enumerate() {
-				for b in &services[i + 1..] {
+			// Remove things with duplicate names, because they'll cause a lot more compile errors.
+			// Duplicate IDs we just generate though, because they don't cause duplicate type or functions name.
+			let mut remove_services = Vec::new();
+			let mut remove_streams = Vec::new();
+
+			for (a_i, a) in services.iter().enumerate() {
+				for (b_i, b) in services.iter().enumerate().skip(a_i + 1) {
 					if a.service_id.value == b.service_id.value {
 						errors.push(syn::Error::new(b.service_id.span, "duplicate service ID"));
+					}
+					if a.name() == b.name() {
+						errors.push(syn::Error::new(b.name().span(), "duplicate service name"));
+						remove_services.push(b_i);
 					}
 				}
 			}
 
-			for (i, a) in streams.iter().enumerate() {
-				for b in &streams[i + 1..] {
+			for (a_i, a) in streams.iter().enumerate() {
+				for (b_i, b) in streams.iter().enumerate().skip(a_i + 1) {
 					if a.service_id.value == b.service_id.value {
 						errors.push(syn::Error::new(b.service_id.span, "duplicate service ID"));
 					}
+					if a.name() == b.name() {
+						errors.push(syn::Error::new(b.name().span(), "duplicate stream name"));
+						remove_streams.push(b_i);
+					}
 				}
+			}
+
+			for i in remove_services.into_iter().rev() {
+				services.remove(i);
+			}
+
+			for i in remove_streams.into_iter().rev() {
+				streams.remove(i);
 			}
 
 			Self {
@@ -153,20 +174,41 @@ pub mod cooked {
 				}
 			}
 
-			for (i, a) in request_updates.iter().enumerate() {
-				for b in &request_updates[i + 1..] {
+			// Remove things with duplicate names, because they'll cause a lot more compile errors.
+			// Duplicate IDs we just generate though, because they don't cause duplicate type or functions name.
+			let mut remove_request_updates = Vec::new();
+			let mut remove_response_updates = Vec::new();
+
+			for (a_i, a) in request_updates.iter().enumerate() {
+				for (b_i, b) in request_updates.iter().enumerate().skip(a_i + 1) {
 					if a.service_id.value == b.service_id.value {
 						errors.push(syn::Error::new(b.service_id.span, "duplicate service ID"));
+					}
+					if a.name() == b.name() {
+						errors.push(syn::Error::new(b.name().span(), "duplicate request update name"));
+						remove_request_updates.push(b_i);
 					}
 				}
 			}
 
-			for (i, a) in response_updates.iter().enumerate() {
-				for b in &response_updates[i + 1..] {
+			for (a_i, a) in response_updates.iter().enumerate() {
+				for (b_i, b) in response_updates.iter().enumerate().skip(a_i + 1) {
 					if a.service_id.value == b.service_id.value {
 						errors.push(syn::Error::new(b.service_id.span, "duplicate service ID"));
 					}
+					if a.name() == b.name() {
+						errors.push(syn::Error::new(b.name().span(), "duplicate response update name"));
+						remove_response_updates.push(b_i);
+					}
 				}
+			}
+
+			for i in remove_request_updates.into_iter().rev() {
+				request_updates.remove(i);
+			}
+
+			for i in remove_response_updates.into_iter().rev() {
+				response_updates.remove(i);
 			}
 
 			Self {
