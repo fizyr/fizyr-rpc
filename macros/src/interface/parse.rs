@@ -85,6 +85,23 @@ pub mod cooked {
 					raw::InterfaceItem::Stream(raw) => streams.push(StreamDefinition::from_raw(errors, raw)),
 				}
 			}
+
+			for (i, a) in services.iter().enumerate() {
+				for b in &services[i + 1..] {
+					if a.service_id.value == b.service_id.value {
+						errors.push(syn::Error::new(b.service_id.span, "duplicate service ID"));
+					}
+				}
+			}
+
+			for (i, a) in streams.iter().enumerate() {
+				for b in &streams[i + 1..] {
+					if a.service_id.value == b.service_id.value {
+						errors.push(syn::Error::new(b.service_id.span, "duplicate service ID"));
+					}
+				}
+			}
+
 			Self {
 				name: raw.name,
 				doc: attrs.doc,
