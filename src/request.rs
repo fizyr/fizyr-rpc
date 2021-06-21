@@ -26,7 +26,6 @@ pub struct ReceivedRequest<Body> {
 	service_id: i32,
 	incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
-	peek_buffer: Option<Message<Body>>,
 }
 
 /// An incoming request or stream message.
@@ -121,19 +120,6 @@ impl<Body> SentRequest<Body> {
 		result_rx.await.map_err(|_| error::connection_aborted())??;
 		Ok(())
 	}
-
-	/// Put a message back in the peek buffer.
-	///
-	/// Do not use this function.
-	/// It is not convered by the version number API stability guarantee.
-	///
-	/// # Panics
-	/// This function panics if there already is a message in the peek buffer.
-	#[doc(hidden)]
-	pub fn _unpeek_message(&mut self, message: Message<Body>) {
-		assert!(self.peek_buffer.is_none());
-		self.peek_buffer = Some(message);
-	}
 }
 
 impl<Body> ReceivedRequest<Body> {
@@ -149,7 +135,6 @@ impl<Body> ReceivedRequest<Body> {
 			service_id,
 			incoming_rx,
 			command_tx,
-			peek_buffer: None,
 		}
 	}
 
@@ -165,11 +150,7 @@ impl<Body> ReceivedRequest<Body> {
 
 	/// Receive the next update message of the request from the remote peer.
 	pub async fn recv_update(&mut self) -> Option<Message<Body>> {
-		if let Some(message) = self.peek_buffer.take() {
-			Some(message)
-		} else {
-			self.incoming_rx.recv().await
-		}
+		self.incoming_rx.recv().await
 	}
 
 	/// Send an update for the request to the remote peer.
@@ -200,19 +181,6 @@ impl<Body> ReceivedRequest<Body> {
 			.send(SendRawMessage { message, result_tx }.into())
 			.map_err(|_| error::connection_aborted())?;
 		result_rx.await.map_err(|_| error::connection_aborted())?
-	}
-
-	/// Put a message back in the peek buffer.
-	///
-	/// Do not use this function.
-	/// It is not convered by the version number API stability guarantee.
-	///
-	/// # Panics
-	/// This function panics if there already is a message in the peek buffer.
-	#[doc(hidden)]
-	pub fn _unpeek_message(&mut self, message: Message<Body>) {
-		assert!(self.peek_buffer.is_none());
-		self.peek_buffer = Some(message);
 	}
 }
 

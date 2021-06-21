@@ -373,7 +373,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			&syn::Ident::new("ResponseUpdate", Span::call_site()),
 			&format!("A response update for the {} service", service.name()),
 		);
-		generate_recv_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::ResponseUpdate), service.response_updates(), UpdateKind::ResponseUpdate);
+		generate_recv_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::ResponseUpdate), UpdateKind::ResponseUpdate);
 	}
 
 	let response_type = service.response_type();
@@ -496,7 +496,7 @@ fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 	}
 }
 
-fn generate_recv_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, enum_type: &TokenStream, updates: &[UpdateDefinition], kind: UpdateKind) {
+fn generate_recv_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, enum_type: &TokenStream, kind: UpdateKind) {
 	let mut doc = quote! {
 		/// Receive an update from the remote peer.
 	};
@@ -511,7 +511,7 @@ fn generate_recv_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 
 	impl_tokens.extend(quote! {
 		#doc
-		pub async fn recv_update(&mut self, timeout: std::time::Duration) -> Result<Option<#enum_type>, #fizyr_rpc::error::RecvMessageError>
+		pub async fn recv_update(&mut self) -> Result<Option<#enum_type>, #fizyr_rpc::error::RecvMessageError>
 		where
 			#enum_type: #fizyr_rpc::util::format::FromMessage<F>,
 		{
@@ -522,53 +522,6 @@ fn generate_recv_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 			}
 		}
 	});
-
-	for update in updates {
-		let function_name = syn::Ident::new(&format!("recv_{}_update", update.name()), Span::call_site());
-		let service_id = update.service_id();
-		let body_type = update.body_type();
-		let doc = format!("Receive a {} update from the remote peer.", update.name());
-		let mut doc = quote!(#[doc = #doc]);
-		doc.extend(match kind {
-			UpdateKind::ResponseUpdate => quote! {
-				///
-				/// If the received message is a response message or a different update message, this function returns an error.
-				/// The message will remain in the read queue and can still be received by another `recv_*` function.
-				/// As long as the message is in the read queue, this function will keep returning an error.
-			},
-			UpdateKind::RequestUpdate => quote! {
-				///
-				/// If the received message is a different update message, this function returns an error.
-				/// The message will remain in the read queue and can still be received by another `recv_*` function.
-				/// As long as the message is in the read queue, this function will keep returning an error.
-			},
-		});
-
-		impl_tokens.extend(quote! {
-			#doc
-			pub async fn #function_name(&mut self) -> Result<#body_type, #fizyr_rpc::error::RecvMessageError>
-			where
-				F: #fizyr_rpc::util::format::DecodeBody<#body_type>,
-			{
-				let update = match self.request.recv_update().await {
-					None => return Err(#fizyr_rpc::error::UnexpectedMessageType {
-						value: #fizyr_rpc::MessageType::Response,
-						expected: #fizyr_rpc::MessageType::ResponderUpdate,
-					}.into()),
-					Some(x) => x,
-				};
-
-				let service_id = update.header.service_id;
-				if service_id != #service_id {
-					// Put the message back in the read queue so that a different `recv_*` call can read it.
-					self.request._unpeek_message(update);
-					return Err(#fizyr_rpc::error::UnexpectedServiceId { service_id }.into());
-				}
-
-				F::decode_body(update.body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)
-			}
-		})
-	}
 }
 
 fn generate_streams(item_tokens: &mut TokenStream, client_impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) {
@@ -657,8 +610,10 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 	let mut variants = TokenStream::new();
 	let mut from_message = TokenStream::new();
 	let mut into_message = TokenStream::new();
+	let mut service_id_arms = TokenStream::new();
 	let mut decode_all = TokenStream::new();
 	let mut encode_all = TokenStream::new();
+	let mut impl_tokens = TokenStream::new();
 	for message in messages {
 		let variant_name = to_upper_camel_case(&message.name().to_string());
 		let variant_name = syn::Ident::new(&variant_name, message.name().span());
@@ -666,7 +621,7 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		let body_type = message.body_type();
 
 		let service_id = message.service_id();
-		variants.extend(quote!{
+		variants.extend(quote! {
 			#variant_doc
 			#variant_name(#body_type),
 		});
@@ -675,17 +630,60 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			#service_id => Ok(Self::#variant_name(F::decode_body(message.body).map_err(#fizyr_rpc::error::FromMessageError::DecodeBody)?)),
 		});
 
-		decode_all.extend(quote!(
+		decode_all.extend(quote! {
 			F: #fizyr_rpc::util::format::DecodeBody<#body_type>,
-		));
+		});
 
 		into_message.extend(quote! {
 			Self::#variant_name(message) => Ok((#service_id, F::encode_body(message)?)),
 		});
 
-		encode_all.extend(quote!(
+		service_id_arms.extend(quote! {
+			Self::#variant_name(_) => #service_id,
+		});
+
+		encode_all.extend(quote! {
 			F: #fizyr_rpc::util::format::EncodeBody<#body_type>,
-		));
+		});
+
+		let is_fn_name = syn::Ident::new(&format!("is_{}", message.name()), Span::call_site());
+		let is_fn_doc = format!("Check if the message is a [`Self::{}`].", variant_name);
+
+		let as_fn_name = syn::Ident::new(&format!("as_{}", message.name()), Span::call_site());
+		let as_fn_doc = format!("Get the message as [`Self::{}`] by reference.", variant_name);
+
+		let into_fn_name = syn::Ident::new(&format!("into_{}", message.name()), Span::call_site());
+		let into_fn_doc = format!("Get the message as [`Self::{}`] by value.", variant_name);
+
+		impl_tokens.extend(quote! {
+			#[doc = #is_fn_doc]
+			pub fn #is_fn_name(&self) -> bool {
+				if let Self::#variant_name(_) = self {
+					true
+				} else {
+					false
+				}
+			}
+
+			#[doc = #as_fn_doc]
+			pub fn #as_fn_name(&self) -> Option<&#body_type> {
+				if let Self::#variant_name(x) = self {
+					Some(x)
+				} else {
+					None
+				}
+			}
+
+			#[doc = #into_fn_doc]
+			pub fn #into_fn_name(self) -> Result<#body_type, #fizyr_rpc::error::UnexpectedServiceId> {
+				let service_id = self.service_id();
+				if let Self::#variant_name(x) = self {
+					Ok(x)
+				} else {
+					Err(#fizyr_rpc::error::UnexpectedServiceId { service_id })
+				}
+			}
+		})
 	}
 
 	item_tokens.extend(quote! {
@@ -693,6 +691,17 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		#[derive(Debug)]
 		pub enum #enum_name {
 			#variants
+		}
+
+		impl #enum_name {
+			/// Get the service ID of the message.
+			fn service_id(&self) -> i32 {
+				match self {
+					#service_id_arms
+				}
+			}
+
+			#impl_tokens
 		}
 
 		impl<F: #fizyr_rpc::util::format::Format> #fizyr_rpc::util::format::FromMessage<F> for #enum_name
@@ -730,7 +739,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 		generate_send_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::ResponseUpdate), service.response_updates());
 	}
 	if !service.request_updates().is_empty() {
-		generate_recv_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::RequestUpdate), service.request_updates(), UpdateKind::RequestUpdate);
+		generate_recv_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::RequestUpdate), UpdateKind::RequestUpdate);
 	}
 
 	item_tokens.extend(quote! {

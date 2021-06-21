@@ -50,14 +50,29 @@ async fn record() {
 	});
 
 	let_assert!(Ok(mut sent_request) = client.record(RecordRequest { color: true, cloud: false }).await);
-	assert!(let Ok(RecordState::Recording) = sent_request.recv_state_update().await);
-	assert!(let Ok(RecordState::Processing) = sent_request.recv_state_update().await);
-	let_assert!(Ok(image) = sent_request.recv_image_update().await);
+
+	let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
+	assert!(update.is_state() == true);
+	assert!(update.is_image() == false);
+	assert!(let Some(RecordState::Recording) = update.as_state());
+	assert!(let None = update.as_image());
+	assert!(let Ok(RecordState::Recording) = update.into_state());
+
+	let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
+	assert!(let Ok(RecordState::Processing) = update.into_state());
+
+	let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
+	let_assert!(Ok(image) = update.into_image());
 	assert!(image.format == 1);
 	assert!(image.width == 2);
 	assert!(image.height == 3);
 	assert!(image.data == &[0, 1, 2, 3, 4, 5]);
-	assert!(let Ok(RecordState::Done) = sent_request.recv_state_update().await);
+
+	let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
+	assert!(let Ok(RecordState::Done) = update.into_state());
+
+	assert!(let Ok(None) = sent_request.recv_update().await);
+
 	assert!(let Ok(()) = sent_request.recv_response().await);
 	drop(client);
 
