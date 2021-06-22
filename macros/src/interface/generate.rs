@@ -325,7 +325,7 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 
 	generate_received_request(&mut service_item_tokens, fizyr_rpc, service);
 
-	let mod_doc = format!("Support types for the {} service.", service.name());
+	let mod_doc = format!("Support types for the `{}` service.", service.name());
 	item_tokens.extend(quote! {
 		#[doc = #mod_doc]
 		pub mod #service_name {
@@ -394,8 +394,8 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		generate_recv_update_function(&mut read_handle_impl_tokens, fizyr_rpc, &quote!(#service_name::ResponseUpdate), UpdateKind::ResponseUpdate);
 	}
 
-	let handle_doc = format!("Read/write handle for a sent request for the {} service.", service.name());
-	let write_handle_doc = format!("Write handle for a sent request for the {} service.", service.name());
+	let handle_doc = format!("Read/write handle for a sent request for the `{}` service.", service.name());
+	let write_handle_doc = format!("Write handle for a sent request for the `{}` service.", service.name());
 
 	item_tokens.extend(quote! {
 		#[doc = #handle_doc]
@@ -513,7 +513,7 @@ fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 		let function_name = syn::Ident::new(&format!("send_{}_update", update.name()), Span::call_site());
 		let body_type = update.body_type();
 		let service_id = update.service_id();
-		let doc = format!("Send a {} update to the remote peer.", update.name());
+		let doc = format!("Send a `{}` update to the remote peer.", update.name());
 		let body_arg;
 		let body_val;
 		if is_unit_type(body_type) {
@@ -578,7 +578,7 @@ fn generate_streams(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 	for stream in interface.streams() {
 		let service_id = stream.service_id();
 		let fn_name = syn::Ident::new(&format!("send_{}", stream.name()), Span::call_site());
-		let fn_doc = format!("Send a {} stream message to the remote peer.", stream.name());
+		let fn_doc = format!("Send a `{}` stream message to the remote peer.", stream.name());
 		let body_arg;
 		let body_val;
 		let body_type = stream.body_type();
