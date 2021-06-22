@@ -10,6 +10,7 @@ use crate::Message;
 use crate::MessageType;
 use crate::ReceivedRequestHandle;
 use crate::SentRequestHandle;
+use crate::request::RequestHandleCommand;
 
 /// An error occurred while processing an incoming message.
 #[derive(Debug, Clone, Error)]
@@ -46,10 +47,10 @@ pub struct RequestTracker<Body> {
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 
 	/// Map of channels for incoming messages for sent requests.
-	sent_requests: BTreeMap<u32, mpsc::UnboundedSender<Message<Body>>>,
+	sent_requests: BTreeMap<u32, mpsc::UnboundedSender<RequestHandleCommand<Body>>>,
 
 	/// Map of channels for incoming messages for received requests.
-	received_requests: BTreeMap<u32, mpsc::UnboundedSender<Message<Body>>>,
+	received_requests: BTreeMap<u32, mpsc::UnboundedSender<RequestHandleCommand<Body>>>,
 }
 
 impl<Body> RequestTracker<Body> {
@@ -90,7 +91,9 @@ impl<Body> RequestTracker<Body> {
 	/// Note that sent requests are also removed internally when they receive a response,
 	/// or when they would receive a message but the [`SentRequestHandle`] was dropped.
 	pub fn remove_sent_request(&mut self, request_id: u32) -> Result<(), error::UnknownRequestId> {
-		self.sent_requests.remove(&request_id).ok_or(error::UnknownRequestId { request_id })?;
+		let tx = self.sent_requests.remove(&request_id).ok_or(error::UnknownRequestId { request_id })?;
+		// Send a Close command to ensure the read handle stops reading.
+		let _: Result<_, _> = tx.send(RequestHandleCommand::Close);
 		Ok(())
 	}
 
@@ -132,9 +135,10 @@ impl<Body> RequestTracker<Body> {
 	///
 	/// This should be called when a request is finished to make the ID available again.
 	/// Note that received requests are also removed internally when they would receive a message but the [`ReceivedRequestHandle`] was dropped.
-	#[allow(unused)] // TODO: Evaluate if Peer should be calling this sometimes.
 	pub fn remove_received_request(&mut self, request_id: u32) -> Result<(), error::UnknownRequestId> {
-		self.received_requests.remove(&request_id).ok_or(error::UnknownRequestId { request_id })?;
+		let tx = self.received_requests.remove(&request_id).ok_or(error::UnknownRequestId { request_id })?;
+		// Send a Close command to ensure the read handle stops reading.
+		let _: Result<_, _> = tx.send(RequestHandleCommand::Close);
 		Ok(())
 	}
 
@@ -173,7 +177,7 @@ impl<Body> RequestTracker<Body> {
 			Entry::Vacant(_) => Err(error::UnknownRequestId { request_id }),
 			Entry::Occupied(mut entry) => {
 				// Forward the message to the sent_request, then remove the entry.
-				let _: Result<_, _> = entry.get_mut().send(message);
+				let _: Result<_, _> = entry.get_mut().send(RequestHandleCommand::Message(message));
 				entry.remove();
 				Ok(())
 			},
@@ -186,7 +190,7 @@ impl<Body> RequestTracker<Body> {
 			Entry::Vacant(_) => Err(error::UnknownRequestId { request_id }),
 			Entry::Occupied(mut entry) => {
 				// If the received_request is dropped, clear the entry.
-				if entry.get_mut().send(message).is_err() {
+				if entry.get_mut().send(RequestHandleCommand::Message(message)).is_err() {
 					entry.remove();
 					Err(error::UnknownRequestId { request_id })
 				} else {
@@ -202,7 +206,7 @@ impl<Body> RequestTracker<Body> {
 			Entry::Vacant(_) => Err(error::UnknownRequestId { request_id }),
 			Entry::Occupied(mut entry) => {
 				// If the sent_request is dropped, clear the entry.
-				if entry.get_mut().send(message).is_err() {
+				if entry.get_mut().send(RequestHandleCommand::Message(message)).is_err() {
 					entry.remove();
 					Err(error::UnknownRequestId { request_id })
 				} else {
@@ -264,6 +268,7 @@ mod test {
 		// Send and update and response.
 		let_assert!(Ok(()) = received_request.send_update(3, Body).await);
 		let_assert!(Ok(()) = received_request.send_response(4, Body).await);
+		let_assert!(Ok(()) = tracker.remove_received_request(received_request.request_id()));
 
 		// The received request is now dropped, so lets check that new incoming message cause an error.
 		let_assert!(
@@ -272,6 +277,7 @@ mod test {
 		);
 		assert!(e.request_id == 1);
 
+		drop(received_request);
 		drop(tracker);
 		assert!(let Ok(()) = command_task.await);
 	}

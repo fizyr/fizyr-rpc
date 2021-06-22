@@ -5,13 +5,18 @@ use crate::error;
 use crate::peer::Command;
 use crate::Message;
 
+pub(crate) enum RequestHandleCommand<Body> {
+	Close,
+	Message(Message<Body>),
+}
+
 /// A handle for a sent request.
 ///
 /// The handle can be used to receive updates and the response from the remote peer,
 /// and to send update messages to the remote peer.
 pub struct SentRequestHandle<Body> {
 	write_handle: SentRequestWriteHandle<Body>,
-	incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
+	incoming_rx: mpsc::UnboundedReceiver<RequestHandleCommand<Body>>,
 	peek_buffer: Option<Message<Body>>,
 }
 
@@ -35,7 +40,7 @@ pub struct SentRequestWriteHandle<Body> {
 /// and to send updates and the response to the remote peer.
 pub struct ReceivedRequestHandle<Body> {
 	write_handle: ReceivedRequestWriteHandle<Body>,
-	incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
+	incoming_rx: mpsc::UnboundedReceiver<RequestHandleCommand<Body>>,
 }
 
 /// A write handle for a received request.
@@ -66,7 +71,7 @@ impl<Body> SentRequestHandle<Body> {
 	pub(crate) fn new(
 		request_id: u32,
 		service_id: i32,
-		incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
+		incoming_rx: mpsc::UnboundedReceiver<RequestHandleCommand<Body>>,
 		command_tx: mpsc::UnboundedSender<Command<Body>>,
 	) -> Self {
 		let write_handle = SentRequestWriteHandle {
@@ -138,7 +143,21 @@ impl<Body> SentRequestHandle<Body> {
 		if let Some(message) = self.peek_buffer.take() {
 			Some(message)
 		} else {
-			self.incoming_rx.recv().await
+			match self.incoming_rx.recv().await? {
+				RequestHandleCommand::Message(message) => {
+					// Close the channel when reading a response message.
+					if message.header.message_type.is_response() {
+						self.incoming_rx.close();
+					}
+					Some(message)
+				},
+				// Close the channel when instructed to do so.
+				// This is sent by the request tracker when unregistering the request.
+				RequestHandleCommand::Close => {
+					self.incoming_rx.close();
+					None
+				},
+			}
 		}
 	}
 
@@ -178,7 +197,7 @@ impl<Body> ReceivedRequestHandle<Body> {
 	pub(crate) fn new(
 		request_id: u32,
 		service_id: i32,
-		incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
+		incoming_rx: mpsc::UnboundedReceiver<RequestHandleCommand<Body>>,
 		command_tx: mpsc::UnboundedSender<Command<Body>>,
 	) -> Self {
 		let write_handle = ReceivedRequestWriteHandle {
@@ -211,7 +230,15 @@ impl<Body> ReceivedRequestHandle<Body> {
 
 	/// Receive the next update message of the request from the remote peer.
 	pub async fn recv_update(&mut self) -> Option<Message<Body>> {
-		self.incoming_rx.recv().await
+		match self.incoming_rx.recv().await? {
+			RequestHandleCommand::Message(x) => Some(x),
+			// Close the channel when instructed to do so.
+			// This is sent by the request tracker when unregistering the request.
+			RequestHandleCommand::Close => {
+				self.incoming_rx.close();
+				None
+			},
+		}
 	}
 
 	/// Send an update for the request to the remote peer.
@@ -220,12 +247,12 @@ impl<Body> ReceivedRequestHandle<Body> {
 	}
 
 	/// Send the final response for the request to the remote peer.
-	pub async fn send_response(self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+	pub async fn send_response(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
 		self.write_handle.send_response(service_id, body).await
 	}
 
 	/// Send the final response with an error message.
-	pub async fn send_error_response(self, message: &str) -> Result<(), error::WriteMessageError>
+	pub async fn send_error_response(&self, message: &str) -> Result<(), error::WriteMessageError>
 	where
 		Body: crate::Body,
 	{
@@ -251,13 +278,13 @@ impl<Body> ReceivedRequestWriteHandle<Body> {
 	}
 
 	/// Send the final response for the request to the remote peer.
-	pub async fn send_response(self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+	pub async fn send_response(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
 		let body = body.into();
 		self.send_raw_message(Message::response(self.request_id, service_id, body)).await
 	}
 
 	/// Send the final response with an error message.
-	pub async fn send_error_response(self, message: &str) -> Result<(), error::WriteMessageError>
+	pub async fn send_error_response(&self, message: &str) -> Result<(), error::WriteMessageError>
 	where
 		Body: crate::Body,
 	{
