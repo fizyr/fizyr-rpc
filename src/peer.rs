@@ -1,20 +1,20 @@
 use crate::util::{select, Either};
 use tokio::sync::mpsc;
+use tokio::sync::oneshot;
 
-use crate::Incoming;
 use crate::Message;
 use crate::PeerHandle;
+use crate::ReceivedMessage;
 use crate::SentRequest;
 use crate::error;
 use crate::request_tracker::RequestTracker;
-use tokio::sync::oneshot;
 use crate::util;
 
 /// Message for the internal peer command loop.
 pub enum Command<Body> {
 	SendRequest(SendRequest<Body>),
 	SendRawMessage(SendRawMessage<Body>),
-	ProcessIncomingMessage(ProcessIncomingMessage<Body>),
+	ProcessReceivedMessage(ProcessReceivedMessage<Body>),
 	Stop,
 	UnregisterReadHandle,
 	RegisterWriteHandle,
@@ -46,7 +46,7 @@ pub struct Peer<Transport: crate::transport::Transport> {
 	command_rx: mpsc::UnboundedReceiver<Command<Transport::Body>>,
 
 	/// Sending end of the channel for incoming requests and stream messages.
-	incoming_tx: mpsc::UnboundedSender<Result<Incoming<Transport::Body>, error::RecvMessageError>>,
+	incoming_tx: mpsc::UnboundedSender<Result<ReceivedMessage<Transport::Body>, error::RecvMessageError>>,
 
 	/// The number of [`PeerWriteHandle`][crate::PeerWriteHandle] objects for this peer.
 	///
@@ -102,7 +102,7 @@ impl<Transport: crate::transport::Transport> Peer<Transport> {
 		handle
 	}
 
-	/// Connect to a remote peer.
+	/// Connect to a remote server.
 	///
 	/// Similar to [`Self::spawn()`], this spawns a background task for the peer.
 	///
@@ -197,7 +197,7 @@ where
 
 			// But first send the error to the command loop so it can be delivered to the peer.
 			// If that fails the command loop already closed, so just stop the read loop.
-			if self.command_tx.send(crate::peer::ProcessIncomingMessage { message }.into()).is_err() {
+			if self.command_tx.send(crate::peer::ProcessReceivedMessage { message }.into()).is_err() {
 				break;
 			}
 
@@ -223,7 +223,7 @@ where
 	command_rx: &'a mut mpsc::UnboundedReceiver<Command<W::Body>>,
 
 	/// The channel for sending incoming messages to the [`PeerHandle`].
-	incoming_tx: &'a mut mpsc::UnboundedSender<Result<Incoming<W::Body>, error::RecvMessageError>>,
+	incoming_tx: &'a mut mpsc::UnboundedSender<Result<ReceivedMessage<W::Body>, error::RecvMessageError>>,
 
 	/// Flag to indicate if the peer read handle has already been stopped.
 	read_handle_dropped: &'a mut bool,
@@ -255,7 +255,7 @@ where
 			let flow = match command {
 				Command::SendRequest(command) => self.send_request(command).await,
 				Command::SendRawMessage(command) => self.send_raw_message(command).await,
-				Command::ProcessIncomingMessage(command) => self.process_incoming_message(command).await,
+				Command::ProcessReceivedMessage(command) => self.process_incoming_message(command).await,
 				Command::Stop => LoopFlow::Stop,
 				Command::UnregisterReadHandle => {
 					*self.read_handle_dropped = true;
@@ -331,7 +331,7 @@ where
 	}
 
 	/// Process an incoming message.
-	async fn process_incoming_message(&mut self, command: crate::peer::ProcessIncomingMessage<W::Body>) -> LoopFlow {
+	async fn process_incoming_message(&mut self, command: crate::peer::ProcessReceivedMessage<W::Body>) -> LoopFlow {
 		// Forward errors to the peer read handle.
 		let message = match command.message {
 			Ok(x) => x,
@@ -359,7 +359,7 @@ where
 			// `msg` must be Ok(), because we checked it before.
 			Err(mpsc::error::SendError(msg)) => match msg.unwrap() {
 				// Respond to requests with an error.
-				Incoming::Request(request) => {
+				ReceivedMessage::Request(request, _body) => {
 					let error_msg = format!("unexpected request for service {}", request.service_id());
 					let response = Message::error_response(request.request_id(), &error_msg);
 					if self.write_message(&response).await.is_err() {
@@ -368,13 +368,13 @@ where
 						LoopFlow::Continue
 					}
 				},
-				Incoming::Stream(_) => LoopFlow::Continue,
+				ReceivedMessage::Stream(_) => LoopFlow::Continue,
 			},
 		}
 	}
 
 	/// Send an incoming message to the PeerHandle.
-	async fn send_incoming(&mut self, incoming: Result<Incoming<W::Body>, error::RecvMessageError>) -> Result<(), ()> {
+	async fn send_incoming(&mut self, incoming: Result<ReceivedMessage<W::Body>, error::RecvMessageError>) -> Result<(), ()> {
 		if self.incoming_tx.send(incoming).is_err() {
 			*self.read_handle_dropped = true;
 			Err(())
@@ -426,7 +426,7 @@ pub struct SendRawMessage<Body> {
 }
 
 /// Command to process an incoming message from the remote peer.
-pub struct ProcessIncomingMessage<Body> {
+pub struct ProcessReceivedMessage<Body> {
 	/// The message from the remote peer, or an error.
 	pub message: Result<Message<Body>, error::ReadMessageError>,
 }
@@ -437,7 +437,7 @@ impl<Body> std::fmt::Debug for Command<Body> {
 		match self {
 			Self::SendRequest(x) => debug.field("SendRequest", x),
 			Self::SendRawMessage(x) => debug.field("SendRawMessage", x),
-			Self::ProcessIncomingMessage(x) => debug.field("ProcessIncomingMessage", x),
+			Self::ProcessReceivedMessage(x) => debug.field("ProcessReceivedMessage", x),
 			Self::Stop => debug.field("Stop", &()),
 			Self::UnregisterReadHandle => debug.field("UnregisterReadHandle", &()),
 			Self::RegisterWriteHandle => debug.field("RegisterWriteHandle", &()),
@@ -459,9 +459,9 @@ impl<Body> std::fmt::Debug for SendRawMessage<Body> {
 	}
 }
 
-impl<Body> std::fmt::Debug for ProcessIncomingMessage<Body> {
+impl<Body> std::fmt::Debug for ProcessReceivedMessage<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		f.debug_struct("ProcessIncomingMessage").field("message", &self.message).finish()
+		f.debug_struct("ProcessReceivedMessage").field("message", &self.message).finish()
 	}
 }
 
@@ -477,9 +477,9 @@ impl<Body> From<SendRawMessage<Body>> for Command<Body> {
 	}
 }
 
-impl<Body> From<ProcessIncomingMessage<Body>> for Command<Body> {
-	fn from(other: ProcessIncomingMessage<Body>) -> Self {
-		Self::ProcessIncomingMessage(other)
+impl<Body> From<ProcessReceivedMessage<Body>> for Command<Body> {
+	fn from(other: ProcessReceivedMessage<Body>) -> Self {
+		Self::ProcessReceivedMessage(other)
 	}
 }
 
@@ -497,7 +497,7 @@ mod test {
 	async fn test_peer() {
 		let_assert!(Ok((peer_a, peer_b)) = UnixStream::pair());
 
-		let (peer_a, mut handle_a) = Peer::new(StreamTransport::new(peer_a, Default::default()));
+		let (peer_a, handle_a) = Peer::new(StreamTransport::new(peer_a, Default::default()));
 		let (peer_b, mut handle_b) = Peer::new(StreamTransport::new(peer_b, Default::default()));
 
 		let task_a = tokio::spawn(peer_a.run());
@@ -508,17 +508,17 @@ mod test {
 		let request_id = sent_request.request_id();
 
 		// Receive the request on B.
-		let_assert!(Ok(Incoming::Request(mut received_request)) = handle_b.next_message().await);
+		let_assert!(Ok(ReceivedMessage::Request(mut received_request, _body)) = handle_b.recv_message().await);
 
 		// Send an update from A and receive it on B.
 		let_assert!(Ok(()) = sent_request.send_update(3, &[4][..]).await);
-		let_assert!(Ok(update) = received_request.recv_update().await);
+		let_assert!(Some(update) = received_request.recv_update().await);
 		assert!(update.header == MessageHeader::requester_update(request_id, 3));
 		assert!(update.body.as_ref() == &[4]);
 
 		// Send an update from B and receive it on A.
 		let_assert!(Ok(()) = received_request.send_update(5, &[6][..]).await);
-		let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
+		let_assert!(Some(update) = sent_request.recv_update().await);
 		assert!(update.header == MessageHeader::responder_update(request_id, 5));
 		assert!(update.body.as_ref() == &[6]);
 
@@ -539,7 +539,7 @@ mod test {
 	#[tokio::test]
 	async fn peeked_response_is_not_gone() {
 		let_assert!(Ok((peer_a, peer_b)) = UnixStream::pair());
-		let mut handle_a = Peer::spawn(StreamTransport::new(peer_a, Default::default()));
+		let handle_a = Peer::spawn(StreamTransport::new(peer_a, Default::default()));
 		let mut handle_b = Peer::spawn(StreamTransport::new(peer_b, Default::default()));
 
 		// Send a request from A.
@@ -547,7 +547,7 @@ mod test {
 		let request_id = sent_request.request_id();
 
 		// Receive the request on B.
-		let_assert!(Ok(Incoming::Request(mut received_request)) = handle_b.next_message().await);
+		let_assert!(Ok(ReceivedMessage::Request(received_request, _body)) = handle_b.recv_message().await);
 
 		// Send two updates and a response from B to A.
 		let_assert!(Ok(()) = received_request.send_update(5, &b"Hello world!"[..]).await);
@@ -556,9 +556,9 @@ mod test {
 
 		// Try to receive three responses.
 		// This should stuff the response in the internal peek buffer.
-		assert!(let Ok(Some(_)) = sent_request.recv_update().await);
-		assert!(let Ok(Some(_)) = sent_request.recv_update().await);
-		assert!(let Ok(None) = sent_request.recv_update().await);
+		assert!(let Some(_) = sent_request.recv_update().await);
+		assert!(let Some(_) = sent_request.recv_update().await);
+		assert!(let None = sent_request.recv_update().await);
 
 		// Now receive the response, which should be returned intact from the peek buffer exactly once.
 		let_assert!(Ok(response) = sent_request.recv_response().await);
@@ -573,7 +573,7 @@ mod test {
 		use crate::error::RecvMessageError;
 
 		let_assert!(Ok((peer_a, peer_b)) = UnixStream::pair());
-		let mut handle_a = Peer::spawn(StreamTransport::new(peer_a, Default::default()));
+		let handle_a = Peer::spawn(StreamTransport::new(peer_a, Default::default()));
 		let mut handle_b = Peer::spawn(StreamTransport::new(peer_b, Default::default()));
 
 		// Send a request from A.
@@ -581,7 +581,7 @@ mod test {
 		let request_id = sent_request.request_id();
 
 		// Receive the request on B.
-		let_assert!(Ok(Incoming::Request(mut received_request)) = handle_b.next_message().await);
+		let_assert!(Ok(ReceivedMessage::Request(received_request, _body)) = handle_b.recv_message().await);
 
 		// Send one update and a response from B to A.
 		let_assert!(Ok(()) = received_request.send_update(5, &b"Hello world!"[..]).await);
@@ -591,10 +591,10 @@ mod test {
 		assert!(let Err(RecvMessageError::UnexpectedMessageType(_)) = sent_request.recv_response().await);
 
 		// Now we should receive the update intact from the peek buffer exactly once.
-		let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
+		let_assert!(Some(update) = sent_request.recv_update().await);
 		assert!(update.header == MessageHeader::responder_update(request_id, 5));
 		assert!(update.body.as_ref() == b"Hello world!");
-		assert!(let Ok(None) = sent_request.recv_update().await);
+		assert!(let None = sent_request.recv_update().await);
 
 		// Now receive the response.
 		let_assert!(Ok(response) = sent_request.recv_response().await);

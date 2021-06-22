@@ -1,0 +1,12 @@
+[package]
+name = "fizyr-rpc-macros"
+version = "0.1.0"
+edition = "2018"
+
+[lib]
+proc_macro = true
+
+[dependencies]
+syn = { version = "1.0.72", default-features = false, features = ["derive", "parsing", "printing", "proc-macro", "extra-traits"] }
+proc-macro2 = "1.0.26"
+quote = "1.0.9"

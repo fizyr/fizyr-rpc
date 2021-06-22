@@ -1,6 +1,14 @@
 # Changelog
 
 ## main
+### Changed
+- Renamed `PeerHandle::next_message()` to `recv_message()`.
+- Moved message body out of `ReceivedRequest`.
+- Changed `SentRequest/ReceivedRequest::recv_update()` to return an `Option<Message>`.
+- Renamed `Incoming` to `ReceivedMessage`.
+
+### Removed
+- Removed unused `Outgoing` type.
 
 ## v0.4.2 - 2021-05-20
 ### Fixed

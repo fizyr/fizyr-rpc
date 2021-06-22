@@ -63,7 +63,7 @@
 //! let mut peer = TcpPeer::connect("localhost:1337", StreamConfig::default()).await?;
 //! let mut request = peer.send_request(1, &b"Hello World!"[..]).await?;
 //!
-//! while let Some(update) = request.recv_update().await? {
+//! while let Some(update) = request.recv_update().await {
 //!     let body = std::str::from_utf8(&update.body)?;
 //!     eprintln!("Received update: {}", body);
 //! }
@@ -77,8 +77,22 @@
 
 #![warn(missing_docs)]
 
-#[macro_use]
-mod macros;
+/// Unwrap a [`Poll`](std::task::Poll) value and return from the enclosing function if it was [`Pending`](std::task::Poll::Pending).
+///
+/// This is like `try!()`, but for [`Poll`](std::task::Poll).
+#[allow(unused_macros)]
+macro_rules! ready {
+	($e:expr) => {
+		match $e {
+			::core::task::Poll::Pending => return ::core::task::Poll::Pending,
+			::core::task::Poll::Ready(x) => x,
+		}
+	};
+}
+
+#[cfg(feature = "macros")]
+#[doc(hidden)]
+pub mod macros;
 
 pub mod error;
 mod message;
@@ -100,10 +114,10 @@ pub use message::HEADER_LEN;
 pub use message::MAX_PAYLOAD_LEN;
 pub use peer::Peer;
 pub use peer_handle::PeerHandle;
+pub use peer_handle::PeerCloseHandle;
 pub use peer_handle::PeerReadHandle;
 pub use peer_handle::PeerWriteHandle;
-pub use request::Incoming;
-pub use request::Outgoing;
+pub use request::ReceivedMessage;
 pub use request::ReceivedRequest;
 pub use request::SentRequest;
 pub use server::Server;
@@ -156,3 +170,7 @@ pub type UnixSeqpacketPeer = Peer<UnixSeqpacketTransport>;
 /// Server for Unix seqpacket sockets.
 #[cfg(feature = "unix-seqpacket")]
 pub type UnixSeqpacketServer = Server<tokio_seqpacket::UnixSeqpacketListener>;
+
+#[doc(hidden)]
+#[deprecated(note = "This type was renamed to ReceivedMessage. Please use that instead.", since = "0.5.0")]
+pub type Incoming<Body> = ReceivedMessage<Body>;

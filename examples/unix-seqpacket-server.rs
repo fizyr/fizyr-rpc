@@ -44,7 +44,7 @@ async fn handle_peer(mut peer: fizyr_rpc::PeerHandle<fizyr_rpc::UnixBody>) -> Re
 	eprintln!("new connection accepted");
 	loop {
 		// Receive the next incoming message.
-		let incoming = match peer.next_message().await {
+		let incoming = match peer.recv_message().await {
 			Ok(x) => x,
 			Err(e) => {
 				if e.is_connection_aborted() {
@@ -60,9 +60,9 @@ async fn handle_peer(mut peer: fizyr_rpc::PeerHandle<fizyr_rpc::UnixBody>) -> Re
 
 		// Handle the incoming message.
 		match incoming {
-			fizyr_rpc::Incoming::Stream(msg) => eprintln!("unspported stream message received: {:?}", msg),
-			fizyr_rpc::Incoming::Request(request) => match request.service_id() {
-				1 => handle_hello(request).await?,
+			fizyr_rpc::ReceivedMessage::Stream(msg) => eprintln!("unspported stream message received: {:?}", msg),
+			fizyr_rpc::ReceivedMessage::Request(request, body) => match request.service_id() {
+				1 => handle_hello(request, body).await?,
 				n => request
 					.send_error_response(&format!("unknown service ID: {}", n))
 					.await
@@ -72,9 +72,9 @@ async fn handle_peer(mut peer: fizyr_rpc::PeerHandle<fizyr_rpc::UnixBody>) -> Re
 	}
 }
 
-async fn handle_hello(request: fizyr_rpc::ReceivedRequest<fizyr_rpc::UnixBody>) -> Result<(), String> {
+async fn handle_hello(request: fizyr_rpc::ReceivedRequest<fizyr_rpc::UnixBody>, body: fizyr_rpc::UnixBody) -> Result<(), String> {
 	// Parse the request body as UTF-8 and print it.
-	let message = std::str::from_utf8(&request.body().data).map_err(|_| "invalid UTF-8 in hello message")?;
+	let message = std::str::from_utf8(&body.data).map_err(|_| "invalid UTF-8 in hello message")?;
 	eprintln!("received hello request: {}", message);
 
 	// Send a goodbye response.

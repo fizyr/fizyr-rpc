@@ -24,26 +24,16 @@ pub struct SentRequest<Body> {
 pub struct ReceivedRequest<Body> {
 	request_id: u32,
 	service_id: i32,
-	body: Body,
 	incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 }
 
 /// An incoming request or stream message.
-pub enum Incoming<Body> {
+pub enum ReceivedMessage<Body> {
 	/// An incoming request.
-	Request(ReceivedRequest<Body>),
+	Request(ReceivedRequest<Body>, Body),
 
 	/// An incoming stream message.
-	Stream(Message<Body>),
-}
-
-/// An outgoing request or stream message.
-pub enum Outgoing<Body> {
-	/// An outgoing request.
-	Request(SentRequest<Body>),
-
-	/// An outgoing stream message.
 	Stream(Message<Body>),
 }
 
@@ -76,15 +66,15 @@ impl<Body> SentRequest<Body> {
 
 	/// Receive the next update message of the request from the remote peer.
 	///
-	/// This function returns `Ok(None)` if the final response is received instead of an update message.
+	/// This function returns `None` if the final response is received instead of an update message.
 	/// If that happens, the response message can be read using [`Self::recv_response`].
-	pub async fn recv_update(&mut self) -> Result<Option<Message<Body>>, error::RecvMessageError> {
+	pub async fn recv_update(&mut self) -> Option<Message<Body>> {
 		let message = self.recv_message().await?;
 		if message.header.message_type.is_responder_update() {
-			Ok(Some(message))
+			Some(message)
 		} else {
 			self.peek_buffer = Some(message);
-			Ok(None)
+			None
 		}
 	}
 
@@ -94,7 +84,7 @@ impl<Body> SentRequest<Body> {
 	/// If that happens, the update message can be read using [`Self::recv_update`].
 	/// To ensure that there are no update messages left, keep calling [`Self::recv_update`] untill it returns `Ok(None)`.
 	pub async fn recv_response(&mut self) -> Result<Message<Body>, error::RecvMessageError> {
-		let message = self.recv_message().await?;
+		let message = self.recv_message().await.ok_or_else(error::connection_aborted)?;
 		let kind = message.header.message_type;
 		if kind.is_response() {
 			Ok(message)
@@ -110,16 +100,16 @@ impl<Body> SentRequest<Body> {
 	/// Receive the next message of the request from the remote peer.
 	///
 	/// This could be an update message or a response message.
-	async fn recv_message(&mut self) -> Result<Message<Body>, error::RecvMessageError> {
+	async fn recv_message(&mut self) -> Option<Message<Body>> {
 		if let Some(message) = self.peek_buffer.take() {
-			Ok(message)
+			Some(message)
 		} else {
-			Ok(self.incoming_rx.recv().await.ok_or_else(error::connection_aborted)?)
+			self.incoming_rx.recv().await
 		}
 	}
 
 	/// Send an update for the request to the remote peer.
-	pub async fn send_update(&mut self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendMessageError> {
 		use crate::peer::SendRawMessage;
 		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();
@@ -127,7 +117,8 @@ impl<Body> SentRequest<Body> {
 		self.command_tx
 			.send(SendRawMessage { message, result_tx }.into())
 			.map_err(|_| error::connection_aborted())?;
-		result_rx.await.map_err(|_| error::connection_aborted())?
+		result_rx.await.map_err(|_| error::connection_aborted())??;
+		Ok(())
 	}
 }
 
@@ -136,14 +127,12 @@ impl<Body> ReceivedRequest<Body> {
 	pub(crate) fn new(
 		request_id: u32,
 		service_id: i32,
-		body: Body,
 		incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
 		command_tx: mpsc::UnboundedSender<Command<Body>>,
 	) -> Self {
 		Self {
 			request_id,
 			service_id,
-			body,
 			incoming_rx,
 			command_tx,
 		}
@@ -159,30 +148,25 @@ impl<Body> ReceivedRequest<Body> {
 		self.service_id
 	}
 
-	/// Get the body of the initial request message.
-	pub fn body(&self) -> &Body {
-		&self.body
-	}
-
 	/// Receive the next update message of the request from the remote peer.
-	pub async fn recv_update(&mut self) -> Result<Message<Body>, error::ReadMessageError> {
-		Ok(self.incoming_rx.recv().await.ok_or_else(error::connection_aborted)?)
+	pub async fn recv_update(&mut self) -> Option<Message<Body>> {
+		self.incoming_rx.recv().await
 	}
 
 	/// Send an update for the request to the remote peer.
-	pub async fn send_update(&mut self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
 		let body = body.into();
 		self.send_raw_message(Message::responder_update(self.request_id, service_id, body)).await
 	}
 
 	/// Send the final response for the request to the remote peer.
-	pub async fn send_response(mut self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+	pub async fn send_response(self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
 		let body = body.into();
 		self.send_raw_message(Message::response(self.request_id, service_id, body)).await
 	}
 
 	/// Send the final response with an error message.
-	pub async fn send_error_response(mut self, message: &str) -> Result<(), error::WriteMessageError>
+	pub async fn send_error_response(self, message: &str) -> Result<(), error::WriteMessageError>
 	where
 		Body: crate::Body,
 	{
@@ -190,7 +174,7 @@ impl<Body> ReceivedRequest<Body> {
 	}
 
 	/// Send a raw message.
-	async fn send_raw_message(&mut self, message: Message<Body>) -> Result<(), error::WriteMessageError> {
+	async fn send_raw_message(&self, message: Message<Body>) -> Result<(), error::WriteMessageError> {
 		use crate::peer::SendRawMessage;
 		let (result_tx, result_rx) = oneshot::channel();
 		self.command_tx
@@ -220,20 +204,11 @@ impl<Body> std::fmt::Debug for ReceivedRequest<Body> {
 	}
 }
 
-impl<Body> std::fmt::Debug for Incoming<Body> {
+impl<Body> std::fmt::Debug for ReceivedMessage<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
-			Self::Request(x) => {
-				write!(f, "ReceivedRequest(")?;
-				x.fmt(f)?;
-				write!(f, ")")?;
-			},
-			Self::Stream(x) => {
-				write!(f, "Stream(")?;
-				x.fmt(f)?;
-				write!(f, ")")?;
-			},
+			Self::Request(x, _body) => write!(f, "Request({:?})", x),
+			Self::Stream(x) => write!(f, "Stream({:?})", x),
 		}
-		Ok(())
 	}
 }

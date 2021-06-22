@@ -1,12 +1,10 @@
-/// Unwrap a [`Poll`](std::task::Poll) value and return from the enclosing function if it was [`Pending`](std::task::Poll::Pending).
-///
-/// This is like `try!()`, but for [`Poll`](std::task::Poll).
-#[allow(unused_macros)]
-macro_rules! ready {
-	($e:expr) => {
-		match $e {
-			::core::task::Poll::Pending => return ::core::task::Poll::Pending,
-			::core::task::Poll::Ready(x) => x,
-		}
-	};
+#[doc(hidden)]
+pub use fizyr_rpc_macros::interface as interface_impl;
+
+#[macro_export]
+/// Define an RPC interface.
+macro_rules! interface {
+	($($tokens:tt)*) => {
+		$crate::macros::interface_impl!{$crate; $($tokens)*}
+	}
 }

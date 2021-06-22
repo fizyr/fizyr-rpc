@@ -20,7 +20,7 @@ async fn main() {
 
 async fn do_main(options: &Options) -> Result<(), String> {
 	// Connect to a remote server.
-	let mut peer = TcpPeer::connect(&options.address, Default::default()).await
+	let peer = TcpPeer::connect(&options.address, Default::default()).await
 		.map_err(|e| format!("failed to connect to {}: {}", options.address, e))?;
 
 	// Send a request to the remote peer.
@@ -29,15 +29,7 @@ async fn do_main(options: &Options) -> Result<(), String> {
 		.await
 		.map_err(|e| format!("failed to send request: {}", e))?;
 
-	loop {
-		let update = request
-			.recv_update()
-			.await
-			.map_err(|e| format!("failed to read message: {}", e))?;
-		let update = match update {
-			Some(x) => x,
-			None => break,
-		};
+	while let Some(update) = request.recv_update().await {
 		let message = std::str::from_utf8(&update.body.data).map_err(|_| "invalid UTF-8 in update")?;
 		eprintln!("Received update: {}", message);
 	}

@@ -10,6 +10,7 @@ mod accept;
 mod connect;
 mod into_transport;
 mod select;
+pub mod format;
 
 pub use accept::{Accept, Bind, Listener};
 pub use connect::Connect;
