@@ -72,7 +72,7 @@ async fn handle_peer(mut peer: fizyr_rpc::PeerHandle<fizyr_rpc::UnixBody>) -> Re
 	}
 }
 
-async fn handle_hello(request: fizyr_rpc::ReceivedRequest<fizyr_rpc::UnixBody>, body: fizyr_rpc::UnixBody) -> Result<(), String> {
+async fn handle_hello(request: fizyr_rpc::ReceivedRequestHandle<fizyr_rpc::UnixBody>, body: fizyr_rpc::UnixBody) -> Result<(), String> {
 	// Parse the request body as UTF-8 and print it.
 	let message = std::str::from_utf8(&body.data).map_err(|_| "invalid UTF-8 in hello message")?;
 	eprintln!("received hello request: {}", message);

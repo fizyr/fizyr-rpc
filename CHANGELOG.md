@@ -1,11 +1,15 @@
 # Changelog
 
 ## main
+### Added
+- Add `SentRequestWriteHandle` and `ReceivedRequestWriteHandle` to support parallel reading and writing.
+
 ### Changed
 - Renamed `PeerHandle::next_message()` to `recv_message()`.
 - Moved message body out of `ReceivedRequest`.
 - Changed `SentRequest/ReceivedRequest::recv_update()` to return an `Option<Message>`.
 - Renamed `Incoming` to `ReceivedMessage`.
+- Renamed `SentRequest` and `ReceivedRequest` to `SentRequestHandle` and `ReceivedRequestHandle`.
 
 ### Removed
 - Removed unused `Outgoing` type.

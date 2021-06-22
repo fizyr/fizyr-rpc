@@ -9,35 +9,59 @@ use crate::Message;
 ///
 /// The handle can be used to receive updates and the response from the remote peer,
 /// and to send update messages to the remote peer.
-pub struct SentRequest<Body> {
+pub struct SentRequestHandle<Body> {
+	write_handle: SentRequestWriteHandle<Body>,
+	incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
+	peek_buffer: Option<Message<Body>>,
+}
+
+/// A write handle for a sent request.
+///
+/// Unlike [`SentRequestHandle`], write handles can be cloned.
+/// But unlike regular handles, they can not be used to receive updates or the response from the remote peer.
+///
+/// Write handles can be used to send updates even when the regular handle is mutably borrowed.
+///
+/// You can get more write handles using [`SentRequestHandle::write_handle()`] or by cloning an existing one.
+pub struct SentRequestWriteHandle<Body> {
 	request_id: u32,
 	service_id: i32,
-	incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
-	peek_buffer: Option<Message<Body>>,
 }
 
 /// A handle for a received request.
 ///
 /// The handle can be used to receive updates from the remote peer,
 /// and to send updates and the response to the remote peer.
-pub struct ReceivedRequest<Body> {
+pub struct ReceivedRequestHandle<Body> {
+	write_handle: ReceivedRequestWriteHandle<Body>,
+	incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
+}
+
+/// A write handle for a received request.
+///
+/// Unlike [`ReceivedRequestHandle`], write handles can be cloned.
+/// But unlike regular handles, they can not be used to receive updates or the response from the remote peer.
+///
+/// Write handles can be used to send updates even when the regular handle is mutably borrowed.
+///
+/// You can get more write handles using [`ReceivedRequestHandle::write_handle()`] or by cloning an existing one.
+pub struct ReceivedRequestWriteHandle<Body> {
 	request_id: u32,
 	service_id: i32,
-	incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 }
 
 /// An incoming request or stream message.
 pub enum ReceivedMessage<Body> {
 	/// An incoming request.
-	Request(ReceivedRequest<Body>, Body),
+	Request(ReceivedRequestHandle<Body>, Body),
 
 	/// An incoming stream message.
 	Stream(Message<Body>),
 }
 
-impl<Body> SentRequest<Body> {
+impl<Body> SentRequestHandle<Body> {
 	/// Create a new sent request.
 	pub(crate) fn new(
 		request_id: u32,
@@ -45,23 +69,33 @@ impl<Body> SentRequest<Body> {
 		incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
 		command_tx: mpsc::UnboundedSender<Command<Body>>,
 	) -> Self {
-		Self {
+		let write_handle = SentRequestWriteHandle {
 			request_id,
 			service_id,
-			incoming_rx,
 			command_tx,
+		};
+		Self {
+			write_handle,
+			incoming_rx,
 			peek_buffer: None,
 		}
 	}
 
 	/// Get the request ID of the sent request.
 	pub fn request_id(&self) -> u32 {
-		self.request_id
+		self.write_handle.request_id()
 	}
 
 	/// Get the service ID of the initial request message.
 	pub fn service_id(&self) -> i32 {
-		self.service_id
+		self.write_handle.service_id()
+	}
+
+	/// Create a write handle for this request.
+	///
+	/// The write handle can be cloned and used even while this handle is mutably borrowed.
+	pub fn write_handle(&self) -> SentRequestWriteHandle<Body> {
+		self.write_handle.clone()
 	}
 
 	/// Receive the next update message of the request from the remote peer.
@@ -110,6 +144,23 @@ impl<Body> SentRequest<Body> {
 
 	/// Send an update for the request to the remote peer.
 	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendMessageError> {
+		self.write_handle.send_update(service_id, body).await
+	}
+}
+
+impl<Body> SentRequestWriteHandle<Body> {
+	/// Get the request ID of the sent request.
+	pub fn request_id(&self) -> u32 {
+		self.request_id
+	}
+
+	/// Get the service ID of the initial request message.
+	pub fn service_id(&self) -> i32 {
+		self.service_id
+	}
+
+	/// Send an update for the request to the remote peer.
+	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendMessageError> {
 		use crate::peer::SendRawMessage;
 		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();
@@ -122,7 +173,7 @@ impl<Body> SentRequest<Body> {
 	}
 }
 
-impl<Body> ReceivedRequest<Body> {
+impl<Body> ReceivedRequestHandle<Body> {
 	/// Create a new received request.
 	pub(crate) fn new(
 		request_id: u32,
@@ -130,15 +181,60 @@ impl<Body> ReceivedRequest<Body> {
 		incoming_rx: mpsc::UnboundedReceiver<Message<Body>>,
 		command_tx: mpsc::UnboundedSender<Command<Body>>,
 	) -> Self {
-		Self {
+		let write_handle = ReceivedRequestWriteHandle {
 			request_id,
 			service_id,
-			incoming_rx,
 			command_tx,
+		};
+		Self {
+			write_handle,
+			incoming_rx,
 		}
 	}
 
 	/// Get the request ID of the received request.
+	pub fn request_id(&self) -> u32 {
+		self.write_handle.request_id()
+	}
+
+	/// Get the service ID of the received request message.
+	pub fn service_id(&self) -> i32 {
+		self.write_handle.service_id()
+	}
+
+	/// Create a write handle for this request.
+	///
+	/// The write handle can be cloned and used even while this handle is mutably borrowed.
+	pub fn write_handle(&self) -> ReceivedRequestWriteHandle<Body> {
+		self.write_handle.clone()
+	}
+
+	/// Receive the next update message of the request from the remote peer.
+	pub async fn recv_update(&mut self) -> Option<Message<Body>> {
+		self.incoming_rx.recv().await
+	}
+
+	/// Send an update for the request to the remote peer.
+	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+		self.write_handle.send_update(service_id, body).await
+	}
+
+	/// Send the final response for the request to the remote peer.
+	pub async fn send_response(self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+		self.write_handle.send_response(service_id, body).await
+	}
+
+	/// Send the final response with an error message.
+	pub async fn send_error_response(self, message: &str) -> Result<(), error::WriteMessageError>
+	where
+		Body: crate::Body,
+	{
+		self.write_handle.send_error_response(message).await
+	}
+}
+
+impl<Body> ReceivedRequestWriteHandle<Body> {
+	/// Get the request ID of the sent request.
 	pub fn request_id(&self) -> u32 {
 		self.request_id
 	}
@@ -146,11 +242,6 @@ impl<Body> ReceivedRequest<Body> {
 	/// Get the service ID of the initial request message.
 	pub fn service_id(&self) -> i32 {
 		self.service_id
-	}
-
-	/// Receive the next update message of the request from the remote peer.
-	pub async fn recv_update(&mut self) -> Option<Message<Body>> {
-		self.incoming_rx.recv().await
 	}
 
 	/// Send an update for the request to the remote peer.
@@ -184,22 +275,42 @@ impl<Body> ReceivedRequest<Body> {
 	}
 }
 
-impl<Body> std::fmt::Debug for SentRequest<Body> {
+impl<Body> std::fmt::Debug for SentRequestHandle<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		// TODO: use finish_non_exhaustive when it hits stable.
-		f.debug_struct("SentRequest")
-			.field("request_id", &self.request_id)
-			.field("service_id", &self.service_id)
+		f.debug_struct("SentRequestHandle")
+			.field("request_id", &self.request_id())
+			.field("service_id", &self.service_id())
 			.finish()
 	}
 }
 
-impl<Body> std::fmt::Debug for ReceivedRequest<Body> {
+impl<Body> std::fmt::Debug for SentRequestWriteHandle<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		// TODO: use finish_non_exhaustive when it hits stable.
-		f.debug_struct("ReceivedRequest")
-			.field("request_id", &self.request_id)
-			.field("service_id", &self.service_id)
+		f.debug_struct("SentRequestWriteHandle")
+			.field("request_id", &self.request_id())
+			.field("service_id", &self.service_id())
+			.finish()
+	}
+}
+
+impl<Body> std::fmt::Debug for ReceivedRequestHandle<Body> {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		// TODO: use finish_non_exhaustive when it hits stable.
+		f.debug_struct("ReceivedRequestHandle")
+			.field("request_id", &self.request_id())
+			.field("service_id", &self.service_id())
+			.finish()
+	}
+}
+
+impl<Body> std::fmt::Debug for ReceivedRequestWriteHandle<Body> {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		// TODO: use finish_non_exhaustive when it hits stable.
+		f.debug_struct("ReceivedRequestWriteHandle")
+			.field("request_id", &self.request_id())
+			.field("service_id", &self.service_id())
 			.finish()
 	}
 }
@@ -209,6 +320,26 @@ impl<Body> std::fmt::Debug for ReceivedMessage<Body> {
 		match self {
 			Self::Request(x, _body) => write!(f, "Request({:?})", x),
 			Self::Stream(x) => write!(f, "Stream({:?})", x),
+		}
+	}
+}
+
+impl<Body> Clone for SentRequestWriteHandle<Body> {
+	fn clone(&self) -> Self {
+		Self {
+			request_id: self.request_id,
+			service_id: self.service_id,
+			command_tx: self.command_tx.clone(),
+		}
+	}
+}
+
+impl<Body> Clone for ReceivedRequestWriteHandle<Body> {
+	fn clone(&self) -> Self {
+		Self {
+			request_id: self.request_id,
+			service_id: self.service_id,
+			command_tx: self.command_tx.clone(),
 		}
 	}
 }

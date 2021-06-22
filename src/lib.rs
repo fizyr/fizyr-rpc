@@ -117,9 +117,13 @@ pub use peer_handle::PeerHandle;
 pub use peer_handle::PeerCloseHandle;
 pub use peer_handle::PeerReadHandle;
 pub use peer_handle::PeerWriteHandle;
-pub use request::ReceivedMessage;
-pub use request::ReceivedRequest;
-pub use request::SentRequest;
+pub use request::{
+	ReceivedMessage,
+	ReceivedRequestHandle,
+	ReceivedRequestWriteHandle,
+	SentRequestHandle,
+	SentRequestWriteHandle,
+};
 pub use server::Server;
 pub use server::ServerListener;
 

@@ -8,8 +8,8 @@ use crate::peer::Command;
 use crate::ReceivedMessage;
 use crate::Message;
 use crate::MessageType;
-use crate::ReceivedRequest;
-use crate::SentRequest;
+use crate::ReceivedRequestHandle;
+use crate::SentRequestHandle;
 
 /// An error occurred while processing an incoming message.
 #[derive(Debug, Clone, Error)]
@@ -67,7 +67,7 @@ impl<Body> RequestTracker<Body> {
 	}
 
 	/// Allocate a request ID and register a new sent request.
-	pub fn allocate_sent_request(&mut self, service_id: i32) -> Result<SentRequest<Body>, error::NoFreeRequestIdFound> {
+	pub fn allocate_sent_request(&mut self, service_id: i32) -> Result<SentRequestHandle<Body>, error::NoFreeRequestIdFound> {
 		// Try to find a free ID a bunch of times.
 		for _ in 0..100 {
 			let request_id = self.next_sent_request_id;
@@ -76,7 +76,7 @@ impl<Body> RequestTracker<Body> {
 			if let Entry::Vacant(entry) = self.sent_requests.entry(request_id) {
 				let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
 				entry.insert(incoming_tx);
-				return Ok(SentRequest::new(request_id, service_id, incoming_rx, self.command_tx.clone()));
+				return Ok(SentRequestHandle::new(request_id, service_id, incoming_rx, self.command_tx.clone()));
 			}
 		}
 
@@ -88,7 +88,7 @@ impl<Body> RequestTracker<Body> {
 	///
 	/// This should be called when a request is finished to make the ID available again.
 	/// Note that sent requests are also removed internally when they receive a response,
-	/// or when they would receive a message but the [`SentRequest`] was dropped.
+	/// or when they would receive a message but the [`SentRequestHandle`] was dropped.
 	pub fn remove_sent_request(&mut self, request_id: u32) -> Result<(), error::UnknownRequestId> {
 		self.sent_requests.remove(&request_id).ok_or(error::UnknownRequestId { request_id })?;
 		Ok(())
@@ -102,7 +102,7 @@ impl<Body> RequestTracker<Body> {
 		request_id: u32,
 		service_id: i32,
 		body: Body,
-	) -> Result<(ReceivedRequest<Body>, Body), error::DuplicateRequestId> {
+	) -> Result<(ReceivedRequestHandle<Body>, Body), error::DuplicateRequestId> {
 		match self.received_requests.entry(request_id) {
 			Entry::Occupied(_entry) => {
 				// TODO: Check if the channel is closed so we don't error out unneccesarily.
@@ -115,7 +115,7 @@ impl<Body> RequestTracker<Body> {
 				// } else {
 				// 	let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
 				// 	entry.insert(incoming_tx);
-				// 	Ok(ReceivedRequest::new(request_id, service_id, incoming_rx, self.command_tx.clone()))
+				// 	Ok(ReceivedRequestHandle::new(request_id, service_id, incoming_rx, self.command_tx.clone()))
 				// }
 			},
 
@@ -123,7 +123,7 @@ impl<Body> RequestTracker<Body> {
 			Entry::Vacant(entry) => {
 				let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
 				entry.insert(incoming_tx);
-				Ok((ReceivedRequest::new(request_id, service_id, incoming_rx, self.command_tx.clone()), body))
+				Ok((ReceivedRequestHandle::new(request_id, service_id, incoming_rx, self.command_tx.clone()), body))
 			},
 		}
 	}
@@ -131,7 +131,7 @@ impl<Body> RequestTracker<Body> {
 	/// Remove a received request from the tracker.
 	///
 	/// This should be called when a request is finished to make the ID available again.
-	/// Note that received requests are also removed internally when they would receive a message but the [`ReceivedRequest`] was dropped.
+	/// Note that received requests are also removed internally when they would receive a message but the [`ReceivedRequestHandle`] was dropped.
 	#[allow(unused)] // TODO: Evaluate if Peer should be calling this sometimes.
 	pub fn remove_received_request(&mut self, request_id: u32) -> Result<(), error::UnknownRequestId> {
 		self.received_requests.remove(&request_id).ok_or(error::UnknownRequestId { request_id })?;
