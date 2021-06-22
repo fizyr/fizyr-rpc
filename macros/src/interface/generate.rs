@@ -796,11 +796,15 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 		}
 	});
 
+	let handle_doc = format!("Handle for a received `{}` request.", service.name());
+	let write_handle_doc = format!("Write-only handle for a received `{}` request.", service.name());
 	item_tokens.extend(quote! {
+		#[doc = #handle_doc]
 		pub struct ReceivedRequestHandle<F: #fizyr_rpc::util::format::Format> {
 			pub(super) request: #fizyr_rpc::ReceivedRequestHandle<F::Body>,
 		}
 
+		#[doc = #write_handle_doc]
 		pub struct ReceivedRequestWriteHandle<F: #fizyr_rpc::util::format::Format> {
 			pub(super) request: #fizyr_rpc::ReceivedRequestWriteHandle<F::Body>,
 		}
