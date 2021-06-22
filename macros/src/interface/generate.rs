@@ -284,7 +284,7 @@ fn generate_services(item_tokens: &mut TokenStream, client_impl_tokens: &mut Tok
 /// Generate the support types and function definitions for each service.
 fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, service: &ServiceDefinition) {
 	let service_name = service.name();
-	let service_doc = to_doc_attrs(&service.doc());
+	let service_doc = to_doc_attrs(service.doc());
 	let service_id = service.service_id();
 
 	let request_type = service.request_type();
@@ -318,7 +318,7 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 			}
 		})
 	} else {
-		generate_sent_request(&mut service_item_tokens, &fizyr_rpc, service);
+		generate_sent_request(&mut service_item_tokens, fizyr_rpc, service);
 		client_impl_tokens.extend(quote! {
 			#service_doc
 			pub async fn #service_name(&self, #request_param) -> Result<#service_name::SentRequest<F>, #fizyr_rpc::error::SendRequestError>
@@ -529,7 +529,7 @@ fn generate_streams(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 		generate_message_enum(
 			item_tokens,
 			fizyr_rpc,
-			&interface.streams(),
+			interface.streams(),
 			&syn::Ident::new("StreamMessage", Span::call_site()),
 			&format!("A stream message for the {} interface.", interface.name()),
 		);
