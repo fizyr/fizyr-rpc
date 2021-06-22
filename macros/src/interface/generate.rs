@@ -72,17 +72,6 @@ fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 				Self { peer }
 			}
 
-			/// Connect to a remote server.
-			///
-			/// See [`fizyr_rpc::Peer::connect`](https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Peer.html#method.connect) for more details.
-			pub async fn connect<'a, Transport, Address>(address: Address, config: Transport::Config) -> std::io::Result<Self>
-			where
-				Address: 'a,
-				Transport: #fizyr_rpc::transport::Transport<Body = F::Body> + #fizyr_rpc::util::Connect<'a, Address>,
-			{
-				Ok(#fizyr_rpc::Peer::<Transport>::connect(address, config).await?.into())
-			}
-
 			/// Close the connection with the remote peer.
 			pub fn close(self) {
 				self.peer.close()
