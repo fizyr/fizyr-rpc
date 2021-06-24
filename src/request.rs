@@ -1,5 +1,6 @@
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
 use crate::error;
 use crate::peer::Command;
@@ -31,6 +32,7 @@ pub struct SentRequestHandle<Body> {
 pub struct SentRequestWriteHandle<Body> {
 	request_id: u32,
 	service_id: i32,
+	closed: Arc<AtomicBool>,
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 }
 
@@ -54,6 +56,7 @@ pub struct ReceivedRequestHandle<Body> {
 pub struct ReceivedRequestWriteHandle<Body> {
 	request_id: u32,
 	service_id: i32,
+	closed: Arc<AtomicBool>,
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 }
 
@@ -71,12 +74,14 @@ impl<Body> SentRequestHandle<Body> {
 	pub(crate) fn new(
 		request_id: u32,
 		service_id: i32,
+		closed: Arc<AtomicBool>,
 		incoming_rx: mpsc::UnboundedReceiver<RequestHandleCommand<Body>>,
 		command_tx: mpsc::UnboundedSender<Command<Body>>,
 	) -> Self {
 		let write_handle = SentRequestWriteHandle {
 			request_id,
 			service_id,
+			closed,
 			command_tx,
 		};
 		Self {
@@ -181,6 +186,13 @@ impl<Body> SentRequestWriteHandle<Body> {
 	/// Send an update for the request to the remote peer.
 	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendMessageError> {
 		use crate::peer::SendRawMessage;
+
+		// If the response has already arrived, we're not allowed to send messages anymore.
+		// The request ID could have been re-used already.
+		if self.closed.load(Ordering::Acquire) {
+			return Err(crate::error::RequestClosed.into())
+		}
+
 		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();
 		let message = Message::requester_update(self.request_id, service_id, body);
@@ -197,12 +209,14 @@ impl<Body> ReceivedRequestHandle<Body> {
 	pub(crate) fn new(
 		request_id: u32,
 		service_id: i32,
+		closed: Arc<AtomicBool>,
 		incoming_rx: mpsc::UnboundedReceiver<RequestHandleCommand<Body>>,
 		command_tx: mpsc::UnboundedSender<Command<Body>>,
 	) -> Self {
 		let write_handle = ReceivedRequestWriteHandle {
 			request_id,
 			service_id,
+			closed,
 			command_tx,
 		};
 		Self {
@@ -242,17 +256,17 @@ impl<Body> ReceivedRequestHandle<Body> {
 	}
 
 	/// Send an update for the request to the remote peer.
-	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendMessageError> {
 		self.write_handle.send_update(service_id, body).await
 	}
 
 	/// Send the final response for the request to the remote peer.
-	pub async fn send_response(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+	pub async fn send_response(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendMessageError> {
 		self.write_handle.send_response(service_id, body).await
 	}
 
 	/// Send the final response with an error message.
-	pub async fn send_error_response(&self, message: &str) -> Result<(), error::WriteMessageError>
+	pub async fn send_error_response(&self, message: &str) -> Result<(), error::SendMessageError>
 	where
 		Body: crate::Body,
 	{
@@ -272,19 +286,19 @@ impl<Body> ReceivedRequestWriteHandle<Body> {
 	}
 
 	/// Send an update for the request to the remote peer.
-	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendMessageError> {
 		let body = body.into();
 		self.send_raw_message(Message::responder_update(self.request_id, service_id, body)).await
 	}
 
 	/// Send the final response for the request to the remote peer.
-	pub async fn send_response(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+	pub async fn send_response(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendMessageError> {
 		let body = body.into();
 		self.send_raw_message(Message::response(self.request_id, service_id, body)).await
 	}
 
 	/// Send the final response with an error message.
-	pub async fn send_error_response(&self, message: &str) -> Result<(), error::WriteMessageError>
+	pub async fn send_error_response(&self, message: &str) -> Result<(), error::SendMessageError>
 	where
 		Body: crate::Body,
 	{
@@ -292,13 +306,21 @@ impl<Body> ReceivedRequestWriteHandle<Body> {
 	}
 
 	/// Send a raw message.
-	async fn send_raw_message(&self, message: Message<Body>) -> Result<(), error::WriteMessageError> {
+	async fn send_raw_message(&self, message: Message<Body>) -> Result<(), error::SendMessageError> {
 		use crate::peer::SendRawMessage;
+
+		// If the response has already arrived, we're not allowed to send messages anymore.
+		// The request ID could have been re-used already.
+		if self.closed.load(Ordering::Acquire) {
+			return Err(crate::error::RequestClosed.into())
+		}
+
 		let (result_tx, result_rx) = oneshot::channel();
 		self.command_tx
 			.send(SendRawMessage { message, result_tx }.into())
 			.map_err(|_| error::connection_aborted())?;
-		result_rx.await.map_err(|_| error::connection_aborted())?
+		result_rx.await.map_err(|_| error::connection_aborted())??;
+		Ok(())
 	}
 }
 
@@ -356,6 +378,7 @@ impl<Body> Clone for SentRequestWriteHandle<Body> {
 		Self {
 			request_id: self.request_id,
 			service_id: self.service_id,
+			closed: self.closed.clone(),
 			command_tx: self.command_tx.clone(),
 		}
 	}
@@ -366,7 +389,60 @@ impl<Body> Clone for ReceivedRequestWriteHandle<Body> {
 		Self {
 			request_id: self.request_id,
 			service_id: self.service_id,
+			closed: self.closed.clone(),
 			command_tx: self.command_tx.clone(),
 		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use crate::{Peer, UnixStreamTransport};
+	use tokio::net::UnixStream;
+	use assert2::{assert, let_assert};
+
+	/// Test that request handles can not be used for sending messages after they are closed.
+	///
+	/// They should be closed automatically by the request tracker when the response is sent or received.
+	#[tokio::test]
+	async fn test_closed_after_respone() {
+		let_assert!(Ok((peer_a, peer_b)) = UnixStream::pair());
+
+		let (peer_a, handle_a) = Peer::new(UnixStreamTransport::new(peer_a, Default::default()));
+		let (peer_b, mut handle_b) = Peer::new(UnixStreamTransport::new(peer_b, Default::default()));
+
+		let task_a = tokio::spawn(peer_a.run());
+		let task_b = tokio::spawn(peer_b.run());
+
+		// Send a request from A.
+		let_assert!(Ok(mut sent_request) = handle_a.send_request(1, &[2][..]).await);
+
+		// Receive the request on B.
+		let_assert!(Ok(ReceivedMessage::Request(mut received_request, _body)) = handle_b.recv_message().await);
+
+		// Check that sending requests works.
+		assert!(let Ok(()) = sent_request.send_update(1, vec![]).await);
+		assert!(let Some(_) = received_request.recv_update().await);
+
+		assert!(let Ok(()) = received_request.send_update(1, vec![]).await);
+		assert!(let Some(_) = sent_request.recv_update().await);
+
+		// Now we send and receive a response.
+		// After that, sending responses should be impossible.
+		assert!(let Ok(()) = received_request.send_response(1, vec![]).await);
+		assert!(let Err(crate::error::SendMessageError::RequestClosed(_)) = received_request.send_update(1, vec![]).await);
+		assert!(let Err(crate::error::SendMessageError::RequestClosed(_)) = received_request.send_response(1, vec![]).await);
+
+		assert!(let Ok(_) = sent_request.recv_response().await);
+		assert!(let Err(crate::error::SendMessageError::RequestClosed(_)) = sent_request.send_update(1, vec![]).await);
+
+		drop(handle_a);
+		drop(handle_b);
+		drop(sent_request);
+		drop(received_request);
+
+		assert!(let Ok(()) = task_a.await);
+		assert!(let Ok(()) = task_b.await);
 	}
 }

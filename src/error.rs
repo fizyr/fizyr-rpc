@@ -105,6 +105,11 @@ impl PayloadTooLarge {
 	}
 }
 
+/// The request was already closed.
+#[derive(Debug, Clone, Error)]
+#[error("the request is already closed")]
+pub struct RequestClosed;
+
 /// No free request ID was found.
 #[derive(Debug, Clone, Error)]
 #[error("no free request ID was found")]
@@ -240,6 +245,9 @@ pub enum SendMessageError {
 
 	/// The payload of the message is too large to send.
 	PayloadTooLarge(#[from] PayloadTooLarge),
+
+	/// The request has already been closed.
+	RequestClosed(#[from] RequestClosed),
 
 	/// Failed to encode the message.
 	EncodeBody(Box<dyn std::error::Error + Send>),
