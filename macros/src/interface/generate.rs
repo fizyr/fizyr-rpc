@@ -25,6 +25,7 @@ pub fn generate_interface(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinitio
 	let tokens = quote! {
 		#interface_doc
 		pub mod #interface_name {
+			#[allow(unused_imports)]
 			use super::*;
 
 			#item_tokens
@@ -329,7 +330,9 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 	item_tokens.extend(quote! {
 		#[doc = #mod_doc]
 		pub mod #service_name {
+			#[allow(unused_imports)]
 			use super::*;
+
 			#service_item_tokens
 		}
 	});
@@ -556,7 +559,6 @@ fn generate_recv_update_function(impl_tokens: &mut TokenStream, fizyr_rpc: &syn:
 		where
 			#enum_type: #fizyr_rpc::util::format::FromMessage<F>,
 		{
-			use #fizyr_rpc::util::format::FromMessage;
 			match self.request.recv_update().await {
 				Some(x) => Ok(Some(F::decode_message(x)?)),
 				None => Ok(None),
