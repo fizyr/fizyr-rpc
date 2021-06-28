@@ -151,7 +151,7 @@ macro_rules! interface {
 ///         ///
 ///         /// Popular phrases include:
 ///         ///  * Woah thats cheap!
-///         ///  * Everything used to be better in the old days...
+///         ///  * Everything used to be better in the good old days...
 ///         ///  * Why did they move the toilet paper?
 ///         stream 1 mutter: String,
 ///     }
@@ -186,7 +186,7 @@ macro_rules! interface {
 ///     },
 ///
 ///     /// Payment with an NFT.
-///     NonFungableToken,
+///     NonFungibleToken,
 /// }
 ///
 /// /// The response of a cashier when buying tomatoes.
@@ -245,7 +245,7 @@ pub mod interface_example {
 			///
 			/// Popular phrases include:
 			///  * Woah thats cheap!
-			///  * Everything used to be better in the old days...
+			///  * Everything used to be better in the good old days...
 			///  * Why did they move the toilet paper?
 			stream 1 mutter: String,
 		}
@@ -277,7 +277,7 @@ pub mod interface_example {
 		},
 
 		/// Payment with an NFT.
-		NonFungableToken,
+		NonFungibleToken,
 	}
 
 	/// The response of a cashier when buying tomatoes.
