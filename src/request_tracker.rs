@@ -2,14 +2,16 @@ use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use thiserror::Error;
 use tokio::sync::mpsc;
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
 use crate::error;
 use crate::peer::Command;
 use crate::ReceivedMessage;
 use crate::Message;
 use crate::MessageType;
-use crate::ReceivedRequest;
-use crate::SentRequest;
+use crate::ReceivedRequestHandle;
+use crate::SentRequestHandle;
+use crate::request::RequestHandleCommand;
 
 /// An error occurred while processing an incoming message.
 #[derive(Debug, Clone, Error)]
@@ -32,6 +34,11 @@ impl From<ProcessIncomingMessageError> for error::RecvMessageError {
 	}
 }
 
+struct TrackedRequest<Body> {
+	incoming_tx: mpsc::UnboundedSender<RequestHandleCommand<Body>>,
+	closed: Arc<AtomicBool>,
+}
+
 /// Tracker that manages open requests.
 ///
 /// You normally do not need to work with a request tracker directly.
@@ -46,10 +53,10 @@ pub struct RequestTracker<Body> {
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 
 	/// Map of channels for incoming messages for sent requests.
-	sent_requests: BTreeMap<u32, mpsc::UnboundedSender<Message<Body>>>,
+	sent_requests: BTreeMap<u32, TrackedRequest<Body>>,
 
 	/// Map of channels for incoming messages for received requests.
-	received_requests: BTreeMap<u32, mpsc::UnboundedSender<Message<Body>>>,
+	received_requests: BTreeMap<u32, TrackedRequest<Body>>,
 }
 
 impl<Body> RequestTracker<Body> {
@@ -67,7 +74,7 @@ impl<Body> RequestTracker<Body> {
 	}
 
 	/// Allocate a request ID and register a new sent request.
-	pub fn allocate_sent_request(&mut self, service_id: i32) -> Result<SentRequest<Body>, error::NoFreeRequestIdFound> {
+	pub fn allocate_sent_request(&mut self, service_id: i32) -> Result<SentRequestHandle<Body>, error::NoFreeRequestIdFound> {
 		// Try to find a free ID a bunch of times.
 		for _ in 0..100 {
 			let request_id = self.next_sent_request_id;
@@ -75,8 +82,13 @@ impl<Body> RequestTracker<Body> {
 
 			if let Entry::Vacant(entry) = self.sent_requests.entry(request_id) {
 				let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
-				entry.insert(incoming_tx);
-				return Ok(SentRequest::new(request_id, service_id, incoming_rx, self.command_tx.clone()));
+				let closed = Arc::new(AtomicBool::new(false));
+				let tracked_request = TrackedRequest {
+					incoming_tx,
+					closed: closed.clone(),
+				};
+				entry.insert(tracked_request);
+				return Ok(SentRequestHandle::new(request_id, service_id, closed, incoming_rx, self.command_tx.clone()));
 			}
 		}
 
@@ -88,9 +100,15 @@ impl<Body> RequestTracker<Body> {
 	///
 	/// This should be called when a request is finished to make the ID available again.
 	/// Note that sent requests are also removed internally when they receive a response,
-	/// or when they would receive a message but the [`SentRequest`] was dropped.
+	/// or when they would receive a message but the [`SentRequestHandle`] was dropped.
 	pub fn remove_sent_request(&mut self, request_id: u32) -> Result<(), error::UnknownRequestId> {
-		self.sent_requests.remove(&request_id).ok_or(error::UnknownRequestId { request_id })?;
+		let tracked_request = self.sent_requests.remove(&request_id).ok_or(error::UnknownRequestId { request_id })?;
+
+		// Set the `closed` flag so that existing request write handles will refuse to send more messages.
+		tracked_request.closed.store(true, Ordering::Release);
+
+		// Send a Close command to wake up the read handle if it is waiting for a message.
+		let _: Result<_, _> = tracked_request.incoming_tx.send(RequestHandleCommand::Close);
 		Ok(())
 	}
 
@@ -102,7 +120,7 @@ impl<Body> RequestTracker<Body> {
 		request_id: u32,
 		service_id: i32,
 		body: Body,
-	) -> Result<(ReceivedRequest<Body>, Body), error::DuplicateRequestId> {
+	) -> Result<(ReceivedRequestHandle<Body>, Body), error::DuplicateRequestId> {
 		match self.received_requests.entry(request_id) {
 			Entry::Occupied(_entry) => {
 				// TODO: Check if the channel is closed so we don't error out unneccesarily.
@@ -115,15 +133,20 @@ impl<Body> RequestTracker<Body> {
 				// } else {
 				// 	let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
 				// 	entry.insert(incoming_tx);
-				// 	Ok(ReceivedRequest::new(request_id, service_id, incoming_rx, self.command_tx.clone()))
+				// 	Ok(ReceivedRequestHandle::new(request_id, service_id, incoming_rx, self.command_tx.clone()))
 				// }
 			},
 
 			// The request ID is available.
 			Entry::Vacant(entry) => {
 				let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
-				entry.insert(incoming_tx);
-				Ok((ReceivedRequest::new(request_id, service_id, incoming_rx, self.command_tx.clone()), body))
+				let closed = Arc::new(AtomicBool::new(false));
+				let tracked_request = TrackedRequest {
+					incoming_tx,
+					closed: closed.clone(),
+				};
+				entry.insert(tracked_request);
+				Ok((ReceivedRequestHandle::new(request_id, service_id, closed, incoming_rx, self.command_tx.clone()), body))
 			},
 		}
 	}
@@ -131,10 +154,15 @@ impl<Body> RequestTracker<Body> {
 	/// Remove a received request from the tracker.
 	///
 	/// This should be called when a request is finished to make the ID available again.
-	/// Note that received requests are also removed internally when they would receive a message but the [`ReceivedRequest`] was dropped.
-	#[allow(unused)] // TODO: Evaluate if Peer should be calling this sometimes.
+	/// Note that received requests are also removed internally when they would receive a message but the [`ReceivedRequestHandle`] was dropped.
 	pub fn remove_received_request(&mut self, request_id: u32) -> Result<(), error::UnknownRequestId> {
-		self.received_requests.remove(&request_id).ok_or(error::UnknownRequestId { request_id })?;
+		let tracked_request = self.received_requests.remove(&request_id).ok_or(error::UnknownRequestId { request_id })?;
+
+		// Set the `closed` flag so that existing request write handles will refuse to send more messages.
+		tracked_request.closed.store(true, Ordering::Release);
+
+		// Send a Close command to wake up the read handle if it is waiting for a message.
+		let _: Result<_, _> = tracked_request.incoming_tx.send(RequestHandleCommand::Close);
 		Ok(())
 	}
 
@@ -171,10 +199,17 @@ impl<Body> RequestTracker<Body> {
 		let request_id = message.header.request_id;
 		match self.sent_requests.entry(request_id) {
 			Entry::Vacant(_) => Err(error::UnknownRequestId { request_id }),
-			Entry::Occupied(mut entry) => {
-				// Forward the message to the sent_request, then remove the entry.
-				let _: Result<_, _> = entry.get_mut().send(message);
-				entry.remove();
+			Entry::Occupied(entry) => {
+				let tracked_request = entry.remove();
+
+				// Forward the message to the sent_request.
+				let _: Result<_, _> = tracked_request.incoming_tx.send(RequestHandleCommand::Message(message));
+
+				// Set the `closed` flag so that existing request write handles will refuse to send more messages.
+				tracked_request.closed.store(true, Ordering::Release);
+
+				// Send a Close command to wake up the read handle if it is waiting for a message.
+				let _: Result<_, _> = tracked_request.incoming_tx.send(RequestHandleCommand::Close);
 				Ok(())
 			},
 		}
@@ -186,7 +221,7 @@ impl<Body> RequestTracker<Body> {
 			Entry::Vacant(_) => Err(error::UnknownRequestId { request_id }),
 			Entry::Occupied(mut entry) => {
 				// If the received_request is dropped, clear the entry.
-				if entry.get_mut().send(message).is_err() {
+				if entry.get_mut().incoming_tx.send(RequestHandleCommand::Message(message)).is_err() {
 					entry.remove();
 					Err(error::UnknownRequestId { request_id })
 				} else {
@@ -202,7 +237,7 @@ impl<Body> RequestTracker<Body> {
 			Entry::Vacant(_) => Err(error::UnknownRequestId { request_id }),
 			Entry::Occupied(mut entry) => {
 				// If the sent_request is dropped, clear the entry.
-				if entry.get_mut().send(message).is_err() {
+				if entry.get_mut().incoming_tx.send(RequestHandleCommand::Message(message)).is_err() {
 					entry.remove();
 					Err(error::UnknownRequestId { request_id })
 				} else {
@@ -264,6 +299,7 @@ mod test {
 		// Send and update and response.
 		let_assert!(Ok(()) = received_request.send_update(3, Body).await);
 		let_assert!(Ok(()) = received_request.send_response(4, Body).await);
+		let_assert!(Ok(()) = tracker.remove_received_request(received_request.request_id()));
 
 		// The received request is now dropped, so lets check that new incoming message cause an error.
 		let_assert!(
@@ -272,6 +308,7 @@ mod test {
 		);
 		assert!(e.request_id == 1);
 
+		drop(received_request);
 		drop(tracker);
 		assert!(let Ok(()) = command_task.await);
 	}

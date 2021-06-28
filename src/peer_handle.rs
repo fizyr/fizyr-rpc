@@ -5,7 +5,7 @@ use crate::error;
 use crate::peer::{Command, SendRawMessage, SendRequest};
 use crate::ReceivedMessage;
 use crate::Message;
-use crate::SentRequest;
+use crate::SentRequestHandle;
 
 /// Handle to a peer.
 ///
@@ -34,7 +34,7 @@ pub struct PeerReadHandle<Body> {
 
 	/// Channel for sending commands to the peer loop.
 	///
-	/// Used by [`ReceivedRequest`][crate::ReceivedRequest] for sending updates and the response,
+	/// Used by [`ReceivedRequestHandle`][crate::ReceivedRequestHandle] for sending updates and the response,
 	/// and to notify the peer loop when the read handle is dropped.
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
 }
@@ -49,7 +49,7 @@ pub struct PeerWriteHandle<Body> {
 	/// Channel for sending commands to the peer loop.
 	///
 	/// Use amongst others to send outoing requests and stream messages,
-	/// and copied into [`SentRequest`] to send update messages.
+	/// and copied into [`SentRequestHandle`] to send update messages.
 	///
 	/// Also used to register and unregister the cloned/dropped write handles with the peer.
 	command_tx: mpsc::UnboundedSender<Command<Body>>,
@@ -99,7 +99,7 @@ impl<Body> PeerHandle<Body> {
 	}
 
 	/// Send a new request to the remote peer.
-	pub async fn send_request(&self, service_id: i32, body: impl Into<Body>) -> Result<SentRequest<Body>, error::SendRequestError> {
+	pub async fn send_request(&self, service_id: i32, body: impl Into<Body>) -> Result<SentRequestHandle<Body>, error::SendRequestError> {
 		self.write_handle.send_request(service_id, body).await
 	}
 
@@ -155,7 +155,7 @@ impl<Body> Drop for PeerReadHandle<Body> {
 
 impl<Body> PeerWriteHandle<Body> {
 	/// Send a new request to the remote peer.
-	pub async fn send_request(&self, service_id: i32, body: impl Into<Body>) -> Result<SentRequest<Body>, error::SendRequestError> {
+	pub async fn send_request(&self, service_id: i32, body: impl Into<Body>) -> Result<SentRequestHandle<Body>, error::SendRequestError> {
 		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();
 		self.command_tx

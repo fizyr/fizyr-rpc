@@ -156,8 +156,8 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 		decode_request_arms.extend(quote! {
 			#service_id =>  {
 				let body = F::decode_body(body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)?;
-				let request = #service_name::ReceivedRequest { request };
-				Ok(ReceivedMessage::Request(ReceivedRequest::#variant_name(request, body)))
+				let request = #service_name::ReceivedRequestHandle { request };
+				Ok(ReceivedMessage::Request(ReceivedRequestHandle::#variant_name(request, body)))
 			},
 		});
 	}
@@ -169,7 +169,7 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 		});
 		received_msg_variants.extend(quote! {
 			/// A request message.
-			Request(ReceivedRequest<F>),
+			Request(ReceivedRequestHandle<F>),
 		});
 		received_msg_debug_arms.extend(quote! {
 			Self::Request(x) => ::core::write!(f, "Request({:?})", x),
@@ -321,14 +321,14 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 		generate_sent_request(&mut service_item_tokens, fizyr_rpc, service);
 		client_impl_tokens.extend(quote! {
 			#service_doc
-			pub async fn #service_name(&self, #request_param) -> Result<#service_name::SentRequest<F>, #fizyr_rpc::error::SendRequestError>
+			pub async fn #service_name(&self, #request_param) -> Result<#service_name::SentRequestHandle<F>, #fizyr_rpc::error::SendRequestError>
 			where
 				F: #fizyr_rpc::util::format::EncodeBody<#request_type>,
 				F: #fizyr_rpc::util::format::DecodeBody<#response_type>,
 			{
 				let request_body = #request_body.map_err(#fizyr_rpc::error::SendRequestError::EncodeBody)?;
 				let mut request = self.peer.send_request(#service_id, request_body).await?;
-				Ok(#service_name::SentRequest { request })
+				Ok(#service_name::SentRequestHandle { request })
 			}
 		});
 
@@ -352,32 +352,10 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 /// Otherwise, the return type of a service call will simply be the response message.
 fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, service: &ServiceDefinition) {
 	let service_name = service.name();
-	let mut impl_tokens = TokenStream::new();
-
-	if !service.request_updates().is_empty() {
-		generate_message_enum(
-			item_tokens,
-			fizyr_rpc,
-			service.request_updates(),
-			&syn::Ident::new("RequestUpdate", Span::call_site()),
-			&format!("A request update for the {} service", service.name()),
-		);
-		generate_send_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::RequestUpdate), service.request_updates());
-	}
-
-	if !service.response_updates().is_empty() {
-		generate_message_enum(
-			item_tokens,
-			fizyr_rpc,
-			service.response_updates(),
-			&syn::Ident::new("ResponseUpdate", Span::call_site()),
-			&format!("A response update for the {} service", service.name()),
-		);
-		generate_recv_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::ResponseUpdate), UpdateKind::ResponseUpdate);
-	}
+	let mut read_handle_impl_tokens = TokenStream::new();
+	let mut write_handle_impl_tokens = TokenStream::new();
 
 	let response_type = service.response_type();
-	let struct_doc = format!("A sent request for the {} service.", service.name());
 	let doc_recv_update = match service.response_updates().is_empty() {
 		true => quote! {
 			/// This service call does not support update messages, so there is no way to retrieve it.
@@ -388,13 +366,60 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		},
 	};
 
+	read_handle_impl_tokens.extend(quote! {
+		/// Receive the final response.
+		///
+		/// If an update message is received instead of the final response an error is returned.
+		/// The update message will remain in the message queue and must be read before the response can be received.
+		///
+		#doc_recv_update
+		pub async fn recv_response(&mut self) -> Result<#response_type, #fizyr_rpc::error::RecvMessageError>
+		where
+			F: #fizyr_rpc::util::format::DecodeBody<#response_type>,
+		{
+			let response = self.request.recv_response().await?;
+			let decoded = F::decode_body(response.body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)?;
+			Ok(decoded)
+		}
+	});
+
+	if !service.request_updates().is_empty() {
+		generate_message_enum(
+			item_tokens,
+			fizyr_rpc,
+			service.request_updates(),
+			&syn::Ident::new("RequestUpdate", Span::call_site()),
+			&format!("A request update for the {} service", service.name()),
+		);
+		generate_send_update_functions(&mut write_handle_impl_tokens, fizyr_rpc, &quote!(#service_name::RequestUpdate), service.request_updates());
+	}
+
+	if !service.response_updates().is_empty() {
+		generate_message_enum(
+			item_tokens,
+			fizyr_rpc,
+			service.response_updates(),
+			&syn::Ident::new("ResponseUpdate", Span::call_site()),
+			&format!("A response update for the {} service", service.name()),
+		);
+		generate_recv_update_function(&mut read_handle_impl_tokens, fizyr_rpc, &quote!(#service_name::ResponseUpdate), UpdateKind::ResponseUpdate);
+	}
+
+	let handle_doc = format!("Read/write handle for a sent request for the {} service.", service.name());
+	let write_handle_doc = format!("Write handle for a sent request for the {} service.", service.name());
+
 	item_tokens.extend(quote! {
-		#[doc = #struct_doc]
-		pub struct SentRequest<F: #fizyr_rpc::util::format::Format> {
-			pub(super) request: #fizyr_rpc::SentRequest<F::Body>,
+		#[doc = #handle_doc]
+		pub struct SentRequestHandle<F: #fizyr_rpc::util::format::Format> {
+			pub(super) request: #fizyr_rpc::SentRequestHandle<F::Body>,
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::fmt::Debug for SentRequest<F> {
+		#[doc = #write_handle_doc]
+		pub struct SentRequestWriteHandle<F: #fizyr_rpc::util::format::Format> {
+			pub(super) request: #fizyr_rpc::SentRequestWriteHandle<F::Body>,
+		}
+
+		impl<F: #fizyr_rpc::util::format::Format> ::core::fmt::Debug for SentRequestHandle<F> {
 			fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
 				f.debug_struct(::core::any::type_name::<Self>())
 					.field("request_id", &self.request_id())
@@ -404,33 +429,29 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> SentRequest<F> {
-			/// Receive the final response.
-			///
-			/// If an update message is received instead of the final response an error is returned.
-			/// The update message will remain in the message queue and must be read before the response can be received.
-			#doc_recv_update
-			pub async fn recv_response(&mut self) -> Result<#response_type, #fizyr_rpc::error::RecvMessageError>
-			where
-				F: #fizyr_rpc::util::format::DecodeBody<#response_type>,
-			{
-				let response = self.request.recv_response().await?;
-				let decoded = F::decode_body(response.body).map_err(#fizyr_rpc::error::RecvMessageError::DecodeBody)?;
-				Ok(decoded)
+		impl<F: #fizyr_rpc::util::format::Format> ::core::fmt::Debug for SentRequestWriteHandle<F> {
+			fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+				f.debug_struct(::core::any::type_name::<Self>())
+					.field("request_id", &self.request_id())
+					.field("service_id", &self.service_id())
+					// TODO: use finish_non_exhaustive when it hits stable
+					.finish()
 			}
+		}
 
+		impl<F: #fizyr_rpc::util::format::Format> SentRequestHandle<F> {
 			/// Get the raw request.
-			pub fn inner(&self) -> &#fizyr_rpc::SentRequest<F::Body> {
+			pub fn inner(&self) -> &#fizyr_rpc::SentRequestHandle<F::Body> {
 				&self.request
 			}
 
 			/// Get an exclusive reference to the raw request.
-			pub fn inner_mut(&self) -> &#fizyr_rpc::SentRequest<F::Body> {
+			pub fn inner_mut(&self) -> &#fizyr_rpc::SentRequestHandle<F::Body> {
 				&self.request
 			}
 
 			/// Consume this object to get the raw request.
-			pub fn into_inner(self) -> #fizyr_rpc::SentRequest<F::Body> {
+			pub fn into_inner(self) -> #fizyr_rpc::SentRequestHandle<F::Body> {
 				self.request
 			}
 
@@ -444,7 +465,38 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 				self.request.service_id()
 			}
 
-			#impl_tokens
+			#read_handle_impl_tokens
+
+			#write_handle_impl_tokens
+		}
+
+		impl<F: #fizyr_rpc::util::format::Format> SentRequestWriteHandle<F> {
+			/// Get the raw request.
+			pub fn inner(&self) -> &#fizyr_rpc::SentRequestWriteHandle<F::Body> {
+				&self.request
+			}
+
+			/// Get an exclusive reference to the raw request.
+			pub fn inner_mut(&self) -> &#fizyr_rpc::SentRequestWriteHandle<F::Body> {
+				&self.request
+			}
+
+			/// Consume this object to get the raw request.
+			pub fn into_inner(self) -> #fizyr_rpc::SentRequestWriteHandle<F::Body> {
+				self.request
+			}
+
+			/// Get the request ID.
+			pub fn request_id(&self) -> u32 {
+				self.request.request_id()
+			}
+
+			/// Get the service ID of the request.
+			pub fn service_id(&self) -> i32 {
+				self.request.service_id()
+			}
+
+			#write_handle_impl_tokens
 		}
 	});
 }
@@ -496,7 +548,7 @@ fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 	}
 }
 
-fn generate_recv_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, enum_type: &TokenStream, kind: UpdateKind) {
+fn generate_recv_update_function(impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, enum_type: &TokenStream, kind: UpdateKind) {
 	let mut doc = quote! {
 		/// Receive an update from the remote peer.
 	};
@@ -734,20 +786,37 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 	let service_name = service.name();
 	let service_id = service.service_id();
 
-	let mut impl_tokens = TokenStream::new();
+	let mut read_handle_impl_tokens = TokenStream::new();
+	let mut write_handle_impl_tokens = TokenStream::new();
 	if !service.response_updates().is_empty() {
-		generate_send_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::ResponseUpdate), service.response_updates());
+		generate_send_update_functions(&mut write_handle_impl_tokens, fizyr_rpc, &quote!(#service_name::ResponseUpdate), service.response_updates());
 	}
 	if !service.request_updates().is_empty() {
-		generate_recv_update_functions(&mut impl_tokens, fizyr_rpc, &quote!(#service_name::RequestUpdate), UpdateKind::RequestUpdate);
+		generate_recv_update_function(&mut read_handle_impl_tokens, fizyr_rpc, &quote!(#service_name::RequestUpdate), UpdateKind::RequestUpdate);
 	}
 
+	write_handle_impl_tokens.extend(quote! {
+		/// Send the final response.
+		pub async fn send_response(&self, response: #response_type) -> Result<(), #fizyr_rpc::error::SendMessageError>
+		where
+			F: #fizyr_rpc::util::format::EncodeBody<#response_type>,
+		{
+			let encoded = F::encode_body(response).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
+			let response = self.request.send_response(#service_id, encoded).await?;
+			Ok(())
+		}
+	});
+
 	item_tokens.extend(quote! {
-		pub struct ReceivedRequest<F: #fizyr_rpc::util::format::Format> {
-			pub(super) request: #fizyr_rpc::ReceivedRequest<F::Body>,
+		pub struct ReceivedRequestHandle<F: #fizyr_rpc::util::format::Format> {
+			pub(super) request: #fizyr_rpc::ReceivedRequestHandle<F::Body>,
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::fmt::Debug for ReceivedRequest<F> {
+		pub struct ReceivedRequestWriteHandle<F: #fizyr_rpc::util::format::Format> {
+			pub(super) request: #fizyr_rpc::ReceivedRequestWriteHandle<F::Body>,
+		}
+
+		impl<F: #fizyr_rpc::util::format::Format> ::core::fmt::Debug for ReceivedRequestHandle<F> {
 			fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
 				f.debug_struct(::core::any::type_name::<Self>())
 					.field("request_id", &self.request_id())
@@ -757,12 +826,22 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ReceivedRequest<F> {
+		impl<F: #fizyr_rpc::util::format::Format> ::core::fmt::Debug for ReceivedRequestWriteHandle<F> {
+			fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+				f.debug_struct(::core::any::type_name::<Self>())
+					.field("request_id", &self.request_id())
+					.field("service_id", &self.service_id())
+					// TODO: use finish_non_exhaustive when it hits stable
+					.finish()
+			}
+		}
+
+		impl<F: #fizyr_rpc::util::format::Format> ReceivedRequestHandle<F> {
 			/// Get the raw request.
 			///
 			/// Note that the request body has been consumed when it was parsed.
 			/// As a result, the raw request always has an empty body.
-			pub fn inner(&self) -> &#fizyr_rpc::ReceivedRequest<F::Body> {
+			pub fn inner(&self) -> &#fizyr_rpc::ReceivedRequestHandle<F::Body> {
 				&self.request
 			}
 
@@ -770,7 +849,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			///
 			/// Note that the request body has been consumed when it was parsed.
 			/// As a result, the raw request always has an empty body.
-			pub fn inner_mut(&self) -> &#fizyr_rpc::ReceivedRequest<F::Body> {
+			pub fn inner_mut(&self) -> &#fizyr_rpc::ReceivedRequestHandle<F::Body> {
 				&self.request
 			}
 
@@ -778,7 +857,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			///
 			/// Note that the request body has been consumed when it was parsed.
 			/// As a result, the raw request always has an empty body.
-			pub fn into_inner(self) -> #fizyr_rpc::ReceivedRequest<F::Body> {
+			pub fn into_inner(self) -> #fizyr_rpc::ReceivedRequestHandle<F::Body> {
 				self.request
 			}
 
@@ -792,17 +871,47 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 				self.request.service_id()
 			}
 
-			/// Send the final response.
-			pub async fn send_response(self, response: #response_type) -> Result<(), #fizyr_rpc::error::SendMessageError>
-			where
-				F: #fizyr_rpc::util::format::EncodeBody<#response_type>,
-			{
-				let encoded = F::encode_body(response).map_err(#fizyr_rpc::error::SendMessageError::EncodeBody)?;
-				let response = self.request.send_response(#service_id, encoded).await?;
-				Ok(())
+			#read_handle_impl_tokens
+
+			#write_handle_impl_tokens
+		}
+
+		impl<F: #fizyr_rpc::util::format::Format> ReceivedRequestWriteHandle<F> {
+			/// Get the raw request.
+			///
+			/// Note that the request body has been consumed when it was parsed.
+			/// As a result, the raw request always has an empty body.
+			pub fn inner(&self) -> &#fizyr_rpc::ReceivedRequestWriteHandle<F::Body> {
+				&self.request
 			}
 
-			#impl_tokens
+			/// Get an exclusive reference to the raw request.
+			///
+			/// Note that the request body has been consumed when it was parsed.
+			/// As a result, the raw request always has an empty body.
+			pub fn inner_mut(&self) -> &#fizyr_rpc::ReceivedRequestWriteHandle<F::Body> {
+				&self.request
+			}
+
+			/// Consume this object to get the raw request.
+			///
+			/// Note that the request body has been consumed when it was parsed.
+			/// As a result, the raw request always has an empty body.
+			pub fn into_inner(self) -> #fizyr_rpc::ReceivedRequestWriteHandle<F::Body> {
+				self.request
+			}
+
+			/// Get the request ID.
+			pub fn request_id(&self) -> u32 {
+				self.request.request_id()
+			}
+
+			/// Get the service ID of the request.
+			pub fn service_id(&self) -> i32 {
+				self.request.service_id()
+			}
+
+			#write_handle_impl_tokens
 		}
 	})
 }
@@ -819,7 +928,7 @@ fn generate_received_request_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn
 		let doc = to_doc_attrs(service.doc());
 		variant_tokens.extend(quote! {
 			#doc
-			#variant_name(#service_name::ReceivedRequest<F>, #request_type),
+			#variant_name(#service_name::ReceivedRequestHandle<F>, #request_type),
 		});
 		debug_tokens.extend(quote! {
 			Self::#variant_name(request, _body) => ::core::write!(f, "{}({:?})", #variant_name_string, request),
@@ -829,11 +938,11 @@ fn generate_received_request_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn
 	let enum_doc = format!("Enum for all possible incoming requests of the {} interface.", interface.name());
 	item_tokens.extend(quote! {
 		#[doc = #enum_doc]
-		pub enum ReceivedRequest<F: #fizyr_rpc::util::format::Format> {
+		pub enum ReceivedRequestHandle<F: #fizyr_rpc::util::format::Format> {
 			#variant_tokens
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::fmt::Debug for ReceivedRequest<F> {
+		impl<F: #fizyr_rpc::util::format::Format> ::core::fmt::Debug for ReceivedRequestHandle<F> {
 			fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
 				match self {
 					#debug_tokens

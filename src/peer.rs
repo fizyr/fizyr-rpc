@@ -1,14 +1,15 @@
 use crate::util::{select, Either};
-use tokio::sync::mpsc;
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
 
-use crate::Message;
-use crate::PeerHandle;
-use crate::ReceivedMessage;
-use crate::SentRequest;
-use crate::error;
-use crate::request_tracker::RequestTracker;
-use crate::util;
+use crate::{
+	error,
+	util,
+	request_tracker::RequestTracker,
+	Message,
+	PeerHandle,
+	ReceivedMessage,
+	SentRequestHandle,
+};
 
 /// Message for the internal peer command loop.
 pub enum Command<Body> {
@@ -412,8 +413,8 @@ pub struct SendRequest<Body> {
 	/// The body for the request.
 	pub body: Body,
 
-	/// One-shot channel to transmit back the created [`SentRequest`] object, or an error.
-	pub result_tx: oneshot::Sender<Result<SentRequest<Body>, error::SendRequestError>>,
+	/// One-shot channel to transmit back the created [`SentRequestHandle`] object, or an error.
+	pub result_tx: oneshot::Sender<Result<SentRequestHandle<Body>, error::SendRequestError>>,
 }
 
 /// Command to send a raw message to the remote peer.

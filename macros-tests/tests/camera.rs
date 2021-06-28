@@ -15,7 +15,7 @@ async fn ping() {
 	let_assert!(Ok((client, mut server)) = client_server_pair::<Json>());
 
 	let server = tokio::spawn(async move {
-		let_assert!(Ok(camera::ReceivedMessage::Request(camera::ReceivedRequest::Ping(request, ()))) = server.recv_message().await);
+		let_assert!(Ok(camera::ReceivedMessage::Request(camera::ReceivedRequestHandle::Ping(request, ()))) = server.recv_message().await);
 		assert!(let Ok(()) = request.send_response(()).await);
 		let_assert!(Err(e) = server.recv_message().await);
 		assert!(e.is_connection_aborted());
@@ -32,7 +32,7 @@ async fn record() {
 	let_assert!(Ok((client, mut server)) = client_server_pair::<Json>());
 
 	let server = tokio::spawn(async move {
-		let_assert!(Ok(camera::ReceivedMessage::Request(camera::ReceivedRequest::Record(request, body))) = server.recv_message().await);
+		let_assert!(Ok(camera::ReceivedMessage::Request(camera::ReceivedRequestHandle::Record(request, body))) = server.recv_message().await);
 		assert!(body.color == true);
 		assert!(body.cloud == false);
 		assert!(let Ok(()) = request.send_state_update(RecordState::Recording).await);
