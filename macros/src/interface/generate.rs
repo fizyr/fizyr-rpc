@@ -22,9 +22,10 @@ pub fn generate_interface(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinitio
 	generate_client(&mut item_tokens, fizyr_rpc, interface, client_impl_tokens);
 	generate_server(&mut item_tokens, fizyr_rpc, interface);
 
+	let mod_visiblity = &interface.visibility();
 	let tokens = quote! {
 		#interface_doc
-		pub mod #interface_name {
+		#mod_visiblity mod #interface_name {
 			#[allow(unused_imports)]
 			use super::*;
 

@@ -28,12 +28,16 @@ pub use fizyr_rpc_macros::interface as interface_impl;
 /// fizyr_rpc::interface! {
 ///     // The `interface` keyword defines an RPC interface.
 ///     // You must have exactly one interface definition in the macro invocation.
+///     //
 ///     // The macro generates a module with the same name containing the generated types.
+///     // You can adjust the visiblity of the generated module with the `pub` keyword as normal.
+///     // You can use this to take full control over the public module structure,
+///     // by declaring the interface private and re-exporting the module contents from a different location.
 ///     //
 ///     // Each item in can have user written documentation.
 ///     // Simply write doc comments with triple slashes as usual.
 ///     // This applies to the interface definition, a service definitions, update definitions and stream definitions.
-///     interface $interface_name {
+///     pub interface $interface_name {
 ///         // The `service` keyword defines a service.
 ///         //
 ///         // You can have any amount of service definition inside an interface definition.
@@ -111,8 +115,8 @@ macro_rules! interface {
 /// You can compare the source the the gerated documentation to inspect the generated API.
 /// The most important generated types are [`supermarket::Client`] and [`supermarket::Server`].
 ///
-/// [`supermarket::Client`]: interface_example::supermarket::Client
-/// [`supermarket::Server`]: interface_example::supermarket::Server
+/// [`supermarket::Client`]: interface_example::Client
+/// [`supermarket::Server`]: interface_example::Server
 /// ```
 ///
 /// fizyr_rpc::interface! {
@@ -152,6 +156,11 @@ macro_rules! interface {
 ///         stream 1 mutter: String,
 ///     }
 /// }
+///
+/// // Re-export the generated contents directly in this module.
+/// //
+/// // Alternatively, you could use `pub interface` in the macro.
+/// pub use supermarket::*;
 ///
 /// /// The initial request to buy tomatoes.
 /// #[derive(Debug)]
@@ -241,6 +250,8 @@ pub mod interface_example {
 			stream 1 mutter: String,
 		}
 	}
+
+	pub use supermarket::*;
 
 	/// The initial request to buy tomatoes.
 	#[derive(Debug)]
