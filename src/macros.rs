@@ -52,9 +52,12 @@ pub use fizyr_rpc_macros::interface as interface_impl;
 ///         //
 ///         // The $request_type and $response_type indicate the message body for the request and the response.
 ///         // If there is no data in a request or response, you can use the unit type: `()`
+///         //
+///         // If the service has no update messages, you can end the definition with a comma.
+///         // See the next item for the syntax of services with update messages.
 ///         service $id $name: $request_type -> $response_type,
 ///
-///         // If a service has update messages, you can declare them in service a block.
+///         // If a service has update messages, you can declare them in the service block.
 ///         service $id $name: $request_type -> $response_type {
 ///             // The `request_update` keyword defines a request update.
 ///             // You can have any amount of request updates inside a service definition.
