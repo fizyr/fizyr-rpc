@@ -22,9 +22,11 @@ pub fn generate_interface(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinitio
 	generate_client(&mut item_tokens, fizyr_rpc, interface, client_impl_tokens);
 	generate_server(&mut item_tokens, fizyr_rpc, interface);
 
+	let mod_visiblity = &interface.visibility();
 	let tokens = quote! {
 		#interface_doc
-		pub mod #interface_name {
+		#mod_visiblity mod #interface_name {
+			#[allow(unused_imports)]
 			use super::*;
 
 			#item_tokens
@@ -70,17 +72,6 @@ fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 			/// Create a new interface-specific RPC client from a raw write handle.
 			pub fn new(peer: #fizyr_rpc::PeerWriteHandle<F::Body>) -> Self {
 				Self { peer }
-			}
-
-			/// Connect to a remote server.
-			///
-			/// See [`fizyr_rpc::Peer::connect`](https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Peer.html#method.connect) for more details.
-			pub async fn connect<'a, Transport, Address>(address: Address, config: Transport::Config) -> std::io::Result<Self>
-			where
-				Address: 'a,
-				Transport: #fizyr_rpc::transport::Transport<Body = F::Body> + #fizyr_rpc::util::Connect<'a, Address>,
-			{
-				Ok(#fizyr_rpc::Peer::<Transport>::connect(address, config).await?.into())
 			}
 
 			/// Close the connection with the remote peer.
@@ -336,11 +327,13 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 
 	generate_received_request(&mut service_item_tokens, fizyr_rpc, service);
 
-	let mod_doc = format!("Support types for the {} service.", service.name());
+	let mod_doc = format!("Support types for the `{}` service.", service.name());
 	item_tokens.extend(quote! {
 		#[doc = #mod_doc]
 		pub mod #service_name {
+			#[allow(unused_imports)]
 			use super::*;
+
 			#service_item_tokens
 		}
 	});
@@ -405,8 +398,8 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		generate_recv_update_function(&mut read_handle_impl_tokens, fizyr_rpc, &quote!(#service_name::ResponseUpdate), UpdateKind::ResponseUpdate);
 	}
 
-	let handle_doc = format!("Read/write handle for a sent request for the {} service.", service.name());
-	let write_handle_doc = format!("Write handle for a sent request for the {} service.", service.name());
+	let handle_doc = format!("Read/write handle for a sent request for the `{}` service.", service.name());
+	let write_handle_doc = format!("Write handle for a sent request for the `{}` service.", service.name());
 
 	item_tokens.extend(quote! {
 		#[doc = #handle_doc]
@@ -524,7 +517,7 @@ fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 		let function_name = syn::Ident::new(&format!("send_{}_update", update.name()), Span::call_site());
 		let body_type = update.body_type();
 		let service_id = update.service_id();
-		let doc = format!("Send a {} update to the remote peer.", update.name());
+		let doc = format!("Send a `{}` update to the remote peer.", update.name());
 		let body_arg;
 		let body_val;
 		if is_unit_type(body_type) {
@@ -567,7 +560,6 @@ fn generate_recv_update_function(impl_tokens: &mut TokenStream, fizyr_rpc: &syn:
 		where
 			#enum_type: #fizyr_rpc::util::format::FromMessage<F>,
 		{
-			use #fizyr_rpc::util::format::FromMessage;
 			match self.request.recv_update().await {
 				Some(x) => Ok(Some(F::decode_message(x)?)),
 				None => Ok(None),
@@ -589,7 +581,7 @@ fn generate_streams(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 	for stream in interface.streams() {
 		let service_id = stream.service_id();
 		let fn_name = syn::Ident::new(&format!("send_{}", stream.name()), Span::call_site());
-		let fn_doc = format!("Send a {} stream message to the remote peer.", stream.name());
+		let fn_doc = format!("Send a `{}` stream message to the remote peer.", stream.name());
 		let body_arg;
 		let body_val;
 		let body_type = stream.body_type();
@@ -807,11 +799,15 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 		}
 	});
 
+	let handle_doc = format!("Handle for a received `{}` request.", service.name());
+	let write_handle_doc = format!("Write-only handle for a received `{}` request.", service.name());
 	item_tokens.extend(quote! {
+		#[doc = #handle_doc]
 		pub struct ReceivedRequestHandle<F: #fizyr_rpc::util::format::Format> {
 			pub(super) request: #fizyr_rpc::ReceivedRequestHandle<F::Body>,
 		}
 
+		#[doc = #write_handle_doc]
 		pub struct ReceivedRequestWriteHandle<F: #fizyr_rpc::util::format::Format> {
 			pub(super) request: #fizyr_rpc::ReceivedRequestWriteHandle<F::Body>,
 		}

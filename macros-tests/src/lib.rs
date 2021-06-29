@@ -6,7 +6,7 @@ fizyr_rpc::interface! {
 	/// A camera server can represent many different types of cameras,
 	/// like a simple 2D camera, a 3D camera with or without RGB data,
 	/// or even a line scanner.
-	interface camera {
+	pub interface camera {
 		/// Ping the server.
 		///
 		/// A succesful ping indicates that the server is running,

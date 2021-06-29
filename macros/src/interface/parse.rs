@@ -15,6 +15,7 @@ pub mod cooked {
 
 	#[derive(Debug)]
 	pub struct InterfaceDefinition {
+		visibility: syn::Visibility,
 		name: syn::Ident,
 		doc: Vec<WithSpan<String>>,
 		services: Vec<ServiceDefinition>,
@@ -59,6 +60,10 @@ pub mod cooked {
 	}
 
 	impl InterfaceDefinition {
+		pub fn visibility(&self) -> &syn::Visibility {
+			&self.visibility
+		}
+
 		pub fn name(&self) -> &syn::Ident {
 			&self.name
 		}
@@ -124,6 +129,7 @@ pub mod cooked {
 			}
 
 			Self {
+				visibility: raw.visibility,
 				name: raw.name,
 				doc: attrs.doc,
 				services,
@@ -335,6 +341,7 @@ pub mod raw {
 	#[derive(Debug)]
 	pub struct InterfaceDefinition {
 		pub attrs: Vec<syn::Attribute>,
+		pub visibility: syn::Visibility,
 		pub _interface: keyword::interface,
 		pub name: syn::Ident,
 		pub _brace_token: syn::token::Brace,
@@ -415,6 +422,7 @@ pub mod raw {
 			let body;
 			Ok(Self {
 				attrs: input.call(syn::Attribute::parse_outer)?,
+				visibility: input.parse()?,
 				_interface: input.parse()?,
 				name: input.parse()?,
 				_brace_token: syn::braced!(body in input),

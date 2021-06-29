@@ -94,6 +94,9 @@ macro_rules! ready {
 #[doc(hidden)]
 pub mod macros;
 
+#[cfg(feature = "macros")]
+pub use macros::interface_example;
+
 pub mod error;
 mod message;
 mod peer;
