@@ -9,11 +9,11 @@ pub use fizyr_rpc_macros::interface as interface_impl;
 /// This macro generates a module with a `Client` and `Server` struct,
 /// and some more helper types.
 ///
-/// The client struct can be used to initiate requests and send stream messages.
+/// The client struct is used to initiate requests and send stream messages.
 /// It can be created from a [`PeerWriteHandle`] or a [`PeerHandle`].
 /// Note that if you create the client from a [`PeerHandle`], the [`PeerReadHandle`] will not be accessible.
 ///
-/// For the server struct it is exactly the opposite: it can be used to receive requests and stream messages.
+/// For the server struct it is exactly the opposite: it is used to receive requests and stream messages.
 /// It can be created from a [`PeerReadHandle`] or a [`PeerHandle`],
 /// but creating it from a [`PeerHandle`] will discard the [`PeerWriteHandle`].
 ///
@@ -29,14 +29,15 @@ pub use fizyr_rpc_macros::interface as interface_impl;
 ///     // The `interface` keyword defines an RPC interface.
 ///     // You must have exactly one interface definition in the macro invocation.
 ///     //
-///     // The macro generates a module with the same name containing the generated types.
+///     // The $interface_name is used as the name of a module containing the generated types.
+///     //
 ///     // You can adjust the visiblity of the generated module with the `pub` keyword as normal.
 ///     // You can use this to take full control over the public module structure,
 ///     // by declaring the interface private and re-exporting the module contents from a different location.
 ///     //
 ///     // Each item can have user written documentation.
 ///     // Simply write doc comments with triple slashes as usual.
-///     // This applies to the interface definition, a service definitions, update definitions and stream definitions.
+///     // This applies to the interface definition, service definitions, update definitions and stream definitions.
 ///     pub interface $interface_name {
 ///         // The `service` keyword defines a service.
 ///         //
