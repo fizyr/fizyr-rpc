@@ -13,7 +13,7 @@ pub use fizyr_rpc_macros::interface as interface_impl;
 /// It can be created from a [`PeerWriteHandle`] or a [`PeerHandle`].
 /// Note that if you create the client from a [`PeerHandle`], the [`PeerReadHandle`] will not be accessible.
 ///
-/// For the server struct it is exacatly opposite: it can be used to receive requests and stream messages.
+/// For the server struct it is exactly the opposite: it can be used to receive requests and stream messages.
 /// It can be created from a [`PeerReadHandle`] or a [`PeerHandle`],
 /// but creating it from a [`PeerHandle`] will discard the [`PeerWriteHandle`].
 ///
@@ -34,20 +34,20 @@ pub use fizyr_rpc_macros::interface as interface_impl;
 ///     // You can use this to take full control over the public module structure,
 ///     // by declaring the interface private and re-exporting the module contents from a different location.
 ///     //
-///     // Each item in can have user written documentation.
+///     // Each item can have user written documentation.
 ///     // Simply write doc comments with triple slashes as usual.
 ///     // This applies to the interface definition, a service definitions, update definitions and stream definitions.
 ///     pub interface $interface_name {
 ///         // The `service` keyword defines a service.
 ///         //
-///         // You can have any amount of service definition inside an interface definition.
+///         // You can have any amount of service definitions inside an interface definition.
 ///         //
 ///         // The $id is used as the service ID and must be an i32.
 ///         // The ID must be unique for all services in the interface.
 ///         //
 ///         // The $name is the name of the service.
-///         // It is used to generate function en type names.
-///         // It must be a valid Rust identifier and should be lower-case with underscores.
+///         // It is used to generate function and type names.
+///         // It must be a valid Rust identifier and should be lowercase with underscores.
 ///         //
 ///         // The $request_type and $response_type indicate the message body for the request and the response.
 ///         // If there is no data in a request or response, you can use the unit type: `()`
@@ -62,8 +62,8 @@ pub use fizyr_rpc_macros::interface as interface_impl;
 ///             // The ID must be unique for all request updates in the service.
 ///             //
 ///             // The $name is the name of the update message.
-///             // It is used to generate function en type names.
-///             // It must be a valid Rust identifier and should be lower-case with underscores.
+///             // It is used to generate function and type names.
+///             // It must be a valid Rust identifier and should be lowercase with underscores.
 ///             //
 ///             // The $body_type indicates the type of the message.
 ///             // If there is no data in the message, you can use the unit type: `()`
@@ -76,8 +76,8 @@ pub use fizyr_rpc_macros::interface as interface_impl;
 ///             // The ID must be unique for all response updates in the service.
 ///             //
 ///             // The $name is the name of the update message.
-///             // It is used to generate function en type names.
-///             // It must be a valid Rust identifier and should be lower-case with underscores.
+///             // It is used to generate function and type names.
+///             // It must be a valid Rust identifier and should be lowercase with underscores.
 ///             //
 ///             // The $body_type indicates the type of the message.
 ///             // If there is no data in the message, you can use the unit type: `()`
@@ -91,8 +91,8 @@ pub use fizyr_rpc_macros::interface as interface_impl;
 ///         // The ID must be unique for all streams in the interface.
 ///         //
 ///         // The $name is the name of the stream.
-///         // It is used to generate function en type names.
-///         // It must be a valid Rust identifier and should be lower-case with underscores.
+///         // It is used to generate function and type names.
+///         // It must be a valid Rust identifier and should be lowercase with underscores.
 ///         //
 ///         // The $body_type indicates the type of the message.
 ///         // If there is no data in the message, you can use the unit type: `()`
@@ -112,7 +112,7 @@ macro_rules! interface {
 
 /// Example module for the `interface!` macro.
 ///
-/// You can compare the source the the gerated documentation to inspect the generated API.
+/// You can compare the source of the generated documentation to inspect the generated API.
 /// The most important generated types are [`supermarket::Client`] and [`supermarket::Server`].
 ///
 /// [`supermarket::Client`]: interface_example::Client
