@@ -13,17 +13,11 @@ use std::task::{Context, Poll};
 use crate::error::{ReadMessageError, WriteMessageError};
 use crate::{Message, MessageHeader};
 
-#[cfg(any(feature = "unix-stream", feature = "tcp"))]
 pub(crate) mod stream;
-
-#[cfg(any(feature = "unix-stream", feature = "tcp"))]
 pub use stream::StreamTransport;
 
-#[cfg(feature = "unix-seqpacket")]
-pub use unix::UnixTransport;
-
-#[cfg(feature = "unix-seqpacket")]
 pub(crate) mod unix;
+pub use unix::UnixTransport;
 
 /// Trait for types that represent a bi-direction message transport.
 ///

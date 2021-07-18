@@ -130,16 +130,12 @@ pub use request::{
 pub use server::Server;
 pub use server::ServerListener;
 
-#[cfg(any(feature = "unix-stream", feature = "tcp"))]
 pub use transport::stream::StreamBody;
 
-#[cfg(any(feature = "unix-stream", feature = "tcp"))]
 pub use transport::stream::StreamConfig;
 
-#[cfg(feature = "unix-seqpacket")]
 pub use transport::unix::UnixBody;
 
-#[cfg(feature = "unix-seqpacket")]
 pub use transport::unix::UnixConfig;
 
 /// Message transport for TCP.
