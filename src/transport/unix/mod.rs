@@ -133,7 +133,7 @@ mod test {
 		let mut file = fd.into_file();
 		let_assert!(Ok(_) = file.write_all(data));
 		assert!(let Ok(_) = file.seek(std::io::SeekFrom::Start(0)));
-		filedesc::FileDesc::new(file)
+		unsafe { filedesc::FileDesc::new(file) }
 	}
 
 	fn read_blob(fd: &FileDesc) -> std::io::Result<Vec<u8>> {
