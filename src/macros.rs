@@ -24,7 +24,7 @@ pub use fizyr_rpc_macros::interface as interface_impl;
 /// # Syntax
 ///
 /// The syntax for the macro is as follows:
-/// ```rust
+/// ```no_compile
 /// fizyr_rpc::interface! {
 ///     // The `interface` keyword defines an RPC interface.
 ///     // You must have exactly one interface definition in the macro invocation.
@@ -121,8 +121,8 @@ macro_rules! interface {
 ///
 /// [`supermarket::Client`]: interface_example::Client
 /// [`supermarket::Server`]: interface_example::Server
-/// ```
 ///
+/// ```no_compile
 /// fizyr_rpc::interface! {
 ///     /// RPC interface for the supermarket.
 ///     interface supermarket {
