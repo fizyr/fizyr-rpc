@@ -16,7 +16,7 @@ async fn ping() {
 
 	let server = tokio::spawn(async move {
 		let_assert!(Ok(camera::ReceivedMessage::Request(camera::ReceivedRequestHandle::Ping(request, ()))) = server.recv_message().await);
-		assert!(let Ok(()) = request.send_response(()).await);
+		assert!(let Ok(()) = request.send_response(&()).await);
 		let_assert!(Err(e) = server.recv_message().await);
 		assert!(e.is_connection_aborted());
 	});
@@ -35,21 +35,21 @@ async fn record() {
 		let_assert!(Ok(camera::ReceivedMessage::Request(camera::ReceivedRequestHandle::Record(request, body))) = server.recv_message().await);
 		assert!(body.color == true);
 		assert!(body.cloud == false);
-		assert!(let Ok(()) = request.send_state_update(RecordState::Recording).await);
-		assert!(let Ok(()) = request.send_state_update(RecordState::Processing).await);
-		assert!(let Ok(()) = request.send_image_update(Image {
+		assert!(let Ok(()) = request.send_state_update(&RecordState::Recording).await);
+		assert!(let Ok(()) = request.send_state_update(&RecordState::Processing).await);
+		assert!(let Ok(()) = request.send_image_update(&Image {
 			format: 1,
 			width: 2,
 			height: 3,
 			data: vec![0, 1, 2, 3, 4, 5],
 		}).await);
-		assert!(let Ok(()) = request.send_state_update(RecordState::Done).await);
-		assert!(let Ok(()) = request.send_response(()).await);
+		assert!(let Ok(()) = request.send_state_update(&RecordState::Done).await);
+		assert!(let Ok(()) = request.send_response(&()).await);
 		let_assert!(Err(e) = server.recv_message().await);
 		assert!(e.is_connection_aborted());
 	});
 
-	let_assert!(Ok(mut sent_request) = client.record(RecordRequest { color: true, cloud: false }).await);
+	let_assert!(Ok(mut sent_request) = client.record(&RecordRequest { color: true, cloud: false }).await);
 
 	let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
 	assert!(update.is_state() == true);

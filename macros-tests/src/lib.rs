@@ -72,8 +72,8 @@ impl<T: serde::de::DeserializeOwned> fizyr_rpc::util::format::DecodeBody<T> for 
 }
 
 impl<T: serde::Serialize> fizyr_rpc::util::format::EncodeBody<T> for Json {
-	fn encode_body(value: T) -> Result<fizyr_rpc::StreamBody, Box<dyn std::error::Error + Send>> {
-		serde_json::to_vec(&value)
+	fn encode_body(value: &T) -> Result<fizyr_rpc::StreamBody, Box<dyn std::error::Error + Send>> {
+		serde_json::to_vec(value)
 			.map(fizyr_rpc::StreamBody::from)
 			.map_err(|e| Box::new(e) as _)
 	}

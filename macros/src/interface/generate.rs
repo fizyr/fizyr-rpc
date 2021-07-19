@@ -283,9 +283,9 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 	let request_body;
 	if is_unit_type(request_type) {
 		request_param = None;
-		request_body = quote!(F::encode_body(()))
+		request_body = quote!(F::encode_body(&()))
 	} else {
-		request_param = Some(quote!(request: #request_type));
+		request_param = Some(quote!(request: &#request_type));
 		request_body = quote!(F::encode_body(request))
 	}
 
@@ -503,7 +503,7 @@ enum UpdateKind {
 fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, enum_type: &TokenStream, updates: &[UpdateDefinition]) {
 	quote! {
 		/// Send a request update to the remote peer.
-		pub async fn send_update(&self, update: #enum_type) -> Result<(), #fizyr_rpc::error::SendMessageError>
+		pub async fn send_update(&self, update: &#enum_type) -> Result<(), #fizyr_rpc::error::SendMessageError>
 		where
 			#enum_type: #fizyr_rpc::util::format::ToMessage<F>,
 		{
@@ -522,9 +522,9 @@ fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 		let body_val;
 		if is_unit_type(body_type) {
 			body_arg = None;
-			body_val = quote!(());
+			body_val = quote!(&());
 		} else {
-			body_arg = Some(quote!(update: #body_type));
+			body_arg = Some(quote!(update: &#body_type));
 			body_val = quote!(update);
 		}
 		impl_tokens.extend(quote! {
@@ -587,9 +587,9 @@ fn generate_streams(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 		let body_type = stream.body_type();
 		if is_unit_type(body_type) {
 			body_arg = None;
-			body_val = quote!(());
+			body_val = quote!(&());
 		} else {
-			body_arg = Some(quote!(body: #body_type));
+			body_arg = Some(quote!(body: &#body_type));
 			body_val = quote!(body);
 		}
 		client_impl_tokens.extend(quote! {
@@ -653,7 +653,7 @@ impl MessageDefinition for StreamDefinition {
 fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, messages: &[impl MessageDefinition], enum_name: &syn::Ident, enum_doc: &str) {
 	let mut variants = TokenStream::new();
 	let mut from_message = TokenStream::new();
-	let mut into_message = TokenStream::new();
+	let mut to_message = TokenStream::new();
 	let mut service_id_arms = TokenStream::new();
 	let mut decode_all = TokenStream::new();
 	let mut encode_all = TokenStream::new();
@@ -678,7 +678,7 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			F: #fizyr_rpc::util::format::DecodeBody<#body_type>,
 		});
 
-		into_message.extend(quote! {
+		to_message.extend(quote! {
 			Self::#variant_name(message) => Ok((#service_id, F::encode_body(message)?)),
 		});
 
@@ -760,13 +760,13 @@ fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> #fizyr_rpc::util::format::IntoMessage<F> for #enum_name
+		impl<F: #fizyr_rpc::util::format::Format> #fizyr_rpc::util::format::ToMessage<F> for #enum_name
 		where
 			#encode_all
 		{
-			fn into_message(self) -> Result<(i32, F::Body), Box<dyn std::error::Error + Send>> {
+			fn to_message(&self) -> Result<(i32, F::Body), Box<dyn std::error::Error + Send>> {
 				match self {
-					#into_message
+					#to_message
 				}
 			}
 		}
@@ -789,7 +789,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 
 	write_handle_impl_tokens.extend(quote! {
 		/// Send the final response.
-		pub async fn send_response(&self, response: #response_type) -> Result<(), #fizyr_rpc::error::SendMessageError>
+		pub async fn send_response(&self, response: &#response_type) -> Result<(), #fizyr_rpc::error::SendMessageError>
 		where
 			F: #fizyr_rpc::util::format::EncodeBody<#response_type>,
 		{

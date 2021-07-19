@@ -8,8 +8,8 @@ pub trait Format {
 	/// Encode a Rust value to a message.
 	///
 	/// This function must return the service ID and the message body as tuple if it succeeds.
-	fn encode_message<T: IntoMessage<Self>>(value: T) -> Result<(i32, Self::Body), Box<dyn std::error::Error + Send>> {
-		value.into_message()
+	fn encode_message<T: ToMessage<Self>>(value: &T) -> Result<(i32, Self::Body), Box<dyn std::error::Error + Send>> {
+		value.to_message()
 	}
 
 	/// Decode a message to a Rust value.
@@ -21,7 +21,7 @@ pub trait Format {
 /// Trait for formats that can encode `T` to a message body.
 pub trait EncodeBody<T>: Format {
 	/// Encode the value to a message body.
-	fn encode_body(value: T) -> Result<Self::Body, Box<dyn std::error::Error + Send>>;
+	fn encode_body(value: &T) -> Result<Self::Body, Box<dyn std::error::Error + Send>>;
 }
 
 /// Trait for formats that can decode `T` from a message body.
@@ -35,11 +35,11 @@ pub trait DecodeBody<T: Sized>: Format {
 /// Unlike the [`EncodeBody`] trait,
 /// this trait requires that the service ID is derived from the Rust value.
 /// It is intended for enums that represent all possible messages for a specific interface.
-pub trait IntoMessage<F: Format + ?Sized> {
+pub trait ToMessage<F: Format + ?Sized> {
 	/// Encode a Rust value to a message.
 	///
 	/// This function must return the service ID and the message body as tuple if it succeeds.
-	fn into_message(self) -> Result<(i32, F::Body), Box<dyn std::error::Error + Send>>;
+	fn to_message(&self) -> Result<(i32, F::Body), Box<dyn std::error::Error + Send>>;
 }
 
 /// Trait for values that can be decoded from a message with a specific [`Format`].
