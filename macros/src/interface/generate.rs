@@ -303,9 +303,18 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 			{
 				let request_body = #request_body.map_err(#fizyr_rpc::Error::encode_failed)?;
 				let mut request = self.peer.send_request(#service_id, request_body).await?;
+
 				let response = request.recv_response().await?;
-				let decoded = F::decode_body(response.body).map_err(#fizyr_rpc::Error::decode_failed)?;
-				Ok(decoded)
+				if response.header.service_id == -1 {
+					use #fizyr_rpc::Body;
+					let message = response.body
+						.into_error()
+						.map_err(|e| #fizyr_rpc::Error::decode_failed(Box::new(e)))?;
+					Err(#fizyr_rpc::Error::remote_error(message))
+				} else {
+					let decoded = F::decode_body(response.body).map_err(#fizyr_rpc::Error::decode_failed)?;
+					Ok(decoded)
+				}
 			}
 		})
 	} else {
@@ -371,8 +380,16 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			F: #fizyr_rpc::util::format::DecodeBody<#response_type>,
 		{
 			let response = self.request.recv_response().await?;
-			let decoded = F::decode_body(response.body).map_err(#fizyr_rpc::Error::decode_failed)?;
-			Ok(decoded)
+			if response.header.service_id == -1 {
+				use #fizyr_rpc::Body;
+				let message = response.body
+					.into_error()
+					.map_err(|e| #fizyr_rpc::Error::decode_failed(Box::new(e)))?;
+				Err(#fizyr_rpc::Error::remote_error(message))
+			} else {
+				let decoded = F::decode_body(response.body).map_err(#fizyr_rpc::Error::decode_failed)?;
+				Ok(decoded)
+			}
 		}
 	});
 
@@ -796,6 +813,12 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			let encoded = F::encode_body(response).map_err(#fizyr_rpc::Error::encode_failed)?;
 			let response = self.request.send_response(#service_id, encoded).await?;
 			Ok(())
+		}
+
+		/// Send the final response.
+		pub async fn send_error_response(&self, error: &str) -> Result<(), #fizyr_rpc::Error>
+		{
+			Ok(self.request.send_error_response(error).await?)
 		}
 	});
 
