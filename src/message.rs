@@ -1,4 +1,5 @@
-use crate::error;
+use crate::Error;
+use crate::error::private::InnerError;
 
 /// The encoded length of a message header.
 ///
@@ -109,14 +110,14 @@ pub enum MessageType {
 
 impl MessageType {
 	/// Try to convert a [`u32`] into a [`MessageType`]
-	pub fn from_u32(value: u32) -> Result<Self, error::InvalidMessageType> {
+	pub fn from_u32(value: u32) -> Result<Self, Error> {
 		match value {
 			0 => Ok(Self::Request),
 			1 => Ok(Self::Response),
 			2 => Ok(Self::RequesterUpdate),
 			3 => Ok(Self::ResponderUpdate),
 			4 => Ok(Self::Stream),
-			value => Err(error::InvalidMessageType { value }),
+			value => Err(InnerError::InvalidMessageType { value }.into()),
 		}
 	}
 
@@ -225,7 +226,7 @@ impl MessageHeader {
 	///
 	/// # Panic
 	/// This function panics if the buffer does not contain a full header.
-	pub fn decode(buffer: &[u8]) -> Result<Self, error::InvalidMessageType> {
+	pub fn decode(buffer: &[u8]) -> Result<Self, Error> {
 		use byteorder::{ByteOrder, LE};
 		let message_type = LE::read_u32(&buffer[0..]);
 		let request_id = LE::read_u32(&buffer[4..]);

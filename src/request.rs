@@ -2,9 +2,13 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
-use crate::error;
+use crate::error::private::{
+	connection_aborted,
+	InnerError,
+	UnexpectedMessageType,
+};
 use crate::peer::Command;
-use crate::Message;
+use crate::{Error, Message};
 
 pub(crate) enum RequestHandleCommand<Body> {
 	Close,
@@ -124,20 +128,27 @@ impl<Body> SentRequestHandle<Body> {
 
 	/// Receive the final response of the request from the remote peer.
 	///
-	/// This function returns an [`InvalidMessageType`][error::InvalidMessageType] if the received message is an update message.
-	/// If that happens, the update message can be read using [`Self::recv_update`].
+	/// This function returns an error if the received message is an update message.
+	/// You can detect this situation using [`Error::is_unexpected_message_type()`].
+	/// Afterwards, the update message can be read using [`Self::recv_update`].
 	/// To ensure that there are no update messages left, keep calling [`Self::recv_update`] untill it returns `Ok(None)`.
-	pub async fn recv_response(&mut self) -> Result<Message<Body>, error::RecvMessageError> {
-		let message = self.recv_message().await.ok_or_else(error::connection_aborted)?;
+	pub async fn recv_response(&mut self) -> Result<Message<Body>, Error> {
+		let message = self.recv_message()
+			.await
+			.ok_or_else(connection_aborted)?;
 		let kind = message.header.message_type;
 		if kind.is_response() {
 			Ok(message)
 		} else {
 			self.peek_buffer = Some(message);
-			Err(error::UnexpectedMessageType {
-				value: kind,
-				expected: crate::MessageType::Response,
-			}.into())
+			Err(
+				InnerError::from(
+					UnexpectedMessageType {
+						value: kind,
+						expected: crate::MessageType::Response,
+					}
+				).into()
+			)
 		}
 	}
 
@@ -167,7 +178,7 @@ impl<Body> SentRequestHandle<Body> {
 	}
 
 	/// Send an update for the request to the remote peer.
-	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendMessageError> {
+	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), Error> {
 		self.write_handle.send_update(service_id, body).await
 	}
 }
@@ -184,13 +195,13 @@ impl<Body> SentRequestWriteHandle<Body> {
 	}
 
 	/// Send an update for the request to the remote peer.
-	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendMessageError> {
+	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), Error> {
 		use crate::peer::SendRawMessage;
 
 		// If the response has already arrived, we're not allowed to send messages anymore.
 		// The request ID could have been re-used already.
 		if self.closed.load(Ordering::Acquire) {
-			return Err(crate::error::RequestClosed.into())
+			return Err(InnerError::RequestClosed.into())
 		}
 
 		let body = body.into();
@@ -198,8 +209,8 @@ impl<Body> SentRequestWriteHandle<Body> {
 		let message = Message::requester_update(self.request_id, service_id, body);
 		self.command_tx
 			.send(SendRawMessage { message, result_tx }.into())
-			.map_err(|_| error::connection_aborted())?;
-		result_rx.await.map_err(|_| error::connection_aborted())??;
+			.map_err(|_| connection_aborted())?;
+		result_rx.await.map_err(|_| connection_aborted())??;
 		Ok(())
 	}
 }
@@ -256,17 +267,17 @@ impl<Body> ReceivedRequestHandle<Body> {
 	}
 
 	/// Send an update for the request to the remote peer.
-	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendMessageError> {
+	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), Error> {
 		self.write_handle.send_update(service_id, body).await
 	}
 
 	/// Send the final response for the request to the remote peer.
-	pub async fn send_response(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendMessageError> {
+	pub async fn send_response(&self, service_id: i32, body: impl Into<Body>) -> Result<(), Error> {
 		self.write_handle.send_response(service_id, body).await
 	}
 
 	/// Send the final response with an error message.
-	pub async fn send_error_response(&self, message: &str) -> Result<(), error::SendMessageError>
+	pub async fn send_error_response(&self, message: &str) -> Result<(), Error>
 	where
 		Body: crate::Body,
 	{
@@ -286,19 +297,19 @@ impl<Body> ReceivedRequestWriteHandle<Body> {
 	}
 
 	/// Send an update for the request to the remote peer.
-	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendMessageError> {
+	pub async fn send_update(&self, service_id: i32, body: impl Into<Body>) -> Result<(), Error> {
 		let body = body.into();
 		self.send_raw_message(Message::responder_update(self.request_id, service_id, body)).await
 	}
 
 	/// Send the final response for the request to the remote peer.
-	pub async fn send_response(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::SendMessageError> {
+	pub async fn send_response(&self, service_id: i32, body: impl Into<Body>) -> Result<(), Error> {
 		let body = body.into();
 		self.send_raw_message(Message::response(self.request_id, service_id, body)).await
 	}
 
 	/// Send the final response with an error message.
-	pub async fn send_error_response(&self, message: &str) -> Result<(), error::SendMessageError>
+	pub async fn send_error_response(&self, message: &str) -> Result<(), Error>
 	where
 		Body: crate::Body,
 	{
@@ -306,20 +317,20 @@ impl<Body> ReceivedRequestWriteHandle<Body> {
 	}
 
 	/// Send a raw message.
-	async fn send_raw_message(&self, message: Message<Body>) -> Result<(), error::SendMessageError> {
+	async fn send_raw_message(&self, message: Message<Body>) -> Result<(), Error> {
 		use crate::peer::SendRawMessage;
 
 		// If the response has already arrived, we're not allowed to send messages anymore.
 		// The request ID could have been re-used already.
 		if self.closed.load(Ordering::Acquire) {
-			return Err(crate::error::RequestClosed.into())
+			return Err(InnerError::RequestClosed.into())
 		}
 
 		let (result_tx, result_rx) = oneshot::channel();
 		self.command_tx
 			.send(SendRawMessage { message, result_tx }.into())
-			.map_err(|_| error::connection_aborted())?;
-		result_rx.await.map_err(|_| error::connection_aborted())??;
+			.map_err(|_| connection_aborted())?;
+		result_rx.await.map_err(|_| connection_aborted())??;
 		Ok(())
 	}
 }
@@ -431,11 +442,11 @@ mod test {
 		// Now we send and receive a response.
 		// After that, sending responses should be impossible.
 		assert!(let Ok(()) = received_request.send_response(1, vec![]).await);
-		assert!(let Err(crate::error::SendMessageError::RequestClosed(_)) = received_request.send_update(1, vec![]).await);
-		assert!(let Err(crate::error::SendMessageError::RequestClosed(_)) = received_request.send_response(1, vec![]).await);
+		assert!(let Err(_) = received_request.send_update(1, vec![]).await);
+		assert!(let Err(_) = received_request.send_response(1, vec![]).await);
 
 		assert!(let Ok(_) = sent_request.recv_response().await);
-		assert!(let Err(crate::error::SendMessageError::RequestClosed(_)) = sent_request.send_update(1, vec![]).await);
+		assert!(let Err(_) = sent_request.send_update(1, vec![]).await);
 
 		drop(handle_a);
 		drop(handle_b);

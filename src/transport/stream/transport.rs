@@ -5,9 +5,8 @@ use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use super::{StreamBody, StreamConfig};
-use crate::error::{PayloadTooLarge, ReadMessageError, WriteMessageError};
-use crate::Message;
-use crate::MessageHeader;
+use crate::error::private::check_payload_too_large;
+use crate::{Error, Message, MessageHeader};
 
 /// Length of a message frame and header.
 const FRAMED_HEADER_LEN: usize = 4 + crate::HEADER_LEN as usize;
@@ -113,7 +112,7 @@ where
 {
 	type Body = StreamBody;
 
-	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, ReadMessageError>> {
+	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>> {
 		// Get the original &mut Self from the pin.
 		let this = self.get_mut();
 
@@ -132,7 +131,7 @@ where
 
 				// Check body length and create body buffer.
 				let body_len = length - crate::HEADER_LEN as u32;
-				PayloadTooLarge::check(body_len as usize, this.max_body_len)?;
+				check_payload_too_large(body_len as usize, this.max_body_len as usize)?;
 				this.body_buffer = vec![0; body_len as usize];
 			}
 		}
@@ -161,11 +160,11 @@ where
 {
 	type Body = StreamBody;
 
-	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), WriteMessageError>> {
+	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), Error>> {
 		let this = self.get_mut();
 
 		// Make sure the body length doesn't exceed the maximum.
-		PayloadTooLarge::check(body.len(), this.max_body_len)?;
+		check_payload_too_large(body.len(), this.max_body_len as usize)?;
 
 		// Encode the header if we haven't done that yet.
 		let header_buffer = this.header_buffer.get_or_insert_with(|| {

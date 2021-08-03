@@ -4,10 +4,11 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use super::{UnixBody, UnixConfig};
-use crate::error;
-use crate::error::{PayloadTooLarge, ReadMessageError, WriteMessageError};
-use crate::Message;
-use crate::MessageHeader;
+use crate::error::private::{
+	check_message_too_short,
+	check_payload_too_large, connection_aborted,
+};
+use crate::{Error, Message, MessageHeader};
 
 /// Transport layer for Unix datagram/seqpacket sockets.
 pub struct UnixTransport<Socket> {
@@ -85,7 +86,7 @@ impl<W> UnixWriteHalf<W> {
 impl crate::transport::TransportReadHalf for UnixReadHalf<&tokio_seqpacket::UnixSeqpacket> {
 	type Body = UnixBody;
 
-	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, ReadMessageError>> {
+	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>> {
 		use tokio_seqpacket::ancillary::SocketAncillary;
 
 		let this = self.get_mut();
@@ -111,11 +112,11 @@ impl crate::transport::TransportReadHalf for UnixReadHalf<&tokio_seqpacket::Unix
 		let fds = extract_file_descriptors(&ancillary)?;
 
 		if bytes_read == 0 {
-			return Poll::Ready(Err(error::connection_aborted().into()));
+			return Poll::Ready(Err(connection_aborted()));
 		}
 
 		// Make sure we received an entire header.
-		error::MessageTooShort::check(bytes_read)?;
+		check_message_too_short(bytes_read)?;
 
 		// Parse the header.
 		let header = MessageHeader::decode(&header_buffer)?;
@@ -132,13 +133,13 @@ impl crate::transport::TransportReadHalf for UnixReadHalf<&tokio_seqpacket::Unix
 impl crate::transport::TransportWriteHalf for UnixWriteHalf<&tokio_seqpacket::UnixSeqpacket> {
 	type Body = UnixBody;
 
-	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), WriteMessageError>> {
+	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), Error>> {
 		use tokio_seqpacket::ancillary::SocketAncillary;
 
 		let this = self.get_mut();
 
 		// Check the outgoing body size.
-		PayloadTooLarge::check(body.data.len(), this.max_body_len)?;
+		check_payload_too_large(body.data.len(), this.max_body_len as usize)?;
 
 		// Prepare a buffer for the message header.
 		let mut header_buffer = [0; crate::HEADER_LEN as usize];

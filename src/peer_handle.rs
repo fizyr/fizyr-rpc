@@ -1,11 +1,9 @@
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-use crate::error;
+use crate::error::private::connection_aborted;
 use crate::peer::{Command, SendRawMessage, SendRequest};
-use crate::ReceivedMessage;
-use crate::Message;
-use crate::SentRequestHandle;
+use crate::{Error, Message, ReceivedMessage, SentRequestHandle};
 
 /// Handle to a peer.
 ///
@@ -30,7 +28,7 @@ pub struct PeerHandle<Body> {
 /// Any open requests will also be terminated.
 pub struct PeerReadHandle<Body> {
 	/// Channel for incoming request and stream messages.
-	incoming_rx: mpsc::UnboundedReceiver<Result<ReceivedMessage<Body>, error::RecvMessageError>>,
+	incoming_rx: mpsc::UnboundedReceiver<Result<ReceivedMessage<Body>, Error>>,
 
 	/// Channel for sending commands to the peer loop.
 	///
@@ -70,7 +68,7 @@ pub struct PeerCloseHandle<Body> {
 impl<Body> PeerHandle<Body> {
 	/// Create a new peer handle from the separate channels.
 	pub(crate) fn new(
-		incoming_rx: mpsc::UnboundedReceiver<Result<ReceivedMessage<Body>, error::RecvMessageError>>,
+		incoming_rx: mpsc::UnboundedReceiver<Result<ReceivedMessage<Body>, Error>>,
 		command_tx: mpsc::UnboundedSender<Command<Body>>,
 	) -> Self {
 		let read_handle = PeerReadHandle {
@@ -94,17 +92,17 @@ impl<Body> PeerHandle<Body> {
 	///
 	/// Errors for invalid incoming messages are also reported by this function.
 	/// For example: incoming update messages that are not associated with a received request will be reported as an error here.
-	pub async fn recv_message(&mut self) -> Result<ReceivedMessage<Body>, error::RecvMessageError> {
+	pub async fn recv_message(&mut self) -> Result<ReceivedMessage<Body>, Error> {
 		self.read_handle.recv_message().await
 	}
 
 	/// Send a new request to the remote peer.
-	pub async fn send_request(&self, service_id: i32, body: impl Into<Body>) -> Result<SentRequestHandle<Body>, error::SendRequestError> {
+	pub async fn send_request(&self, service_id: i32, body: impl Into<Body>) -> Result<SentRequestHandle<Body>, Error> {
 		self.write_handle.send_request(service_id, body).await
 	}
 
 	/// Send a stream message to the remote peer.
-	pub async fn send_stream(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+	pub async fn send_stream(&self, service_id: i32, body: impl Into<Body>) -> Result<(), Error> {
 		self.write_handle.send_stream(service_id, body).await
 	}
 
@@ -127,8 +125,10 @@ impl<Body> PeerReadHandle<Body> {
 	///
 	/// Errors for invalid incoming messages are also reported by this function.
 	/// For example: incoming update messages that are not associated with a received request will be reported as an error here.
-	pub async fn recv_message(&mut self) -> Result<ReceivedMessage<Body>, error::RecvMessageError> {
-		self.incoming_rx.recv().await.ok_or_else(error::connection_aborted)?
+	pub async fn recv_message(&mut self) -> Result<ReceivedMessage<Body>, Error> {
+		self.incoming_rx.recv()
+			.await
+			.ok_or_else(connection_aborted)?
 	}
 
 	/// Close the connection with the remote peer.
@@ -155,26 +155,26 @@ impl<Body> Drop for PeerReadHandle<Body> {
 
 impl<Body> PeerWriteHandle<Body> {
 	/// Send a new request to the remote peer.
-	pub async fn send_request(&self, service_id: i32, body: impl Into<Body>) -> Result<SentRequestHandle<Body>, error::SendRequestError> {
+	pub async fn send_request(&self, service_id: i32, body: impl Into<Body>) -> Result<SentRequestHandle<Body>, Error> {
 		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();
 		self.command_tx
 			.send(SendRequest { service_id, body, result_tx }.into())
-			.map_err(|_| error::connection_aborted())?;
+			.map_err(|_| connection_aborted())?;
 
-		result_rx.await.map_err(|_| error::connection_aborted())?
+		result_rx.await.map_err(|_| connection_aborted())?
 	}
 
 	/// Send a stream message to the remote peer.
-	pub async fn send_stream(&self, service_id: i32, body: impl Into<Body>) -> Result<(), error::WriteMessageError> {
+	pub async fn send_stream(&self, service_id: i32, body: impl Into<Body>) -> Result<(), Error> {
 		let body = body.into();
 		let (result_tx, result_rx) = oneshot::channel();
 		let message = Message::stream(0, service_id, body);
 		self.command_tx
 			.send(SendRawMessage { message, result_tx }.into())
-			.map_err(|_| error::connection_aborted())?;
+			.map_err(|_| connection_aborted())?;
 
-		result_rx.await.map_err(|_| error::connection_aborted())?
+		result_rx.await.map_err(|_| connection_aborted())?
 	}
 
 	/// Close the connection with the remote peer.
