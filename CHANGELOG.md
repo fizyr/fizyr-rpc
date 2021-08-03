@@ -3,6 +3,7 @@
 ## main
 ### Added
 - Add `SentRequestWriteHandle` and `ReceivedRequestWriteHandle` to support parallel reading and writing.
+- Add `Body::as_error()` and `Body::into_error()` as required functions on the `Body` trait.
 
 ### Changed
 - Renamed `PeerHandle::next_message()` to `recv_message()`.

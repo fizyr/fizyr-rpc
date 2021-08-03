@@ -20,6 +20,16 @@ pub trait Body: Send + Sync + Sized + 'static {
 
 	/// Create a message body from an error message.
 	fn from_error(message: &str) -> Self;
+
+	/// Interpret a body as error message.
+	///
+	/// You should only call this if you know that the body represent an error message.
+	fn as_error(&self) -> Result<&str, std::str::Utf8Error>;
+
+	/// Interpret a body as error message.
+	///
+	/// You should only call this if you know that the body represent an error message.
+	fn into_error(self) -> Result<String, std::string::FromUtf8Error>;
 }
 
 /// Well-known service IDs.
