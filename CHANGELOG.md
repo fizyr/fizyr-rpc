@@ -17,6 +17,9 @@
 - Removed unused `Outgoing` type.
 - Removed all old error types and the `error` module.
 
+### Fixed
+- Fixed accepting connections with Unix stream sockets.
+
 ## v0.4.2 - 2021-05-20
 ### Fixed
 - Fixed bug where a sent request was untracked once a response to a received request was sent.

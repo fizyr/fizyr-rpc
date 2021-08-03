@@ -66,9 +66,7 @@ impl Listener for tokio::net::UnixListener {
 	type Connection = tokio::net::UnixStream;
 
 	fn poll_accept(self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
-		let accept = tokio::net::UnixListener::accept(self.get_mut());
-		tokio::pin!(accept);
-		let (socket, _address) = ready!(accept.poll(context))?;
+		let (socket, _addr) = ready!(tokio::net::UnixListener::poll_accept(self.get_mut(), context))?;
 		Poll::Ready(Ok((socket, ())))
 	}
 }
