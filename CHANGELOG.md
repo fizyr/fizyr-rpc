@@ -10,9 +10,11 @@
 - Changed `SentRequest/ReceivedRequest::recv_update()` to return an `Option<Message>`.
 - Renamed `Incoming` to `ReceivedMessage`.
 - Renamed `SentRequest` and `ReceivedRequest` to `SentRequestHandle` and `ReceivedRequestHandle`.
+- Switched to a single opaque error type.
 
 ### Removed
 - Removed unused `Outgoing` type.
+- Removed all old error types and the `error` module.
 
 ## v0.4.2 - 2021-05-20
 ### Fixed
