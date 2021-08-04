@@ -816,8 +816,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 		}
 
 		/// Send the final response.
-		pub async fn send_error_response(&self, error: &str) -> Result<(), #fizyr_rpc::Error>
-		{
+		pub async fn send_error_response(&self, error: &str) -> Result<(), #fizyr_rpc::Error> {
 			Ok(self.request.send_error_response(error).await?)
 		}
 	});
