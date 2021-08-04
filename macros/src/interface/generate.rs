@@ -305,7 +305,7 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 				let mut request = self.peer.send_request(#service_id, request_body).await?;
 
 				let response = request.recv_response().await?;
-				if response.header.service_id == -1 {
+				if response.header.service_id == #fizyr_rpc::service_id::ERROR {
 					use #fizyr_rpc::Body;
 					let message = response.body
 						.into_error()
@@ -380,7 +380,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			F: #fizyr_rpc::util::format::DecodeBody<#response_type>,
 		{
 			let response = self.request.recv_response().await?;
-			if response.header.service_id == -1 {
+			if response.header.service_id == #fizyr_rpc::service_id::ERROR {
 				use #fizyr_rpc::Body;
 				let message = response.body
 					.into_error()
