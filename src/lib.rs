@@ -97,7 +97,7 @@ pub mod macros;
 #[cfg(feature = "macros")]
 pub use macros::interface_example;
 
-pub mod error;
+mod error;
 mod message;
 mod peer;
 mod peer_handle;
@@ -108,6 +108,7 @@ mod server;
 pub mod transport;
 pub mod util;
 
+pub use error::Error;
 pub use message::service_id;
 pub use message::Body;
 pub use message::Message;

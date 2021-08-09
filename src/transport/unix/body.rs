@@ -34,6 +34,14 @@ impl crate::Body for UnixBody {
 	fn from_error(message: &str) -> Self {
 		Self::from(message.as_bytes())
 	}
+
+	fn as_error(&self) -> Result<&str, std::str::Utf8Error> {
+		std::str::from_utf8(&self.data)
+	}
+
+	fn into_error(self) -> Result<String, std::string::FromUtf8Error> {
+		String::from_utf8(self.data)
+	}
 }
 
 impl From<Vec<u8>> for UnixBody {

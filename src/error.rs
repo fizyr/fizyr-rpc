@@ -2,327 +2,239 @@
 
 use thiserror::Error;
 
-pub(crate) fn connection_aborted() -> std::io::Error {
-	std::io::ErrorKind::ConnectionAborted.into()
-}
-
-/// An error occurred while reading a message.
+/// Opaque error for all RPC operations.
 #[derive(Debug, Error)]
-#[error("{0}")]
-pub enum ReadMessageError {
-	/// An I/O error occurred.
-	Io(#[from] std::io::Error),
-
-	/// The received message is too short to be valid.
-	MessageTooShort(#[from] MessageTooShort),
-
-	/// The received message has an invalid type.
-	InvalidMessageType(#[from] InvalidMessageType),
-
-	/// The payload of the message is too large to receive.
-	PayloadTooLarge(#[from] PayloadTooLarge),
+#[error("{inner}")]
+pub struct Error {
+	#[from]
+	pub(crate) inner: private::InnerError,
 }
 
-impl ReadMessageError {
-	/// Check if the error is an I/O error indicating that the connection was aborted by the remote peer.
+impl Error {
+	/// Create a new error from an I/O error.
+	pub fn io_error(error: std::io::Error) -> Self {
+		private::InnerError::from(error).into()
+	}
+
+	/// Create a new error for a message that is too short to be valid.
+	pub fn message_too_short(message_len: usize) -> Self {
+		private::InnerError::MessageTooShort { message_len }.into()
+	}
+
+	/// Create a new error for a message with an invalid message type in the header.
+	pub fn invalid_message_type(value: u32) -> Self {
+		private::InnerError::InvalidMessageType { value }.into()
+	}
+
+	/// Create a new error for a message with an body that exceeds the allowed size.
+	pub fn payload_too_large(body_len: usize, max_len: usize) -> Self {
+		private::InnerError::PayloadTooLarge { body_len, max_len }.into()
+	}
+
+	/// Create a new error for an incoming message with an unexpected service ID.
+	pub fn unexpected_service_id(service_id: i32) -> Self {
+		private::InnerError::UnexpectedServiceId { service_id }.into()
+	}
+
+	/// Create a new error for an outgoing message body that could not be encoded.
+	pub fn encode_failed(inner: Box<dyn std::error::Error + Send>) -> Self {
+		private::InnerError::EncodeFailed(inner).into()
+	}
+
+	/// Create a new error for an incoming message with a body that could not be decoded.
+	pub fn decode_failed(inner: Box<dyn std::error::Error + Send>) -> Self {
+		private::InnerError::DecodeFailed(inner).into()
+	}
+
+	/// Create a new error for an incoming message that represent an error response from the remote peer.
+	///
+	/// A remote error does not indicate a communication or protocol violation.
+	/// It is used when the remote peer correctly received and understood the request,
+	/// but is unable to succesfully complete it.
+	pub fn remote_error(message: String) -> Self {
+		private::InnerError::RemoteError(message).into()
+	}
+
+	/// Create a new error with a custom message.
+	pub fn custom(message: String) -> Self {
+		private::InnerError::Custom(message).into()
+	}
+
+	/// Check if this error is caused by the remote peer closing the connection cleanly.
 	pub fn is_connection_aborted(&self) -> bool {
-		if let Self::Io(e) = &self {
+		if let private::InnerError::Io(e) = &self.inner {
 			e.kind() == std::io::ErrorKind::ConnectionAborted
 		} else {
 			false
 		}
 	}
-}
 
-/// An error occurred while writing a message.
-#[derive(Debug, Error)]
-#[error("{0}")]
-pub enum WriteMessageError {
-	/// An I/O error occurred.
-	Io(#[from] std::io::Error),
+	/// Check if an unexpected message type was received.
+	///
+	/// This can happen when you call [`recv_response()`] while an update message is still queued.
+	pub fn is_unexpected_message_type(&self) -> bool {
+		matches!(&self.inner, private::InnerError::UnexpectedMessageType(_))
+	}
 
-	/// The payload of the message is too large to send.
-	PayloadTooLarge(#[from] PayloadTooLarge),
-}
+	/// Check if this error represent an error response from the remote peer.
+	///
+	/// See [`Self::remote_error()`] for more details on what a remote error is.
+	pub fn is_remote_error(&self) -> bool {
+		matches!(&self.inner, private::InnerError::RemoteError(_))
+	}
 
-impl WriteMessageError {
-	/// Check if the error is an I/O error indicating that the connection was aborted by the remote peer.
-	pub fn is_connection_aborted(&self) -> bool {
-		if let Self::Io(e) = &self {
-			e.kind() == std::io::ErrorKind::ConnectionAborted
+	/// Get this error as remote error message.
+	///
+	/// See [`Self::remote_error()`] for more details on what a remote error is.
+	pub fn as_remote_error(&self) -> Option<&str> {
+		if let private::InnerError::RemoteError(msg) = &self.inner {
+			Some(msg)
 		} else {
-			false
+			None
+		}
+	}
+
+	/// Get this error as remote error message.
+	///
+	/// See [`Self::remote_error()`] for more details on what a remote error is.
+	pub fn into_remote_error(self) -> Option<String> {
+		if let private::InnerError::RemoteError(msg) = self.inner {
+			Some(msg)
+		} else {
+			None
 		}
 	}
 }
 
-/// The received message is too short to contain a valid message.
-#[derive(Debug, Clone, Error)]
-#[error("the message is too short to be valid: need atleast 12 bytes for the header, got only {message_len} bytes")]
-pub struct MessageTooShort {
-	/// The actual size of the received message.
-	pub message_len: usize,
+impl From<std::io::Error> for Error {
+	fn from(other: std::io::Error) -> Self {
+		Self::io_error(other)
+	}
 }
 
-impl MessageTooShort {
+pub(crate) mod private {
+	use super::*;
+
+	pub(crate) fn connection_aborted() -> Error {
+		InnerError::from(std::io::Error::from(std::io::ErrorKind::ConnectionAborted)).into()
+	}
+
+	#[derive(Debug, Error)]
+	#[error("{0}")]
+	#[doc(hidden)]
+	pub enum InnerError {
+		/// An I/O error occurred.
+		Io(#[from] std::io::Error),
+
+		/// The received message is too short to be valid.
+		#[error("the message is too short to be valid: need atleast 12 bytes for the header, got only {message_len} bytes")]
+		MessageTooShort {
+			message_len: usize,
+		},
+
+		/// The received message has an invalid type.
+		#[error("invalid message type: expected a value in the range [0..4], got {value}")]
+		InvalidMessageType {
+			/// The received value.
+			value: u32,
+		},
+
+		/// The message body is too large.
+		#[error("payload too large: maximum payload size is {max_len}, got {body_len}")]
+		PayloadTooLarge {
+			/// The actual length of the message body in bytes.
+			body_len: usize,
+
+			/// The maximum allowed length of a message body in bytes.
+			max_len: usize,
+		},
+
+		/// The request ID is already associated with an open request.
+		#[error("duplicate request ID: request ID {request_id} is already associated with an open request")]
+		DuplicateRequestId {
+			/// The duplicate request ID.
+			request_id: u32,
+		},
+
+		/// The request ID is not associated with an open request.
+		#[error("unknown request ID: request ID {request_id} is not associated with an open request")]
+		UnknownRequestId {
+			/// The unknown request ID.
+			request_id: u32,
+		},
+
+		/// The received message has an unexpected message type.
+		UnexpectedMessageType(#[from] UnexpectedMessageType),
+
+		/// The received message has an unexpected service ID.
+		#[error("unexpected service ID: {service_id}")]
+		UnexpectedServiceId {
+			/// The unrecognized/unexpected service ID.
+			service_id: i32,
+		},
+
+		/// No free request ID was found.
+		#[error("no free request ID was found")]
+		NoFreeRequestIdFound,
+
+		/// The request has already been closed.
+		#[error("the request is already closed")]
+		RequestClosed,
+
+		/// Failed to encode the message.
+		EncodeFailed(Box<dyn std::error::Error + Send>),
+
+		/// Failed to decode the message.
+		DecodeFailed(Box<dyn std::error::Error + Send>),
+
+		/// The remote peer replied with an error instead of the regular response.
+		RemoteError(String),
+
+		/// A custom error message.
+		Custom(String),
+	}
+
 	/// Check if a message size is large enough to contain a valid message.
-	pub fn check(message_len: usize) -> Result<(), Self> {
+	pub fn check_message_too_short(message_len: usize) -> Result<(), InnerError> {
 		if message_len >= crate::HEADER_LEN as usize {
 			Ok(())
 		} else {
-			Err(Self { message_len })
+			Err(InnerError::MessageTooShort { message_len })
 		}
 	}
-}
 
-/// The message type is invalid.
-#[derive(Debug, Clone, Error)]
-#[error("invalid message type: expected a value in the range [0..4], got {value}")]
-pub struct InvalidMessageType {
-	/// The received value.
-	pub value: u32,
-}
-
-/// The message body is too large.
-#[derive(Debug, Clone, Error)]
-#[error("payload too large: maximum payload size is {max_len}, got {body_len}")]
-pub struct PayloadTooLarge {
-	/// The actual length of the message body in bytes.
-	pub body_len: usize,
-
-	/// The maximum allowed length of a message body in bytes.
-	pub max_len: u32,
-}
-
-impl PayloadTooLarge {
 	/// Check if a payload length is small enough to fit in a message body.
-	pub fn check(body_len: usize, max_len: u32) -> Result<(), Self> {
+	pub fn check_payload_too_large(body_len: usize, max_len: usize) -> Result<(), InnerError> {
 		if body_len <= max_len as usize {
 			Ok(())
 		} else {
-			Err(Self { body_len, max_len })
+			Err(InnerError::PayloadTooLarge{ body_len, max_len })
 		}
 	}
-}
 
-/// The request was already closed.
-#[derive(Debug, Clone, Error)]
-#[error("the request is already closed")]
-pub struct RequestClosed;
+	/// The received message had an unexpected type.
+	#[derive(Debug, Clone, Error)]
+	pub struct UnexpectedMessageType {
+		/// The actual type of the received message.
+		pub value: crate::MessageType,
 
-/// No free request ID was found.
-#[derive(Debug, Clone, Error)]
-#[error("no free request ID was found")]
-pub struct NoFreeRequestIdFound;
-
-/// The request ID is already associated with an open request.
-#[derive(Debug, Clone, Error)]
-#[error("duplicate request ID: request ID {request_id} is already associated with an open request")]
-pub struct DuplicateRequestId {
-	/// The duplicate request ID.
-	pub request_id: u32,
-}
-
-/// The request ID is not associated with an open request.
-#[derive(Debug, Clone, Error)]
-#[error("unknown request ID: request ID {request_id} is not associated with an open request")]
-pub struct UnknownRequestId {
-	/// The unknown request ID.
-	pub request_id: u32,
-}
-
-/// The received message had an unexpected type.
-#[derive(Debug, Clone, Error)]
-pub struct UnexpectedMessageType {
-	/// The actual type of the received message.
-	pub value: crate::MessageType,
-
-	/// The expected type of the received message.
-	pub expected: crate::MessageType,
-}
-
-impl std::fmt::Display for UnexpectedMessageType {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		// NOTE: we can use the same string for requester and responder updates,
-		// because they can never get mixed up.
-		// If that would happen, it means the message got routed wrong because it went in the wrong direction.
-		let to_str = |kind| match kind {
-			crate::MessageType::Request => "a request message",
-			crate::MessageType::Response => "a response message",
-			crate::MessageType::RequesterUpdate => "an update message",
-			crate::MessageType::ResponderUpdate => "an update message",
-			crate::MessageType::Stream => "a streaming message",
-		};
-		write!(f, "unexpected message type: expected {}, got {}", to_str(self.expected), to_str(self.value))
+		/// The expected type of the received message.
+		pub expected: crate::MessageType,
 	}
-}
 
-/// The received message had an unexpected service ID.
-#[derive(Debug, Clone, Error)]
-#[error("unexpected service ID: {service_id}")]
-pub struct UnexpectedServiceId {
-	/// The unrecognized/unexpected service ID.
-	pub service_id: i32,
-}
-
-/// An error occurred while reading an incoming message.
-#[derive(Debug, Error)]
-#[error("{0}")]
-pub enum RecvMessageError {
-	/// An I/O error occurred.
-	Io(#[from] std::io::Error),
-
-	/// The received message is too short to be valid.
-	MessageTooShort(#[from] MessageTooShort),
-
-	/// The incoming message has an invalid message type.
-	InvalidMessageType(#[from] InvalidMessageType),
-
-	/// The payload of the incoming message is too large to receive.
-	PayloadTooLarge(#[from] PayloadTooLarge),
-
-	/// The incoming request message has a request ID that is already associated with an open request.
-	DuplicateRequestId(#[from] DuplicateRequestId),
-
-	/// The incoming update or response message has a request ID that is not associated with an open request.
-	UnknownRequestId(#[from] UnknownRequestId),
-
-	/// The received message has an unexpected message type.
-	UnexpectedMessageType(#[from] UnexpectedMessageType),
-
-	/// The received message has an unexpected service ID.
-	UnexpectedServiceId(#[from] UnexpectedServiceId),
-
-	/// Failed to decode the message.
-	DecodeBody(Box<dyn std::error::Error + Send>),
-}
-
-impl RecvMessageError {
-	/// Check if the error is an I/O error indicating that the connection was aborted by the remote peer.
-	pub fn is_connection_aborted(&self) -> bool {
-		if let Self::Io(e) = &self {
-			e.kind() == std::io::ErrorKind::ConnectionAborted
-		} else {
-			false
-		}
-	}
-}
-
-/// An error occurred while sending a request.
-#[derive(Debug, Error)]
-#[error("{0}")]
-pub enum SendRequestError {
-	/// An I/O error occurred.
-	Io(#[from] std::io::Error),
-
-	/// The payload of the message is too large to send.
-	PayloadTooLarge(#[from] PayloadTooLarge),
-
-	/// No free request ID was found.
-	NoFreeRequestIdFound(#[from] NoFreeRequestIdFound),
-
-	/// Failed to encode the message.
-	EncodeBody(Box<dyn std::error::Error + Send>),
-}
-
-impl SendRequestError {
-	/// Check if the error is an I/O error indicating that the connection was aborted by the remote peer.
-	pub fn is_connection_aborted(&self) -> bool {
-		if let Self::Io(e) = &self {
-			e.kind() == std::io::ErrorKind::ConnectionAborted
-		} else {
-			false
-		}
-	}
-}
-
-/// An error occurred while sending an update or stream message.
-#[derive(Debug, Error)]
-#[error("{0}")]
-pub enum SendMessageError {
-	/// An I/O error occurred.
-	Io(#[from] std::io::Error),
-
-	/// The payload of the message is too large to send.
-	PayloadTooLarge(#[from] PayloadTooLarge),
-
-	/// The request has already been closed.
-	RequestClosed(#[from] RequestClosed),
-
-	/// Failed to encode the message.
-	EncodeBody(Box<dyn std::error::Error + Send>),
-}
-
-impl SendMessageError {
-	/// Check if the error is an I/O error indicating that the connection was aborted by the remote peer.
-	pub fn is_connection_aborted(&self) -> bool {
-		if let Self::Io(e) = &self {
-			e.kind() == std::io::ErrorKind::ConnectionAborted
-		} else {
-			false
-		}
-	}
-}
-
-/// An error occurred while performing a service call.
-#[derive(Debug, Error)]
-#[error("{0}")]
-pub enum ServiceCallError {
-	/// Failed to encode or send the request.
-	SendRequest(#[from] SendRequestError),
-
-	/// Failed to receive or decode the response.
-	RecvResponse(#[from] RecvMessageError),
-}
-
-/// An error decoding a message.
-#[derive(Debug, Error)]
-#[error("{0}")]
-pub enum FromMessageError {
-	/// The service ID was not recognized.
-	UnexpectedServiceId(#[from] crate::error::UnexpectedServiceId),
-
-	/// Failed to decode the message body.
-	DecodeBody(Box<dyn std::error::Error + Send>),
-}
-
-// Allow a ReadMessageError to be converted to a RecvMessageError automatically.
-impl From<ReadMessageError> for RecvMessageError {
-	fn from(other: ReadMessageError) -> Self {
-		match other {
-			ReadMessageError::Io(e) => e.into(),
-			ReadMessageError::MessageTooShort(e) => e.into(),
-			ReadMessageError::InvalidMessageType(e) => e.into(),
-			ReadMessageError::PayloadTooLarge(e) => e.into(),
-		}
-	}
-}
-
-// Allow a WriteMessageError to be converted to a SendRequestError automatically.
-impl From<WriteMessageError> for SendRequestError {
-	fn from(other: WriteMessageError) -> Self {
-		match other {
-			WriteMessageError::Io(e) => e.into(),
-			WriteMessageError::PayloadTooLarge(e) => e.into(),
-		}
-	}
-}
-
-// Allow a WriteMessageError to be converted to a SendMessageError automatically.
-impl From<WriteMessageError> for SendMessageError {
-	fn from(other: WriteMessageError) -> Self {
-		match other {
-			WriteMessageError::Io(e) => e.into(),
-			WriteMessageError::PayloadTooLarge(e) => e.into(),
-		}
-	}
-}
-
-impl From<FromMessageError> for crate::error::RecvMessageError {
-	fn from(other: FromMessageError) -> Self {
-		match other {
-			FromMessageError::UnexpectedServiceId(x) => x.into(),
-			FromMessageError::DecodeBody(e) => Self::DecodeBody(e),
+	impl std::fmt::Display for UnexpectedMessageType {
+		fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+			// NOTE: we can use the same string for requester and responder updates,
+			// because they can never get mixed up.
+			// If that would happen, it means the message got routed wrong because it went in the wrong direction.
+			let to_str = |kind| match kind {
+				crate::MessageType::Request => "a request message",
+				crate::MessageType::Response => "a response message",
+				crate::MessageType::RequesterUpdate => "an update message",
+				crate::MessageType::ResponderUpdate => "an update message",
+				crate::MessageType::Stream => "a streaming message",
+			};
+			write!(f, "unexpected message type: expected {}, got {}", to_str(self.expected), to_str(self.value))
 		}
 	}
 }

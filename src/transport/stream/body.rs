@@ -20,6 +20,14 @@ impl crate::Body for StreamBody {
 	fn from_error(message: &str) -> Self {
 		Self::new(message.as_bytes().into())
 	}
+
+	fn as_error(&self) -> Result<&str, std::str::Utf8Error> {
+		std::str::from_utf8(&self.data)
+	}
+
+	fn into_error(self) -> Result<String, std::string::FromUtf8Error> {
+		String::from_utf8(self.data)
+	}
 }
 
 impl<T> From<T> for StreamBody

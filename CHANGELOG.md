@@ -3,6 +3,7 @@
 ## main
 ### Added
 - Add `SentRequestWriteHandle` and `ReceivedRequestWriteHandle` to support parallel reading and writing.
+- Add `Body::as_error()` and `Body::into_error()` as required functions on the `Body` trait.
 
 ### Changed
 - Renamed `PeerHandle::next_message()` to `recv_message()`.
@@ -10,9 +11,14 @@
 - Changed `SentRequest/ReceivedRequest::recv_update()` to return an `Option<Message>`.
 - Renamed `Incoming` to `ReceivedMessage`.
 - Renamed `SentRequest` and `ReceivedRequest` to `SentRequestHandle` and `ReceivedRequestHandle`.
+- Switched to a single opaque error type.
 
 ### Removed
 - Removed unused `Outgoing` type.
+- Removed all old error types and the `error` module.
+
+### Fixed
+- Fixed accepting connections with Unix stream sockets.
 
 ## v0.4.2 - 2021-05-20
 ### Fixed

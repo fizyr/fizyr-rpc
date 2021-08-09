@@ -1,15 +1,16 @@
-use crate::util::{select, Either};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
-	error,
 	util,
-	request_tracker::RequestTracker,
+	Error,
 	Message,
 	PeerHandle,
 	ReceivedMessage,
 	SentRequestHandle,
 };
+use crate::request_tracker::RequestTracker;
+use crate::error::private::InnerError;
+use crate::util::{select, Either};
 
 /// Message for the internal peer command loop.
 pub enum Command<Body> {
@@ -47,7 +48,7 @@ pub struct Peer<Transport: crate::transport::Transport> {
 	command_rx: mpsc::UnboundedReceiver<Command<Transport::Body>>,
 
 	/// Sending end of the channel for incoming requests and stream messages.
-	incoming_tx: mpsc::UnboundedSender<Result<ReceivedMessage<Transport::Body>, error::RecvMessageError>>,
+	incoming_tx: mpsc::UnboundedSender<Result<ReceivedMessage<Transport::Body>, Error>>,
 
 	/// The number of [`PeerWriteHandle`][crate::PeerWriteHandle] objects for this peer.
 	///
@@ -224,7 +225,7 @@ where
 	command_rx: &'a mut mpsc::UnboundedReceiver<Command<W::Body>>,
 
 	/// The channel for sending incoming messages to the [`PeerHandle`].
-	incoming_tx: &'a mut mpsc::UnboundedSender<Result<ReceivedMessage<W::Body>, error::RecvMessageError>>,
+	incoming_tx: &'a mut mpsc::UnboundedSender<Result<ReceivedMessage<W::Body>, Error>>,
 
 	/// Flag to indicate if the peer read handle has already been stopped.
 	read_handle_dropped: &'a mut bool,
@@ -285,7 +286,7 @@ where
 		let request = match self.request_tracker.allocate_sent_request(command.service_id) {
 			Ok(x) => x,
 			Err(e) => {
-				let _: Result<_, _> = command.result_tx.send(Err(e.into()));
+				let _: Result<_, _> = command.result_tx.send(Err(e));
 				return LoopFlow::Continue;
 			},
 		};
@@ -294,7 +295,7 @@ where
 
 		let message = Message::request(request.request_id(), request.service_id(), command.body);
 		if let Err((e, flow)) = self.write_message(&message).await {
-			let _: Result<_, _> = command.result_tx.send(Err(e.into()));
+			let _: Result<_, _> = command.result_tx.send(Err(e));
 			let _: Result<_, _> = self.request_tracker.remove_sent_request(request_id);
 			return flow;
 		}
@@ -337,7 +338,7 @@ where
 		let message = match command.message {
 			Ok(x) => x,
 			Err(e) => {
-				let _: Result<_, _> = self.send_incoming(Err(e.into())).await;
+				let _: Result<_, _> = self.send_incoming(Err(e)).await;
 				return LoopFlow::Continue;
 			},
 		};
@@ -347,7 +348,7 @@ where
 			Ok(None) => return LoopFlow::Continue,
 			Ok(Some(x)) => x,
 			Err(e) => {
-				let _: Result<_, _> = self.send_incoming(Err(e.into())).await;
+				let _: Result<_, _> = self.send_incoming(Err(e)).await;
 				return LoopFlow::Continue;
 			},
 		};
@@ -375,7 +376,7 @@ where
 	}
 
 	/// Send an incoming message to the PeerHandle.
-	async fn send_incoming(&mut self, incoming: Result<ReceivedMessage<W::Body>, error::RecvMessageError>) -> Result<(), ()> {
+	async fn send_incoming(&mut self, incoming: Result<ReceivedMessage<W::Body>, Error>) -> Result<(), ()> {
 		if self.incoming_tx.send(incoming).is_err() {
 			*self.read_handle_dropped = true;
 			Err(())
@@ -384,11 +385,16 @@ where
 		}
 	}
 
-	async fn write_message(&mut self, message: &Message<W::Body>) -> Result<(), (error::WriteMessageError, LoopFlow)> {
+	async fn write_message(&mut self, message: &Message<W::Body>) -> Result<(), (Error, LoopFlow)> {
+		// TODO: let transport indicate if it is broken after a failed write instead of looking at PayloadTooLarge.
 		match self.write_half.write_msg(&message.header, &message.body).await {
 			Ok(()) => Ok(()),
-			Err(e @ error::WriteMessageError::Io(_)) => Err((e, LoopFlow::Stop)),
-			Err(e @ error::WriteMessageError::PayloadTooLarge(_)) => Err((e, LoopFlow::Continue)),
+			Err(e) => {
+				match &e.inner {
+					InnerError::PayloadTooLarge { .. } => Err((e, LoopFlow::Continue)),
+					_ => Err((e, LoopFlow::Stop)),
+				}
+			},
 		}
 	}
 }
@@ -414,7 +420,7 @@ pub struct SendRequest<Body> {
 	pub body: Body,
 
 	/// One-shot channel to transmit back the created [`SentRequestHandle`] object, or an error.
-	pub result_tx: oneshot::Sender<Result<SentRequestHandle<Body>, error::SendRequestError>>,
+	pub result_tx: oneshot::Sender<Result<SentRequestHandle<Body>, Error>>,
 }
 
 /// Command to send a raw message to the remote peer.
@@ -423,13 +429,13 @@ pub struct SendRawMessage<Body> {
 	pub message: Message<Body>,
 
 	/// One-shot channel to receive the result of sending the message.
-	pub result_tx: oneshot::Sender<Result<(), error::WriteMessageError>>,
+	pub result_tx: oneshot::Sender<Result<(), Error>>,
 }
 
 /// Command to process an incoming message from the remote peer.
 pub struct ProcessReceivedMessage<Body> {
 	/// The message from the remote peer, or an error.
-	pub message: Result<Message<Body>, error::ReadMessageError>,
+	pub message: Result<Message<Body>, Error>,
 }
 
 impl<Body> std::fmt::Debug for Command<Body> {
@@ -571,8 +577,6 @@ mod test {
 
 	#[tokio::test]
 	async fn peeked_update_is_not_gone() {
-		use crate::error::RecvMessageError;
-
 		let_assert!(Ok((peer_a, peer_b)) = UnixStream::pair());
 		let handle_a = Peer::spawn(StreamTransport::new(peer_a, Default::default()));
 		let mut handle_b = Peer::spawn(StreamTransport::new(peer_b, Default::default()));
@@ -589,7 +593,7 @@ mod test {
 		let_assert!(Ok(()) = received_request.send_response(6, &b"Goodbye!"[..]).await);
 
 		// Trying to read a response should stuff the update in the internal peek buffer.
-		assert!(let Err(RecvMessageError::UnexpectedMessageType(_)) = sent_request.recv_response().await);
+		assert!(let Err(_) = sent_request.recv_response().await);
 
 		// Now we should receive the update intact from the peek buffer exactly once.
 		let_assert!(Some(update) = sent_request.recv_update().await);

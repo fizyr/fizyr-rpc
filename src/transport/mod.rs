@@ -10,8 +10,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use crate::error::{ReadMessageError, WriteMessageError};
-use crate::{Message, MessageHeader};
+use crate::{Error, Message, MessageHeader};
 
 pub(crate) mod stream;
 pub use stream::StreamTransport;
@@ -76,7 +75,7 @@ pub trait TransportReadHalf: Send + Unpin {
 	///
 	/// If the function returns [`Poll::Pending`],
 	/// the current task is scheduled to wake when more data is available.
-	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, ReadMessageError>>;
+	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>>;
 
 	/// Asynchronously read a complete message from the transport.
 	fn read_msg(&mut self) -> ReadMsg<Self>
@@ -105,7 +104,7 @@ pub trait TransportWriteHalf: Send + Unpin {
 	///
 	/// If the function returns [`Poll::Pending`],
 	/// the current task is scheduled to wake when the transport is ready for more data.
-	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), WriteMessageError>>;
+	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), Error>>;
 
 	/// Asynchronously write a message to the transport.
 	fn write_msg<'c>(&'c mut self, header: &'c MessageHeader, body: &'c Self::Body) -> WriteMsg<Self> {
@@ -135,7 +134,7 @@ impl<T> Future for ReadMsg<'_, T>
 where
 	T: TransportReadHalf + ?Sized + Unpin,
 {
-	type Output = Result<Message<T::Body>, ReadMessageError>;
+	type Output = Result<Message<T::Body>, Error>;
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		Pin::new(&mut *self.get_mut().inner).poll_read_msg(cx)
@@ -146,7 +145,7 @@ impl<T> Future for WriteMsg<'_, T>
 where
 	T: TransportWriteHalf + ?Sized + Unpin,
 {
-	type Output = Result<(), WriteMessageError>;
+	type Output = Result<(), Error>;
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		let header = self.header;
@@ -161,7 +160,7 @@ where
 {
 	type Body = T::Body;
 
-	fn poll_read_msg(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, ReadMessageError>> {
+	fn poll_read_msg(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>> {
 		self.as_mut().poll_read_msg(context)
 	}
 }
@@ -172,7 +171,7 @@ where
 {
 	type Body = T::Body;
 
-	fn poll_read_msg(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, ReadMessageError>> {
+	fn poll_read_msg(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>> {
 		self.as_mut().poll_read_msg(context)
 	}
 }
@@ -184,7 +183,7 @@ where
 {
 	type Body = <P::Target as TransportReadHalf>::Body;
 
-	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, ReadMessageError>> {
+	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>> {
 		self.get_mut().as_mut().poll_read_msg(context)
 	}
 }
@@ -200,7 +199,7 @@ where
 		context: &mut Context,
 		header: &MessageHeader,
 		body: &Self::Body,
-	) -> Poll<Result<(), WriteMessageError>> {
+	) -> Poll<Result<(), Error>> {
 		self.as_mut().poll_write_msg(context, header, body)
 	}
 }
@@ -216,7 +215,7 @@ where
 		context: &mut Context,
 		header: &MessageHeader,
 		body: &Self::Body,
-	) -> Poll<Result<(), WriteMessageError>> {
+	) -> Poll<Result<(), Error>> {
 		self.as_mut().poll_write_msg(context, header, body)
 	}
 }
@@ -228,7 +227,7 @@ where
 {
 	type Body = <P::Target as TransportWriteHalf>::Body;
 
-	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), WriteMessageError>> {
+	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), Error>> {
 		self.get_mut().as_mut().poll_write_msg(context, header, body)
 	}
 }

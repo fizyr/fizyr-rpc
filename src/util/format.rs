@@ -1,5 +1,7 @@
 //! Traits for converting between RPC messages and Rust values.
 
+use crate::Error;
+
 /// A message format, used to encode/decode RPC messages from/to Rust types.
 pub trait Format {
 	/// The body type for the RPC messages.
@@ -13,7 +15,7 @@ pub trait Format {
 	}
 
 	/// Decode a message to a Rust value.
-	fn decode_message<T: FromMessage<Self>>(message: crate::Message<Self::Body>) -> Result<T, crate::error::FromMessageError> {
+	fn decode_message<T: FromMessage<Self>>(message: crate::Message<Self::Body>) -> Result<T, Error> {
 		T::from_message(message)
 	}
 }
@@ -49,5 +51,5 @@ pub trait ToMessage<F: Format + ?Sized> {
 /// It is intended for enums that represent all possible messages for a specific interface.
 pub trait FromMessage<F: Format + ?Sized>: Sized {
 	/// Decode a message to the Rust value.
-	fn from_message(message: crate::Message<F::Body>) -> Result<Self, crate::error::FromMessageError>;
+	fn from_message(message: crate::Message<F::Body>) -> Result<Self, Error>;
 }
