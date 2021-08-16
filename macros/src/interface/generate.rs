@@ -9,31 +9,12 @@ pub fn generate_interface(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinitio
 	let mut item_tokens = TokenStream::new();
 	let mut client_impl_tokens = TokenStream::new();
 
-	let interface_name = interface.name();
-	let interface_doc = if interface.doc().is_empty() {
-		let text = format!("Support types for the {} RPC interface.", interface.name());
-		quote!(#[doc = #text])
-	} else {
-		to_doc_attrs(interface.doc())
-	};
-
 	generate_services(&mut item_tokens, &mut client_impl_tokens, fizyr_rpc, interface);
 	generate_streams(&mut item_tokens, &mut client_impl_tokens, fizyr_rpc, interface);
 	generate_client(&mut item_tokens, fizyr_rpc, interface, client_impl_tokens);
 	generate_server(&mut item_tokens, fizyr_rpc, interface);
 
-	let mod_visiblity = &interface.visibility();
-	let tokens = quote! {
-		#interface_doc
-		#mod_visiblity mod #interface_name {
-			#[allow(unused_imports)]
-			use super::*;
-
-			#item_tokens
-		}
-	};
-
-	tokens
+	item_tokens
 }
 
 /// Generate a client struct.
@@ -41,9 +22,10 @@ pub fn generate_interface(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinitio
 /// `extra_impl` is used to add additional functions to the main `impl` block.
 fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition, extra_impl: TokenStream) {
 	let client_doc = format!("RPC client for the {} interface.", interface.name());
+	let visibility = interface.visibility();
 	item_tokens.extend(quote! {
 		#[doc = #client_doc]
-		pub struct Client<F: #fizyr_rpc::util::format::Format> {
+		#visibility struct Client<F: #fizyr_rpc::util::format::Format> {
 			peer: #fizyr_rpc::PeerWriteHandle<F::Body>,
 		}
 
@@ -190,10 +172,11 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 		});
 	}
 
+	let visibility = interface.visibility();
 	let server_doc = format!("RPC server for the {} interface.", interface.name());
 	item_tokens.extend(quote! {
 		#[doc = #server_doc]
-		pub struct Server<F: #fizyr_rpc::util::format::Format> {
+		#visibility struct Server<F: #fizyr_rpc::util::format::Format> {
 			peer: #fizyr_rpc::PeerReadHandle<F::Body>,
 		}
 
@@ -249,7 +232,7 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 		}
 
 		/// An incoming message from a remote peer.
-		pub enum ReceivedMessage<#received_msg_generics>
+		#visibility enum ReceivedMessage<#received_msg_generics>
 		where
 			#received_msg_where
 		{
@@ -276,12 +259,12 @@ fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 /// Generate the support types and function definitions for each service.
 fn generate_services(item_tokens: &mut TokenStream, client_impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) {
 	for service in interface.services() {
-		generate_service(item_tokens, client_impl_tokens, fizyr_rpc, service);
+		generate_service(item_tokens, client_impl_tokens, fizyr_rpc, service, interface.visibility());
 	}
 }
 
 /// Generate the support types and function definitions for each service.
-fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, service: &ServiceDefinition) {
+fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, service: &ServiceDefinition, visibility: &syn::Visibility) {
 	let service_name = service.name();
 	let service_doc = to_doc_attrs(service.doc());
 	let service_id = service.service_id();
@@ -347,7 +330,7 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 	let mod_doc = format!("Support types for the `{}` service.", service.name());
 	item_tokens.extend(quote! {
 		#[doc = #mod_doc]
-		pub mod #service_name {
+		#visibility mod #service_name {
 			#[allow(unused_imports)]
 			use super::*;
 
@@ -1001,9 +984,10 @@ fn generate_received_request_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn
 	}
 
 	let enum_doc = format!("Enum for all possible incoming requests of the {} interface.", interface.name());
+	let visibility = interface.visibility();
 	item_tokens.extend(quote! {
 		#[doc = #enum_doc]
-		pub enum ReceivedRequestHandle<F: #fizyr_rpc::util::format::Format> {
+		#visibility enum ReceivedRequestHandle<F: #fizyr_rpc::util::format::Format> {
 			#variant_tokens
 		}
 
