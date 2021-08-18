@@ -12,6 +12,7 @@
 - Renamed `Incoming` to `ReceivedMessage`.
 - Renamed `SentRequest` and `ReceivedRequest` to `SentRequestHandle` and `ReceivedRequestHandle`.
 - Switched to a single opaque error type.
+- Renamed `Server` to `Listener` to avoid confusion with generated interfaces.
 
 ### Removed
 - Removed unused `Outgoing` type.

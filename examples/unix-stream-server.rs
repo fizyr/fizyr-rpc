@@ -1,4 +1,4 @@
-use fizyr_rpc::UnixStreamServer;
+use fizyr_rpc::UnixStreamListener;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -20,7 +20,7 @@ async fn main() {
 
 async fn do_main(options: &Options) -> Result<(), String> {
 	// Create the server.
-	let mut server = UnixStreamServer::bind(&options.socket, Default::default())
+	let mut server = UnixStreamListener::bind(&options.socket, Default::default())
 		.await
 		.map_err(|e| format!("failed to bind to {}: {}", options.socket.display(), e))?;
 	eprintln!("listening on {}", options.socket.display());

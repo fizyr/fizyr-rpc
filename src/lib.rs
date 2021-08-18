@@ -16,13 +16,13 @@
 //! The write handle can also be cloned and used in multiple tasks.
 //!
 //! To obtain a [`PeerHandle`], you can call [`Peer::connect()`].
-//! This will connect to a remote server and spawn a background task to read and write messages over the connection.
+//! This will connect to a remote listener and spawn a background task to read and write messages over the connection.
 //! If you need full control over tasks, you can instead create a [`Peer`] object
 //! and call [`Peer::run()`] manually.
 //!
-//! ## Server
+//! ## Listener
 //!
-//! The [`Server`] struct is used to accept incoming connections
+//! The [`Listener`] struct is used to accept incoming connections
 //! and gives you a [`PeerHandle`] for each incoming connection.
 //! You can then use the handle to process incoming messages and to send messages to the peer.
 //! Usually, you will want to spawn a task for each accepted connection that handles the communication.
@@ -32,7 +32,7 @@
 //! Each peer internally uses a [`Transport`][transport::Transport].
 //! The transport is responsible for reading and writing raw messages.
 //! By abstracting away the message transport,
-//! the library can expose a single generic [`Peer`] and [`Server`] struct.
+//! the library can expose a single generic [`Peer`] and [`Listener`] struct.
 //!
 //! There are different transports for different socket types.
 //! Different transports may also use different types as message body.
@@ -98,17 +98,21 @@ pub mod macros;
 pub use macros::interface_example;
 
 mod error;
+mod listener;
 mod message;
 mod peer;
 mod peer_handle;
 mod request;
 mod request_tracker;
-mod server;
 
 pub mod transport;
 pub mod util;
 
 pub use error::Error;
+pub use listener::{
+	Listener,
+	ListeningSocket,
+};
 pub use message::service_id;
 pub use message::Body;
 pub use message::Message;
@@ -128,8 +132,6 @@ pub use request::{
 	SentRequestHandle,
 	SentRequestWriteHandle,
 };
-pub use server::Server;
-pub use server::ServerListener;
 
 pub use transport::stream::StreamBody;
 
@@ -147,9 +149,9 @@ pub type TcpTransport = transport::StreamTransport<tokio::net::TcpStream>;
 #[cfg(feature = "tcp")]
 pub type TcpPeer = Peer<TcpTransport>;
 
-/// Server for TCP sockets.
+/// Listener for TCP sockets.
 #[cfg(feature = "tcp")]
-pub type TcpServer = Server<tokio::net::TcpListener>;
+pub type TcpListener = Listener<tokio::net::TcpListener>;
 
 /// Message transport for Unix stream sockets.
 #[cfg(feature = "unix-stream")]
@@ -159,9 +161,9 @@ pub type UnixStreamTransport = transport::StreamTransport<tokio::net::UnixStream
 #[cfg(feature = "unix-stream")]
 pub type UnixStreamPeer = Peer<UnixStreamTransport>;
 
-/// Server for Unix stream sockets.
+/// Listener for Unix stream sockets.
 #[cfg(feature = "unix-stream")]
-pub type UnixStreamServer = Server<tokio::net::UnixListener>;
+pub type UnixStreamListener = Listener<tokio::net::UnixListener>;
 
 /// Message transport for Unix seqpacket sockets.
 #[cfg(feature = "unix-seqpacket")]
@@ -171,9 +173,9 @@ pub type UnixSeqpacketTransport = transport::UnixTransport<tokio_seqpacket::Unix
 #[cfg(feature = "unix-seqpacket")]
 pub type UnixSeqpacketPeer = Peer<UnixSeqpacketTransport>;
 
-/// Server for Unix seqpacket sockets.
+/// Listener for Unix seqpacket sockets.
 #[cfg(feature = "unix-seqpacket")]
-pub type UnixSeqpacketServer = Server<tokio_seqpacket::UnixSeqpacketListener>;
+pub type UnixSeqpacketListener = Listener<tokio_seqpacket::UnixSeqpacketListener>;
 
 #[doc(hidden)]
 #[deprecated(note = "This type was renamed to ReceivedMessage. Please use that instead.", since = "0.5.0")]

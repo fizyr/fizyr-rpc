@@ -1,4 +1,4 @@
-use fizyr_rpc::TcpServer;
+use fizyr_rpc::TcpListener;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -20,7 +20,7 @@ async fn main() {
 
 async fn do_main(options: &Options) -> Result<(), String> {
 	// Create the server.
-	let mut server = TcpServer::bind(options.bind.as_str(), Default::default())
+	let mut server = TcpListener::bind(options.bind.as_str(), Default::default())
 		.await
 		.map_err(|e| format!("failed to bind to {}: {}", options.bind, e))?;
 	eprintln!("listening on {}", options.bind);

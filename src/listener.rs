@@ -2,25 +2,25 @@ use crate::Peer;
 use crate::PeerHandle;
 use crate::util;
 
-/// Server that spawns peers for all accepted connections.
-pub struct Server<Listener>
+/// Listener that spawns peers for all accepted connections.
+pub struct Listener<Socket>
 where
-	Listener: ServerListener,
+	Socket: ListeningSocket,
 {
-	listener: Listener,
-	config: Listener::Config,
+	listener: Socket,
+	config: Socket::Config,
 }
 
-/// Helper trait for [`Server`].
+/// Helper trait for [`Listener`].
 ///
-/// This trait encapsulates all requirements for the `Listener` type of a [`Server`].
+/// This trait encapsulates all requirements for the `Socket` type of a [`Listener`].
 ///
 /// The trait has a blanket implementation,
 /// so you can not implement it for your own types.
 ///
 /// You *can* use it as trait bound for generic arguments,
 /// but you should not rely on any of the items in this trait.
-pub trait ServerListener: util::Listener + Unpin {
+pub trait ListeningSocket: util::Listener + Unpin {
 	#[doc(hidden)]
 	type Body: crate::Body;
 
@@ -34,14 +34,14 @@ pub trait ServerListener: util::Listener + Unpin {
 	fn spawn(connection: Self::Connection, config: Self::Config) -> PeerHandle<Self::Body>;
 }
 
-impl<Listener> ServerListener for Listener
+impl<Socket> ListeningSocket for Socket
 where
-	Listener: util::Listener + Unpin,
-	Listener::Connection: util::IntoTransport,
+	Socket: util::Listener + Unpin,
+	Socket::Connection: util::IntoTransport,
 {
-	type Body = <Listener::Connection as util::IntoTransport>::Body;
-	type Config = <Listener::Connection as util::IntoTransport>::Config;
-	type Transport = <Listener::Connection as util::IntoTransport>::Transport;
+	type Body = <Socket::Connection as util::IntoTransport>::Body;
+	type Config = <Socket::Connection as util::IntoTransport>::Config;
+	type Transport = <Socket::Connection as util::IntoTransport>::Transport;
 
 	fn spawn(connection: Self::Connection, config: Self::Config) -> PeerHandle<Self::Body> {
 		use util::IntoTransport;
@@ -49,11 +49,11 @@ where
 	}
 }
 
-impl<Listener: ServerListener> Server<Listener> {
+impl<Socket: ListeningSocket> Listener<Socket> {
 	/// Create a server on a listening socket.
 	///
 	/// The passed in config is used to create transports and peers for all accepted connections.
-	pub fn new(listener: Listener, config: Listener::Config) -> Self {
+	pub fn new(listener: Socket, config: Socket::Config) -> Self {
 		Self { listener, config }
 	}
 
@@ -64,11 +64,11 @@ impl<Listener: ServerListener> Server<Listener> {
 	/// For unix transports, the address must implement [`AsRef<std::path::Path>`].
 	///
 	/// This function is asynchronous because it may perform a DNS lookup for some address types.
-	pub async fn bind<'a, Address: 'a>(address: Address, config: Listener::Config) -> std::io::Result<Self>
+	pub async fn bind<'a, Address: 'a>(address: Address, config: Socket::Config) -> std::io::Result<Self>
 	where
-		Listener: util::Bind<'a, Address>,
+		Socket: util::Bind<'a, Address>,
 	{
-		Ok(Self::new(Listener::bind(address).await?, config))
+		Ok(Self::new(Socket::bind(address).await?, config))
 	}
 
 	/// Run the server.
@@ -76,7 +76,7 @@ impl<Listener: ServerListener> Server<Listener> {
 	/// The server will accept connections in a loop and spawn a user task for each new peer.
 	pub async fn run<F, R>(&mut self, task: F) -> std::io::Result<()>
 	where
-		F: FnMut(PeerHandle<Listener::Body>) -> R,
+		F: FnMut(PeerHandle<Socket::Body>) -> R,
 		R: std::future::Future<Output = ()> + Send + 'static,
 	{
 		let mut task = task;
@@ -93,8 +93,8 @@ impl<Listener: ServerListener> Server<Listener> {
 	///
 	/// A [`Peer`] is spawned for the new connection,
 	/// and a [`PeerHandle`] is returned to allow interaction with the peer.
-	pub async fn accept(&mut self) -> std::io::Result<PeerHandle<Listener::Body>> {
+	pub async fn accept(&mut self) -> std::io::Result<PeerHandle<Socket::Body>> {
 		let (connection, _addr) = self.listener.accept().await?;
-		Ok(Listener::spawn(connection, self.config.clone()))
+		Ok(Socket::spawn(connection, self.config.clone()))
 	}
 }

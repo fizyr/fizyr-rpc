@@ -1,4 +1,4 @@
-use fizyr_rpc::UnixSeqpacketServer;
+use fizyr_rpc::UnixSeqpacketListener;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -20,7 +20,7 @@ async fn main() {
 
 async fn do_main(options: &Options) -> Result<(), String> {
 	// Wrap the socket in an RPC server.
-	let mut server = UnixSeqpacketServer::bind(&options.socket, Default::default())
+	let mut server = UnixSeqpacketListener::bind(&options.socket, Default::default())
 		.await
 		.map_err(|e| format!("failed to bind to {}: {}", options.socket.display(), e))?;
 	eprintln!("listening on {}", options.socket.display());
