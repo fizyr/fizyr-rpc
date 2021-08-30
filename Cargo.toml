@@ -8,7 +8,7 @@ authors = [
 ]
 
 license = "BSD-2-Clause OR Apache-2.0"
-repository = "https://github.com/fizyr/fizyr-rpc-rs"
+repository = "https://github.com/fizyr/fizyr-rpc"
 documentation = "https://docs.rs/fizyr-rpc"
 readme = "README.md"
 
