@@ -1,6 +1,6 @@
 # Changelog
 
-## main
+## 0.5.0
 ### Added
 - Add `SentRequestWriteHandle` and `ReceivedRequestWriteHandle` to support parallel reading and writing.
 - Add `Body::as_error()` and `Body::into_error()` as required functions on the `Body` trait.
