@@ -13,7 +13,6 @@ pub mod cooked {
 	use proc_macro2::Span;
 	use super::raw;
 
-	#[derive(Debug)]
 	pub struct InterfaceDefinition {
 		visibility: syn::Visibility,
 		name: syn::Ident,
@@ -22,7 +21,6 @@ pub mod cooked {
 		streams: Vec<StreamDefinition>,
 	}
 
-	#[derive(Debug)]
 	pub struct ServiceDefinition {
 		service_id: WithSpan<i32>,
 		name: syn::Ident,
@@ -33,7 +31,6 @@ pub mod cooked {
 		response_updates: Vec<UpdateDefinition>,
 	}
 
-	#[derive(Debug)]
 	pub struct UpdateDefinition {
 		service_id: WithSpan<i32>,
 		name: syn::Ident,
@@ -41,12 +38,6 @@ pub mod cooked {
 		body_type: Box<syn::Type>,
 	}
 
-	#[derive(Debug)]
-	pub struct UpdateAttributes {
-		doc: Vec<WithSpan<String>>,
-	}
-
-	#[derive(Debug)]
 	pub struct StreamDefinition {
 		service_id: WithSpan<i32>,
 		name: syn::Ident,
@@ -54,7 +45,6 @@ pub mod cooked {
 		body_type: Box<syn::Type>,
 	}
 
-	#[derive(Debug)]
 	struct DocOnlyAttributes {
 		doc: Vec<WithSpan<String>>,
 	}
@@ -331,14 +321,12 @@ pub mod raw {
 		syn::custom_keyword!(stream);
 	}
 
-	#[derive(Debug)]
 	pub struct InterfaceInput {
 		pub fizyr_rpc: syn::Ident,
 		pub _semi_token: syn::token::Semi,
 		pub interface: InterfaceDefinition,
 	}
 
-	#[derive(Debug)]
 	pub struct InterfaceDefinition {
 		pub attrs: Vec<syn::Attribute>,
 		pub visibility: syn::Visibility,
@@ -348,13 +336,11 @@ pub mod raw {
 		pub items: Vec<InterfaceItem>,
 	}
 
-	#[derive(Debug)]
 	pub enum InterfaceItem {
 		Service(ServiceDefinition),
 		Stream(StreamDefinition),
 	}
 
-	#[derive(Debug)]
 	pub struct ServiceDefinition {
 		pub attrs: Vec<syn::Attribute>,
 		pub _service: keyword::service,
@@ -367,19 +353,16 @@ pub mod raw {
 		pub body: MaybeServiceBody,
 	}
 
-	#[derive(Debug)]
 	pub enum MaybeServiceBody {
 		NoBody(syn::token::Comma),
 		Body(ServiceBody, Option<syn::token::Comma>),
 	}
 
-	#[derive(Debug)]
 	pub struct ServiceBody {
 		pub _brace_token: syn::token::Brace,
 		pub updates: syn::punctuated::Punctuated<UpdateDefinition, syn::token::Comma>,
 	}
 
-	#[derive(Debug)]
 	pub struct UpdateDefinition {
 		pub attrs: Vec<syn::Attribute>,
 		pub kind: UpdateKind,
@@ -389,13 +372,11 @@ pub mod raw {
 		pub body_type: Box<syn::Type>,
 	}
 
-	#[derive(Debug)]
 	pub enum UpdateKind {
 		RequestUpdate(keyword::request_update),
 		ResponseUpdate(keyword::response_update),
 	}
 
-	#[derive(Debug)]
 	pub struct StreamDefinition {
 		pub attrs: Vec<syn::Attribute>,
 		pub _stream: keyword::stream,
