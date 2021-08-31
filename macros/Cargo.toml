@@ -1,6 +1,16 @@
 [package]
 name = "fizyr-rpc-macros"
 version = "0.1.0"
+description = "procedural macros for the fizyr-rpc crate"
+version = "0.5.0-alpha1"
+authors = [
+	"Fizyr B.V. <info@fizyr.com>",
+	"Maarten de Vries <maarten@de-vri.es>",
+]
+
+license = "BSD-2-Clause OR Apache-2.0"
+repository = "https://github.com/fizyr/fizyr-rpc"
+
 edition = "2018"
 
 [lib]
