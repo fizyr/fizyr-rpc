@@ -43,6 +43,7 @@ fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 	let client_doc = format!("RPC client for the {} interface.", interface.name());
 	item_tokens.extend(quote! {
 		#[doc = #client_doc]
+		#[derive(Clone)]
 		pub struct Client<F: #fizyr_rpc::util::format::Format> {
 			peer: #fizyr_rpc::PeerWriteHandle<F::Body>,
 		}
@@ -425,6 +426,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		}
 
 		#[doc = #write_handle_doc]
+		#[derive(Clone)]
 		pub struct SentRequestWriteHandle<F: #fizyr_rpc::util::format::Format> {
 			pub(super) request: #fizyr_rpc::SentRequestWriteHandle<F::Body>,
 		}
@@ -830,6 +832,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 		}
 
 		#[doc = #write_handle_doc]
+		#[derive(Clone)]
 		pub struct ReceivedRequestWriteHandle<F: #fizyr_rpc::util::format::Format> {
 			pub(super) request: #fizyr_rpc::ReceivedRequestWriteHandle<F::Body>,
 		}
