@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0-alpha2
+## 0.5.0-alpha2 - 2021-09-22
 ### Changed
 - Implement `Clone` for the write handles of generated interfaces.
 
