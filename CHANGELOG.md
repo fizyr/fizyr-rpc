@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.5.0
+## 0.5.0-alpha2
+### Changed
+- Implement `Clone` for the write handles of generated interfaces.
+
+## 0.5.0-alpha1 - 2021-08-31
 ### Added
 - Add `SentRequestWriteHandle` and `ReceivedRequestWriteHandle` to support parallel reading and writing.
 - Add `Body::as_error()` and `Body::into_error()` as required functions on the `Body` trait.
