@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.5.0-alpha3 - 2021-09-23
 ### Fixed
-- Make write handles clone regardless of their generic parameters.
+- Make write handles cloneable regardless of their generic parameters.
 
 ## 0.5.0-alpha2 - 2021-09-22
 ### Changed
