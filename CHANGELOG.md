@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+### Fixed
+- Make write handles clone regardless of their generic parameters.
+
 ## 0.5.0-alpha2 - 2021-09-22
 ### Changed
 - Implement `Clone` for the write handles of generated interfaces.

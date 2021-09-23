@@ -1,5 +1,6 @@
 use assert2::{let_assert, assert};
 use fizyr_rpc::{UnixStreamPeer, UnixStreamTransport};
+use fizyr_rpc::util::format::Format;
 
 use macros_tests::{camera, Image, Json, RecordRequest, RecordState};
 
@@ -77,4 +78,19 @@ async fn record() {
 	drop(client);
 
 	assert!(let Ok(()) = server.await);
+}
+
+#[allow(dead_code, clippy::all)]
+fn assert_client_clone<F: Format>(camera: camera::Client<F>) {
+	let _ = camera.clone();
+}
+
+#[allow(dead_code, clippy::all)]
+fn assert_received_request_write_handle_clone<F: Format>(handle: camera::record::ReceivedRequestWriteHandle<F>) {
+	let _ = handle.clone();
+}
+
+#[allow(dead_code, clippy::all)]
+fn assert_sent_request_write_handle_clone<F: Format>(handle: camera::record::SentRequestWriteHandle<F>) {
+	let _ = handle.clone();
 }

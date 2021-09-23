@@ -43,7 +43,6 @@ fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 	let client_doc = format!("RPC client for the {} interface.", interface.name());
 	item_tokens.extend(quote! {
 		#[doc = #client_doc]
-		#[derive(Clone)]
 		pub struct Client<F: #fizyr_rpc::util::format::Format> {
 			peer: #fizyr_rpc::PeerWriteHandle<F::Body>,
 		}
@@ -53,6 +52,14 @@ fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interf
 				f.debug_struct(::core::any::type_name::<Self>())
 					.field("peer", &self.peer)
 					.finish()
+			}
+		}
+
+		impl<F: #fizyr_rpc::util::format::Format> ::core::clone::Clone for Client<F> {
+			fn clone(&self) -> Self {
+				Self {
+					peer: self.peer.clone(),
+				}
 			}
 		}
 
@@ -426,7 +433,6 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		}
 
 		#[doc = #write_handle_doc]
-		#[derive(Clone)]
 		pub struct SentRequestWriteHandle<F: #fizyr_rpc::util::format::Format> {
 			pub(super) request: #fizyr_rpc::SentRequestWriteHandle<F::Body>,
 		}
@@ -448,6 +454,14 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 					.field("service_id", &self.service_id())
 					// TODO: use finish_non_exhaustive when it hits stable
 					.finish()
+			}
+		}
+
+		impl<F: #fizyr_rpc::util::format::Format> ::core::clone::Clone for SentRequestWriteHandle<F> {
+			fn clone(&self) -> Self {
+				Self {
+					request: self.request.clone(),
+				}
 			}
 		}
 
@@ -832,7 +846,6 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 		}
 
 		#[doc = #write_handle_doc]
-		#[derive(Clone)]
 		pub struct ReceivedRequestWriteHandle<F: #fizyr_rpc::util::format::Format> {
 			pub(super) request: #fizyr_rpc::ReceivedRequestWriteHandle<F::Body>,
 		}
@@ -854,6 +867,14 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 					.field("service_id", &self.service_id())
 					// TODO: use finish_non_exhaustive when it hits stable
 					.finish()
+			}
+		}
+
+		impl<F: #fizyr_rpc::util::format::Format> ::core::clone::Clone for ReceivedRequestWriteHandle<F> {
+			fn clone(&self) -> Self {
+				Self {
+					request: self.request.clone(),
+				}
 			}
 		}
 
