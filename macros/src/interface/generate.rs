@@ -587,6 +587,9 @@ fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 fn generate_recv_update_function(impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, enum_type: &TokenStream, kind: UpdateKind) {
 	let mut doc = quote! {
 		/// Receive an update from the remote peer.
+		///
+		/// This function only returns an error if an update message was received that could not be parsed.
+		/// If an I/O error occurs or the connection is closed, this function returns `Ok(None)`.
 	};
 	if kind == UpdateKind::ResponseUpdate {
 		doc.extend(quote! {
