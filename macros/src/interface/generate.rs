@@ -491,6 +491,16 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 				self.request.service_id()
 			}
 
+			/// Get a write handle for the sent request.
+			///
+			/// The write handle can be cloned and sent to other threads freely,
+			/// but it can not be used to receive update messages or the final response.
+			pub fn write_handle(&self) -> SentRequestWriteHandle<F> {
+				SentRequestWriteHandle {
+					request: self.request.write_handle(),
+				}
+			}
+
 			#read_handle_impl_tokens
 
 			#write_handle_impl_tokens
@@ -911,6 +921,16 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			/// Get the service ID of the request.
 			pub fn service_id(&self) -> i32 {
 				self.request.service_id()
+			}
+
+			/// Get a write handle for the received request.
+			///
+			/// The write handle can be cloned and sent to other threads freely,
+			/// but it can not be used to receive update messages.
+			pub fn write_handle(&self) -> ReceivedRequestWriteHandle<F> {
+				ReceivedRequestWriteHandle {
+					request: self.request.write_handle(),
+				}
 			}
 
 			#read_handle_impl_tokens

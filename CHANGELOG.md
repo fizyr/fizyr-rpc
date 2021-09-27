@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0-alpha4
+### Added
+- Add missing `write_handle()` functions for `ReceivedRequest` and `SentRequest` in generated interfaces.
+
 ## 0.5.0-alpha3 - 2021-09-23
 ### Fixed
 - Make write handles cloneable regardless of their generic parameters.
