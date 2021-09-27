@@ -71,7 +71,7 @@ impl Error {
 
 	/// Check if an unexpected message type was received.
 	///
-	/// This can happen when you call [`recv_response()`] while an update message is still queued.
+	/// This can happen when you call [`recv_response()`][crate::SentRequestHandle::recv_response] while an update message is still queued.
 	pub fn is_unexpected_message_type(&self) -> bool {
 		matches!(&self.inner, private::InnerError::UnexpectedMessageType(_))
 	}

@@ -1,6 +1,6 @@
 //! Utility traits.
 //!
-//! The traits in this module are used to implement utility functions on [`Peer`][crate::Peer] and [`Server`][crate::Server].
+//! The traits in this module are used to implement utility functions on [`Peer`][crate::Peer] and [`Listener`][crate::Listener].
 //! You do not normally need to use these traits directly.
 //!
 //! However, if you wish to implement a custom transport,
