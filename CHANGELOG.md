@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0-alpha4
+## 0.5.0-alpha4 - 2021-09-27
 ### Added
 - Add missing `write_handle()` functions for `ReceivedRequest` and `SentRequest` in generated interfaces.
 
