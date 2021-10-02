@@ -6,7 +6,11 @@ pub use fizyr_rpc_macros::interface as interface_impl;
 #[macro_export]
 /// Define an RPC interface.
 ///
-/// This macro generates a `Client` and `Server` struct, and some more helper types.
+/// This macro generates an `Interface, `Client` and `Server` struct, and some more helper types.
+///
+/// The `Interface` struct is used to enable RPC interface introspection.
+/// Currently, it only supports retrieving the documentation of the interface itself.
+/// In the future, you can use this struct to get a list of services and streaming messages too.
 ///
 /// The client struct is used to initiate requests and send stream messages.
 /// It can be created from a [`PeerWriteHandle`] or a [`PeerHandle`].
@@ -36,6 +40,9 @@ pub use fizyr_rpc_macros::interface as interface_impl;
 ///     // Each item can have user written documentation.
 ///     // Simply write doc comments with triple slashes as usual.
 ///     // This applies to the interface definition, service definitions, update definitions and stream definitions.
+///     //
+///     // The documentation writter on the `interface` item can be retrieved through the introspection API,
+///     // but does not appear in rustdoc.
 ///     pub interface $interface_name {
 ///         // The `service` keyword defines a service.
 ///         //

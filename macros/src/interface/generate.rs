@@ -9,12 +9,42 @@ pub fn generate_interface(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinitio
 	let mut item_tokens = TokenStream::new();
 	let mut client_impl_tokens = TokenStream::new();
 
+	generate_interface_struct(&mut item_tokens, fizyr_rpc, interface);
 	generate_services(&mut item_tokens, &mut client_impl_tokens, fizyr_rpc, interface);
 	generate_streams(&mut item_tokens, &mut client_impl_tokens, fizyr_rpc, interface);
 	generate_client(&mut item_tokens, fizyr_rpc, interface, client_impl_tokens);
 	generate_server(&mut item_tokens, fizyr_rpc, interface);
 
 	item_tokens
+}
+
+/// Generate a struct representing the interface.
+///
+/// TODO: Add RPC introspection support to this struct.
+fn generate_interface_struct(item_tokens: &mut TokenStream, _fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) {
+	let mut doc = String::new();
+	for line in interface.doc() {
+		doc.push_str(&line.value);
+		doc.push('\n');
+	}
+
+	let interface_doc = format!("Introspection for the {} RPC interface.", interface.name());
+	let visibility = interface.visibility();
+
+	item_tokens.extend(quote! {
+		#[doc = #interface_doc]
+		#[derive(Debug)]
+		#visibility struct Interface {
+			_priv: (),
+		}
+
+		impl Interface {
+			/// Get the documentation of the interface.
+			pub const fn doc() -> &'static str {
+				#doc
+			}
+		}
+	})
 }
 
 /// Generate a client struct.
