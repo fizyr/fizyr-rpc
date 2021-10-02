@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+### Added
+- `interface!(...)` now generate an `Interface` struct for introspection.
+### Changed
+- `interface!(...)` no longer generates a module for the created items.
+
 ## 0.5.0-alpha4 - 2021-09-27
 ### Added
 - Add missing `write_handle()` functions for `ReceivedRequest` and `SentRequest` in generated interfaces.
