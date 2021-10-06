@@ -6,8 +6,11 @@ pub use fizyr_rpc_macros::interface as interface_impl;
 #[macro_export]
 /// Define an RPC interface.
 ///
-/// This macro generates a module with a `Client` and `Server` struct,
-/// and some more helper types.
+/// This macro generates an `Interface, `Client` and `Server` struct, and some more helper types.
+///
+/// The `Interface` struct is used to enable RPC interface introspection.
+/// Currently, it only supports retrieving the documentation of the interface itself.
+/// In the future, you can use this struct to get a list of services and streaming messages too.
 ///
 /// The client struct is used to initiate requests and send stream messages.
 /// It can be created from a [`PeerWriteHandle`] or a [`PeerHandle`].
@@ -29,15 +32,17 @@ pub use fizyr_rpc_macros::interface as interface_impl;
 ///     // The `interface` keyword defines an RPC interface.
 ///     // You must have exactly one interface definition in the macro invocation.
 ///     //
-///     // The $interface_name is used as the name of a module containing the generated types.
+///     // The $interface_name is used in automatically generated documentation and should be UpperCamelCase.
 ///     //
-///     // You can adjust the visiblity of the generated module with the `pub` keyword as normal.
-///     // You can use this to take full control over the public module structure,
-///     // by declaring the interface private and re-exporting the module contents from a different location.
+///     // You can adjust the visiblity of the generated items with the `pub` keyword as normal.
+///     // By default, all generated items are private.
 ///     //
 ///     // Each item can have user written documentation.
 ///     // Simply write doc comments with triple slashes as usual.
 ///     // This applies to the interface definition, service definitions, update definitions and stream definitions.
+///     //
+///     // The documentation writter on the `interface` item can be retrieved through the introspection API,
+///     // but does not appear in rustdoc.
 ///     pub interface $interface_name {
 ///         // The `service` keyword defines a service.
 ///         //
@@ -117,15 +122,15 @@ macro_rules! interface {
 /// Example module for the `interface!` macro.
 ///
 /// You can compare the source of the generated documentation to inspect the generated API.
-/// The most important generated types are [`supermarket::Client`] and [`supermarket::Server`].
+/// The most important generated types are [`Client`] and [`Server`].
 ///
-/// [`supermarket::Client`]: interface_example::Client
-/// [`supermarket::Server`]: interface_example::Server
+/// [`Client`]: interface_example::Client
+/// [`Server`]: interface_example::Server
 ///
 /// ```no_compile
 /// fizyr_rpc::interface! {
 ///     /// RPC interface for the supermarket.
-///     interface supermarket {
+///     pub interface Supermarket {
 ///         /// Greet the cashier.
 ///         ///
 ///         /// The cashier will reply with their own greeting.
@@ -160,11 +165,6 @@ macro_rules! interface {
 ///         stream 1 mutter: String,
 ///     }
 /// }
-///
-/// // Re-export the generated contents directly in this module.
-/// //
-/// // Alternatively, you could use `pub interface` in the macro.
-/// pub use supermarket::*;
 ///
 /// /// The initial request to buy tomatoes.
 /// #[derive(Debug)]
@@ -219,7 +219,7 @@ macro_rules! interface {
 pub mod interface_example {
 	interface! {
 		/// RPC interface for the supermarket.
-		interface supermarket {
+		pub interface Supermarket {
 			/// Greet the cashier.
 			///
 			/// The cashier will reply with their own greeting.
@@ -254,8 +254,6 @@ pub mod interface_example {
 			stream 1 mutter: String,
 		}
 	}
-
-	pub use supermarket::*;
 
 	/// The initial request to buy tomatoes.
 	#[derive(Debug)]

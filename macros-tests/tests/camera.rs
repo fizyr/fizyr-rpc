@@ -2,7 +2,7 @@ use assert2::{let_assert, assert};
 use fizyr_rpc::{UnixStreamPeer, UnixStreamTransport};
 use fizyr_rpc::util::format::Format;
 
-use macros_tests::{camera, Image, Json, RecordRequest, RecordState};
+use macros_tests::{camera, Json};
 
 fn client_server_pair<F: fizyr_rpc::util::format::Format<Body = fizyr_rpc::StreamBody>>() -> std::io::Result<(camera::Client<F>, camera::Server<F>)> {
 	let (client, server) = tokio::net::UnixStream::pair()?;
@@ -36,31 +36,31 @@ async fn record() {
 		let_assert!(Ok(camera::ReceivedMessage::Request(camera::ReceivedRequestHandle::Record(request, body))) = server.recv_message().await);
 		assert!(body.color == true);
 		assert!(body.cloud == false);
-		assert!(let Ok(()) = request.send_state_update(&RecordState::Recording).await);
-		assert!(let Ok(()) = request.send_state_update(&RecordState::Processing).await);
-		assert!(let Ok(()) = request.send_image_update(&Image {
+		assert!(let Ok(()) = request.send_state_update(&camera::RecordState::Recording).await);
+		assert!(let Ok(()) = request.send_state_update(&camera::RecordState::Processing).await);
+		assert!(let Ok(()) = request.send_image_update(&camera::Image {
 			format: 1,
 			width: 2,
 			height: 3,
 			data: vec![0, 1, 2, 3, 4, 5],
 		}).await);
-		assert!(let Ok(()) = request.send_state_update(&RecordState::Done).await);
+		assert!(let Ok(()) = request.send_state_update(&camera::RecordState::Done).await);
 		assert!(let Ok(()) = request.send_response(&()).await);
 		let_assert!(Err(e) = server.recv_message().await);
 		assert!(e.is_connection_aborted());
 	});
 
-	let_assert!(Ok(mut sent_request) = client.record(&RecordRequest { color: true, cloud: false }).await);
+	let_assert!(Ok(mut sent_request) = client.record(&camera::RecordRequest { color: true, cloud: false }).await);
 
 	let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
 	assert!(update.is_state() == true);
 	assert!(update.is_image() == false);
-	assert!(let Some(RecordState::Recording) = update.as_state());
+	assert!(let Some(camera::RecordState::Recording) = update.as_state());
 	assert!(let None = update.as_image());
-	assert!(let Ok(RecordState::Recording) = update.into_state());
+	assert!(let Ok(camera::RecordState::Recording) = update.into_state());
 
 	let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
-	assert!(let Ok(RecordState::Processing) = update.into_state());
+	assert!(let Ok(camera::RecordState::Processing) = update.into_state());
 
 	let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
 	let_assert!(Ok(image) = update.into_image());
@@ -70,7 +70,7 @@ async fn record() {
 	assert!(image.data == &[0, 1, 2, 3, 4, 5]);
 
 	let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
-	assert!(let Ok(RecordState::Done) = update.into_state());
+	assert!(let Ok(camera::RecordState::Done) = update.into_state());
 
 	assert!(let Ok(None) = sent_request.recv_update().await);
 
