@@ -317,6 +317,7 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 	if service.request_updates().is_empty() && service.response_updates().is_empty() {
 		client_impl_tokens.extend(quote! {
 			#service_doc
+			#[allow(clippy::ptr_arg)]
 			pub async fn #service_name(&self, #request_param) -> Result<#response_type, #fizyr_rpc::Error>
 			where
 				F: #fizyr_rpc::util::format::EncodeBody<#request_type>,
@@ -342,6 +343,7 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 		generate_sent_request(&mut service_item_tokens, fizyr_rpc, service);
 		client_impl_tokens.extend(quote! {
 			#service_doc
+			#[allow(clippy::ptr_arg)]
 			pub async fn #service_name(&self, #request_param) -> Result<#service_name::SentRequestHandle<F>, #fizyr_rpc::Error>
 			where
 				F: #fizyr_rpc::util::format::EncodeBody<#request_type>,
@@ -559,6 +561,7 @@ enum UpdateKind {
 fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, enum_type: &TokenStream, updates: &[UpdateDefinition]) {
 	quote! {
 		/// Send a request update to the remote peer.
+		#[allow(clippy::ptr_arg)]
 		pub async fn send_update(&self, update: &#enum_type) -> Result<(), #fizyr_rpc::Error>
 		where
 			#enum_type: #fizyr_rpc::util::format::ToMessage<F>,
@@ -585,6 +588,7 @@ fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 		}
 		impl_tokens.extend(quote! {
 			#[doc = #doc]
+			#[allow(clippy::ptr_arg)]
 			pub async fn #function_name(&self, #body_arg) -> Result<(), #fizyr_rpc::Error>
 			where
 				F: #fizyr_rpc::util::format::EncodeBody<#body_type>,
@@ -653,6 +657,7 @@ fn generate_streams(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 		}
 		client_impl_tokens.extend(quote! {
 			#[doc = #fn_doc]
+			#[allow(clippy::ptr_arg)]
 			pub async fn #fn_name(&self, #body_arg) -> Result<(), #fizyr_rpc::Error>
 			where
 				F: #fizyr_rpc::util::format::EncodeBody<#body_type>,
@@ -848,6 +853,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 
 	write_handle_impl_tokens.extend(quote! {
 		/// Send the final response.
+		#[allow(clippy::ptr_arg)]
 		pub async fn send_response(&self, response: &#response_type) -> Result<(), #fizyr_rpc::Error>
 		where
 			F: #fizyr_rpc::util::format::EncodeBody<#response_type>,
