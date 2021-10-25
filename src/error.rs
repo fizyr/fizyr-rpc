@@ -127,7 +127,7 @@ pub(crate) mod private {
 		Io(#[from] std::io::Error),
 
 		/// The received message is too short to be valid.
-		#[error("the message is too short to be valid: need atleast 12 bytes for the header, got only {message_len} bytes")]
+		#[error("the message is too short to be valid: need at least {} for the header, got only {message_len} bytes", crate::HEADER_LEN)]
 		MessageTooShort {
 			message_len: usize,
 		},
