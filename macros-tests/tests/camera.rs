@@ -18,7 +18,7 @@ async fn ping() {
 	let server = tokio::spawn(async move {
 		let_assert!(Ok(camera::ReceivedMessage::Request(camera::ReceivedRequestHandle::Ping(request, ()))) = server.recv_message().await);
 		assert!(let Ok(()) = request.send_response(&()).await);
-		let_assert!(Err(e) = server.recv_message().await);
+		let_assert!(Err(fizyr_rpc::RecvMessageError::Other(e)) = server.recv_message().await);
 		assert!(e.is_connection_aborted());
 	});
 
@@ -46,33 +46,33 @@ async fn record() {
 		}).await);
 		assert!(let Ok(()) = request.send_state_update(&camera::RecordState::Done).await);
 		assert!(let Ok(()) = request.send_response(&()).await);
-		let_assert!(Err(e) = server.recv_message().await);
+		let_assert!(Err(fizyr_rpc::RecvMessageError::Other(e)) = server.recv_message().await);
 		assert!(e.is_connection_aborted());
 	});
 
 	let_assert!(Ok(mut sent_request) = client.record(&camera::RecordRequest { color: true, cloud: false }).await);
 
-	let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
+	let_assert!(Some(Ok(update)) = sent_request.recv_update().await);
 	assert!(update.is_state() == true);
 	assert!(update.is_image() == false);
 	assert!(let Some(camera::RecordState::Recording) = update.as_state());
 	assert!(let None = update.as_image());
 	assert!(let Ok(camera::RecordState::Recording) = update.into_state());
 
-	let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
+	let_assert!(Some(Ok(update)) = sent_request.recv_update().await);
 	assert!(let Ok(camera::RecordState::Processing) = update.into_state());
 
-	let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
+	let_assert!(Some(Ok(update)) = sent_request.recv_update().await);
 	let_assert!(Ok(image) = update.into_image());
 	assert!(image.format == 1);
 	assert!(image.width == 2);
 	assert!(image.height == 3);
 	assert!(image.data == &[0, 1, 2, 3, 4, 5]);
 
-	let_assert!(Ok(Some(update)) = sent_request.recv_update().await);
+	let_assert!(Some(Ok(update)) = sent_request.recv_update().await);
 	assert!(let Ok(camera::RecordState::Done) = update.into_state());
 
-	assert!(let Ok(None) = sent_request.recv_update().await);
+	assert!(let None = sent_request.recv_update().await);
 
 	assert!(let Ok(()) = sent_request.recv_response().await);
 	drop(client);

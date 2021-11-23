@@ -10,6 +10,47 @@ pub struct Error {
 	pub(crate) inner: private::InnerError,
 }
 
+/// The received update is unknown or invalid.
+///
+/// This error is used in generated interfaces only.
+pub enum ParseUpdateError<Body> {
+	/// The received update has an unknown service ID.
+	UnknownUpdate(crate::Message<Body>),
+
+	/// The received update has a known service ID, but an invalid body.
+	///
+	/// The body has been consumed in the parse attempt,
+	/// so only the message header and parse error are available.
+	InvalidUpdate(crate::MessageHeader, Box<dyn std::error::Error>),
+}
+
+/// Error that can occur when receiving a message from a peer using a generated interface.
+///
+/// Apart from the [`Error`] reported by [`PeerHandle::recv_message()`][crate::PeerHandle::recv_message],
+/// this error is used when the received message has an unknown service ID or an invalid body.
+pub enum RecvMessageError<Body> {
+	/// The underlying call to [`PeerHandle::recv_message()`][crate::PeerHandle::recv_message] returned an error.
+	Other(Error),
+
+	/// The received stream message has an unknown service ID.
+	UnknownStream(crate::Message<Body>),
+
+	/// The received request has an unknown service ID.
+	UnknownRequest(crate::ReceivedRequestHandle<Body>, Body),
+
+	/// The received stream message has a known service ID, but an invalid body.
+	///
+	/// The body has been consumed in the parse attempt,
+	/// so only the message header and parse error are available.
+	InvalidStream(crate::MessageHeader, Box<dyn std::error::Error>),
+
+	/// The received request has a known service ID, but an invalid body.
+	///
+	/// The body has been consumed in the parse attempt,
+	/// so only the request handle and parse error are available.
+	InvalidRequest(crate::ReceivedRequestHandle<Body>, Box<dyn std::error::Error>),
+}
+
 impl Error {
 	/// Create a new error from an I/O error.
 	pub fn io_error(error: std::io::Error) -> Self {
@@ -109,6 +150,74 @@ impl Error {
 impl From<std::io::Error> for Error {
 	fn from(other: std::io::Error) -> Self {
 		Self::io_error(other)
+	}
+}
+
+impl<Body> From<Error> for RecvMessageError<Body> {
+	fn from(other: Error) -> Self {
+		Self::Other(other)
+	}
+}
+
+impl<Body> std::error::Error for ParseUpdateError<Body> {}
+impl<Body> std::error::Error for RecvMessageError<Body> {}
+
+impl<Body> std::fmt::Display for ParseUpdateError<Body> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::UnknownUpdate(message) => write!(f, "received unknown update with service ID {}", message.header.service_id),
+			Self::InvalidUpdate(header, error) => write!(f, "received invalid update with service ID {}: {}", header.service_id, error),
+		}
+	}
+}
+
+impl<Body> std::fmt::Display for RecvMessageError<Body> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Other(e) => write!(f, "{}", e),
+			Self::UnknownStream(message) => write!(f, "received unknown stream message with service ID {}", message.header.service_id),
+			Self::InvalidStream(header, error) => write!(f, "received invalid stream message with service ID {}: {}", header.service_id, error),
+			Self::UnknownRequest(request, _body) => write!(f, "received unknown request message with service ID {}", request.service_id()),
+			Self::InvalidRequest(request, error) => write!(f, "received invalid request message with service ID {}: {}", request.service_id(), error),
+		}
+	}
+}
+
+impl<Body> std::fmt::Debug for ParseUpdateError<Body> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::UnknownUpdate(message) => f.debug_tuple("UnknownUpdate")
+				.field(message)
+				.finish(),
+			Self::InvalidUpdate(header, error) => f.debug_tuple("InvalidUpdate")
+				.field(header)
+				.field(error)
+				.finish(),
+		}
+	}
+}
+
+impl<Body> std::fmt::Debug for RecvMessageError<Body> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Other(e) => f.debug_tuple("Other")
+				.field(e)
+				.finish(),
+			Self::UnknownStream(message) => f.debug_tuple("UnknownStream")
+				.field(message)
+				.finish(),
+			Self::UnknownRequest(request, _body) => f.debug_tuple("UnknownStream")
+				.field(request)
+				.finish(),
+			Self::InvalidStream(header, error) => f.debug_tuple("InvalidStread")
+				.field(header)
+				.field(error)
+				.finish(),
+			Self::InvalidRequest(request, error) => f.debug_tuple("InvalidRequest")
+				.field(request)
+				.field(error)
+				.finish(),
+		}
 	}
 }
 
