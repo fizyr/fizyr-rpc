@@ -80,6 +80,44 @@ async fn record() {
 	assert!(let Ok(()) = server.await);
 }
 
+#[tokio::test]
+async fn record_state() {
+	use camera::camera_events;
+
+	fn client_server_pair<F: fizyr_rpc::util::format::Format<Body = fizyr_rpc::StreamBody>>() -> std::io::Result<(camera_events::Client<F>, camera_events::Server<F>)> {
+		let (client, server) = tokio::net::UnixStream::pair()?;
+		let client = UnixStreamPeer::spawn(UnixStreamTransport::new(client, Default::default()));
+		let server = UnixStreamPeer::spawn(UnixStreamTransport::new(server, Default::default()));
+		Ok((client.into(), server.into()))
+	}
+
+	let_assert!(Ok((client, mut server)) = client_server_pair::<Json>());
+
+	let server = tokio::spawn(async move {
+		let_assert!(Ok(camera_events::ReceivedMessage::Stream(msg)) = server.recv_message().await);
+		let_assert!(camera_events::StreamMessage::RecordState(state) = msg);
+		assert!(state == camera::RecordState::Recording);
+
+		let_assert!(Ok(camera_events::ReceivedMessage::Stream(msg)) = server.recv_message().await);
+		let_assert!(camera_events::StreamMessage::RecordState(state) = msg);
+		assert!(state == camera::RecordState::Processing);
+
+		let_assert!(Ok(camera_events::ReceivedMessage::Stream(msg)) = server.recv_message().await);
+		let_assert!(camera_events::StreamMessage::RecordState(state) = msg);
+		assert!(state == camera::RecordState::Done);
+
+		let_assert!(Err(fizyr_rpc::RecvMessageError::Other(e)) = server.recv_message().await);
+		assert!(e.is_connection_aborted());
+	});
+
+	assert!(let Ok(()) = client.send_record_state(&camera::RecordState::Recording).await);
+	assert!(let Ok(()) = client.send_record_state(&camera::RecordState::Processing).await);
+	assert!(let Ok(()) = client.send_record_state(&camera::RecordState::Done).await);
+
+	drop(client);
+	assert!(let Ok(()) = server.await);
+}
+
 #[allow(dead_code, clippy::all)]
 fn assert_client_clone<F: Format>(camera: camera::Client<F>) {
 	let _ = camera.clone();
