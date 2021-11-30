@@ -1,4 +1,4 @@
-# Unreleased
+# Version 0.5.0-alpha5 - 2021-11-30
 - [add][minor] `interface!(...)` now generates an `Interface` struct for introspection.
 - [change][major] `interface!(...)` no longer generates a module for the created items.
 - [change][major] Allow access to unknown and invalid messages in generated interfaces.
