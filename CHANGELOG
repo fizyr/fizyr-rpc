@@ -1,4 +1,4 @@
-# Unreleased
+# Version 0.5.0-alpha6 - 2021-11-30
 - [fix][minor] Make sure that decode errors are `Send` in all cases.
 
 # Version 0.5.0-alpha5 - 2021-11-30
