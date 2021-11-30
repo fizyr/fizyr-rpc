@@ -12,6 +12,7 @@ use crate::{Error, Message, MessageHeader};
 const FRAMED_HEADER_LEN: usize = 4 + crate::HEADER_LEN as usize;
 
 /// Transport layer for byte-stream sockets.
+#[allow(dead_code)] // Fields are not used when transports are disabled.
 pub struct StreamTransport<Stream> {
 	/// The stream to use for sending/receiving messages.
 	pub(super) stream: Stream,
@@ -21,6 +22,7 @@ pub struct StreamTransport<Stream> {
 }
 
 /// The read half of a [`StreamTransport`].
+#[allow(dead_code)] // Not used when transports are disabled.
 pub struct StreamReadHalf<R> {
 	/// The read half of the underlying stream.
 	pub(super) stream: R,
@@ -42,6 +44,7 @@ pub struct StreamReadHalf<R> {
 }
 
 /// The write half of a [`StreamTransport`].
+#[allow(dead_code)] // Not used when transports are disabled.
 pub struct StreamWriteHalf<W> {
 	/// The write half of the underlying stream.
 	pub(super) stream: W,
@@ -72,6 +75,7 @@ where
 }
 
 impl<R> StreamReadHalf<R> {
+	#[allow(dead_code)] // Not used when transports are disabled.
 	pub(super) fn new(stream: R, max_body_len: u32) -> Self {
 		Self {
 			stream,
@@ -85,6 +89,7 @@ impl<R> StreamReadHalf<R> {
 }
 
 impl<W> StreamWriteHalf<W> {
+	#[allow(dead_code)] // Not used when transports are disabled.
 	pub(super) fn new(stream: W, max_body_len: u32) -> Self {
 		Self {
 			stream,

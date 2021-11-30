@@ -1,5 +1,3 @@
-use std::os::unix::fs::FileTypeExt;
-
 mod body;
 mod config;
 mod transport;
@@ -60,6 +58,8 @@ mod impl_unix_stream {
 		type Future = Pin<Box<dyn Future<Output = std::io::Result<Self>> + 'a>>;
 
 		fn bind(address: Address) -> Self::Future {
+			use std::os::unix::fs::FileTypeExt;
+
 			// Try to unlink the socket before binding it, ignoring errors.
 			if let Ok(metadata) = std::fs::metadata(&address) {
 				if metadata.file_type().is_socket() {

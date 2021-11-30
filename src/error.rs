@@ -304,6 +304,7 @@ pub(crate) mod private {
 	}
 
 	/// Check if a message size is large enough to contain a valid message.
+	#[allow(dead_code)] // not used when all transports are disabled.
 	pub fn check_message_too_short(message_len: usize) -> Result<(), InnerError> {
 		if message_len >= crate::HEADER_LEN as usize {
 			Ok(())
