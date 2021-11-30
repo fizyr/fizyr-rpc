@@ -15,7 +15,7 @@ readme = "README.md"
 keywords = ["rpc", "shared-memory"]
 categories = ["asynchronous", "network-programming"]
 
-edition = "2018"
+edition = "2021"
 
 [features]
 tcp = ["tokio/net"]
