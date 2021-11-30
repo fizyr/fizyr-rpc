@@ -21,7 +21,7 @@ pub enum ParseUpdateError<Body> {
 	///
 	/// The body has been consumed in the parse attempt,
 	/// so only the message header and parse error are available.
-	InvalidUpdate(crate::MessageHeader, Box<dyn std::error::Error>),
+	InvalidUpdate(crate::MessageHeader, Box<dyn std::error::Error + Send>),
 }
 
 /// Error that can occur when receiving a message from a peer using a generated interface.
@@ -42,13 +42,13 @@ pub enum RecvMessageError<Body> {
 	///
 	/// The body has been consumed in the parse attempt,
 	/// so only the message header and parse error are available.
-	InvalidStream(crate::MessageHeader, Box<dyn std::error::Error>),
+	InvalidStream(crate::MessageHeader, Box<dyn std::error::Error + Send>),
 
 	/// The received request has a known service ID, but an invalid body.
 	///
 	/// The body has been consumed in the parse attempt,
 	/// so only the request handle and parse error are available.
-	InvalidRequest(crate::ReceivedRequestHandle<Body>, Box<dyn std::error::Error>),
+	InvalidRequest(crate::ReceivedRequestHandle<Body>, Box<dyn std::error::Error + Send>),
 }
 
 impl Error {

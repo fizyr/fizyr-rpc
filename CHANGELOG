@@ -1,3 +1,6 @@
+# Unreleased
+- [fix][minor] Make sure that decode errors are `Send` in all cases.
+
 # Version 0.5.0-alpha5 - 2021-11-30
 - [add][minor] `interface!(...)` now generates an `Interface` struct for introspection.
 - [change][major] `interface!(...)` no longer generates a module for the created items.
