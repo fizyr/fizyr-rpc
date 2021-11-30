@@ -108,7 +108,11 @@ mod request_tracker;
 pub mod transport;
 pub mod util;
 
-pub use error::Error;
+pub use error::{
+	Error,
+	ParseUpdateError,
+	RecvMessageError,
+};
 pub use listener::{
 	Listener,
 	ListeningSocket,

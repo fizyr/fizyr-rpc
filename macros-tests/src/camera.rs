@@ -28,16 +28,26 @@ fizyr_rpc::interface! {
 			///
 			/// The camera may send multiple image updates depending on the configuration.
 			response_update 12 image: Image,
+		},
+	}
+}
+
+pub mod camera_events {
+	fizyr_rpc::interface! {
+		pub interface camera_events {
+			/// Notifications whenever the camera changes record state.
+			stream 11 record_state: super::RecordState,
 		}
 	}
 }
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RecordRequest {
 	pub color: bool,
 	pub cloud: bool,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Deserialize, Serialize)]
 pub enum RecordState {
 	Recording,
 	Processing,
