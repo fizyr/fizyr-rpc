@@ -13,70 +13,127 @@ pub mod cooked {
 	use proc_macro2::Span;
 	use super::raw;
 
+	/// A parsed interface definition.
 	pub struct InterfaceDefinition {
+		/// The visiblity to use for all generated items.
 		visibility: syn::Visibility,
+
+		/// The name of the interface.
 		name: syn::Ident,
+
+		/// The doc comments of the interface.
 		doc: Vec<WithSpan<String>>,
+
+		/// The services in the interface.
 		services: Vec<ServiceDefinition>,
+
+		/// The stream messages in the interface.
 		streams: Vec<StreamDefinition>,
 	}
 
+	/// A parsed service definition.
 	pub struct ServiceDefinition {
+		/// The ID of the service.
 		service_id: WithSpan<i32>,
+
+		/// The name of the service.
 		name: syn::Ident,
+
+		/// The doc comments of the service.
 		doc: Vec<WithSpan<String>>,
+
+		/// The type of the request body.
 		request_type: Box<syn::Type>,
+
+		/// The type of the response body.
 		response_type: Box<syn::Type>,
+
+		/// The updates that can be sent by the request initiator ("client").
 		request_updates: Vec<UpdateDefinition>,
+
+		/// The updates that can be sent by the request handler ("server").
 		response_updates: Vec<UpdateDefinition>,
 	}
 
+	/// A parsed definition of an update message.
 	pub struct UpdateDefinition {
+		/// The service ID of the update.
 		service_id: WithSpan<i32>,
+
+		/// The name of the update.
 		name: syn::Ident,
+
+		/// The doc comments of the update.
 		doc: Vec<WithSpan<String>>,
+
+		/// The body type of the update.
 		body_type: Box<syn::Type>,
 	}
 
+	/// A parsed definition of a stream message.
 	pub struct StreamDefinition {
+		/// The service ID of the stream.
 		service_id: WithSpan<i32>,
+
+		/// The name of the stream.
 		name: syn::Ident,
+
+		/// The doc comments of the stream.
 		doc: Vec<WithSpan<String>>,
+
+		/// The body type of the stream message.
 		body_type: Box<syn::Type>,
 	}
 
+	/// Trait for message definitions.
+	///
+	/// This is implemented for update messages and stream messages.
 	pub trait MessageDefinition {
+		/// The service ID used for the message.
 		fn service_id(&self) -> &WithSpan<i32>;
+
+		/// The name of the message.
 		fn name(&self) -> &syn::Ident;
+
+		/// The doc comments of the message.
 		fn doc(&self) -> &[WithSpan<String>];
+
+		/// The type of the message body.
 		fn body_type(&self) -> &syn::Type;
 	}
 
+	/// Attributes that include only doc comments.
 	struct DocOnlyAttributes {
 		doc: Vec<WithSpan<String>>,
 	}
 
 	impl InterfaceDefinition {
+		/// Get the visiblity to use for all generated top-level items.
 		pub fn visibility(&self) -> &syn::Visibility {
 			&self.visibility
 		}
 
+		/// Get the name of the interface.
 		pub fn name(&self) -> &syn::Ident {
 			&self.name
 		}
 
+		/// Get the doc comments of the interface.
 		pub fn doc(&self) -> &[WithSpan<String>] {
 			&self.doc
 		}
 
+		/// Get the list of services in the interface.
 		pub fn services(&self) -> &[ServiceDefinition] {
 			&self.services
 		}
 
+		/// Get the list of streams in the interface.
 		pub fn streams(&self) -> &[StreamDefinition] {
 			&self.streams
 		}
 
+		/// Process a raw interface definition into a cooked one.
 		pub fn from_raw(errors: &mut Vec<syn::Error>, raw: raw::InterfaceDefinition) -> Self {
 			let attrs = DocOnlyAttributes::from_raw(errors, raw.attrs);
 			let mut services = Vec::new();
@@ -136,34 +193,42 @@ pub mod cooked {
 	}
 
 	impl ServiceDefinition {
+		/// Get the service ID of the service.
 		pub fn service_id(&self) -> WithSpan<i32> {
 			self.service_id.clone()
 		}
 
+		/// Get the name of the service.
 		pub fn name(&self) -> &syn::Ident {
 			&self.name
 		}
 
+		/// Get the doc comments of the service.
 		pub fn doc(&self) -> &[WithSpan<String>] {
 			&self.doc
 		}
 
+		/// Get the type of the request body.
 		pub fn request_type(&self) -> &syn::Type {
 			self.request_type.as_ref()
 		}
 
+		/// Get the type of the response body.
 		pub fn response_type(&self) -> &syn::Type {
 			self.response_type.as_ref()
 		}
 
+		/// Get the updates that the request initiator can send.
 		pub fn request_updates(&self) -> &[UpdateDefinition] {
 			&self.request_updates
 		}
 
+		/// Get the updates that the request handler can send.
 		pub fn response_updates(&self) -> &[UpdateDefinition] {
 			&self.response_updates
 		}
 
+		/// Process a raw service definition into a cooked one.
 		fn from_raw(errors: &mut Vec<syn::Error>, raw: raw::ServiceDefinition) -> Self {
 			let attrs = DocOnlyAttributes::from_raw(errors, raw.attrs);
 			let mut request_updates = Vec::new();
@@ -227,22 +292,27 @@ pub mod cooked {
 	}
 
 	impl UpdateDefinition {
+		/// Get the service ID of the update.
 		pub fn service_id(&self) -> &WithSpan<i32> {
 			&self.service_id
 		}
 
+		/// Get the name of the update.
 		pub fn name(&self) -> &syn::Ident {
 			&self.name
 		}
 
+		/// Get the doc comments of the update.
 		pub fn doc(&self) -> &[WithSpan<String>] {
 			&self.doc
 		}
 
+		/// Get the type of the update body.
 		pub fn body_type(&self) -> &syn::Type {
 			&self.body_type
 		}
 
+		/// Process a raw update definition into a cooked one.
 		fn from_raw(errors: &mut Vec<syn::Error>, raw: raw::UpdateDefinition) -> (raw::UpdateKind, Self) {
 			let attrs = DocOnlyAttributes::from_raw(errors, raw.attrs);
 
@@ -256,22 +326,27 @@ pub mod cooked {
 	}
 
 	impl StreamDefinition {
+		/// Get the service ID of the stream.
 		pub fn service_id(&self) -> &WithSpan<i32> {
 			&self.service_id
 		}
 
+		/// Get the name of the stream.
 		pub fn name(&self) -> &syn::Ident {
 			&self.name
 		}
 
+		/// Get the doc comments of the stream.
 		pub fn doc(&self) -> &[WithSpan<String>] {
 			&self.doc
 		}
 
+		/// Get the type of the stream body.
 		pub fn body_type(&self) -> &syn::Type {
 			self.body_type.as_ref()
 		}
 
+		/// Process a raw stream definition into a cooked one.
 		fn from_raw(errors: &mut Vec<syn::Error>, raw: raw::StreamDefinition) -> Self {
 			let attrs = DocOnlyAttributes::from_raw(errors, raw.attrs);
 
@@ -286,6 +361,7 @@ pub mod cooked {
 
 
 	impl DocOnlyAttributes {
+		/// Process raw attributes into cooked DocOnlyAttributes.
 		fn from_raw(errors: &mut Vec<syn::Error>, attrs: Vec<syn::Attribute>) -> Self {
 			let mut doc = Vec::new();
 
@@ -304,6 +380,7 @@ pub mod cooked {
 		}
 	}
 
+	/// Parse an integer literal into an i32.
 	fn parse_i32(errors: &mut Vec<syn::Error>, literal: syn::LitInt) -> WithSpan<i32> {
 		match literal.base10_parse() {
 			Ok(x) => WithSpan::new(literal.span(), x),
