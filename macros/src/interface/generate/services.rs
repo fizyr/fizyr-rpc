@@ -3,7 +3,7 @@ use quote::quote;
 
 use crate::interface::parse::cooked::{InterfaceDefinition, ServiceDefinition, UpdateDefinition};
 
-use super::{to_doc_attrs, is_unit_type, to_upper_camel_case};
+use super::{to_doc_attrs, is_unit_type, to_upper_camel_case, message_enum::generate_message_enum};
 
 #[derive(Debug, Eq, PartialEq)]
 enum UpdateKind {

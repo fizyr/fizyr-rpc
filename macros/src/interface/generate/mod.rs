@@ -4,6 +4,7 @@ use super::parse::cooked::InterfaceDefinition;
 
 mod client;
 mod interface_struct;
+mod format_trait;
 mod message_enum;
 mod server;
 mod services;
@@ -19,6 +20,7 @@ pub fn generate_interface(fizyr_rpc: &syn::Ident, interface: &InterfaceDefinitio
 	streams::generate_streams(&mut item_tokens, &mut client_impl_tokens, fizyr_rpc, interface);
 	client::generate_client(&mut item_tokens, fizyr_rpc, interface, client_impl_tokens);
 	server::generate_server(&mut item_tokens, fizyr_rpc, interface);
+	format_trait::generate_format_trait(&mut item_tokens, fizyr_rpc, interface);
 
 	item_tokens
 }
