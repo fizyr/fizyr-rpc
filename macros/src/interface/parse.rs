@@ -45,6 +45,13 @@ pub mod cooked {
 		body_type: Box<syn::Type>,
 	}
 
+	pub trait MessageDefinition {
+		fn service_id(&self) -> &WithSpan<i32>;
+		fn name(&self) -> &syn::Ident;
+		fn doc(&self) -> &[WithSpan<String>];
+		fn body_type(&self) -> &syn::Type;
+	}
+
 	struct DocOnlyAttributes {
 		doc: Vec<WithSpan<String>>,
 	}
@@ -304,6 +311,42 @@ pub mod cooked {
 				errors.push(e);
 				WithSpan::new(Span::call_site(), 0)
 			}
+		}
+	}
+
+	impl MessageDefinition for UpdateDefinition {
+		fn service_id(&self) -> &WithSpan<i32> {
+			self.service_id()
+		}
+
+		fn name(&self) -> &syn::Ident {
+			self.name()
+		}
+
+		fn doc(&self) -> &[WithSpan<String>] {
+			self.doc()
+		}
+
+		fn body_type(&self) -> &syn::Type {
+			self.body_type()
+		}
+	}
+
+	impl MessageDefinition for StreamDefinition {
+		fn service_id(&self) -> &WithSpan<i32> {
+			self.service_id()
+		}
+
+		fn name(&self) -> &syn::Ident {
+			self.name()
+		}
+
+		fn doc(&self) -> &[WithSpan<String>] {
+			self.doc()
+		}
+
+		fn body_type(&self) -> &syn::Type {
+			self.body_type()
 		}
 	}
 }
