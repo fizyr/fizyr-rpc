@@ -26,7 +26,7 @@ pub enum ParseUpdateError<Body> {
 
 /// Error that can occur when receiving a message from a peer using a generated interface.
 ///
-/// Apart from the [`Error`] reported by [`PeerHandle::recv_message()`][crate::PeerHandle::recv_message],
+/// Apart from the [`struct@Error`] reported by [`PeerHandle::recv_message()`][crate::PeerHandle::recv_message],
 /// this error is used when the received message has an unknown service ID or an invalid body.
 pub enum RecvMessageError<Body> {
 	/// The underlying call to [`PeerHandle::recv_message()`][crate::PeerHandle::recv_message] returned an error.
