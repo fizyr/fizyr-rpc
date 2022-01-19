@@ -21,7 +21,7 @@ pub trait Format {
 }
 
 /// Trait for formats that can encode `T` to a message body.
-pub trait EncodeBody<T>: Format {
+pub trait EncodeBody<T: ?Sized>: Format {
 	/// Encode the value to a message body.
 	fn encode_body(value: &T) -> Result<Self::Body, Box<dyn std::error::Error + Send>>;
 }
