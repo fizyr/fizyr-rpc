@@ -1,5 +1,6 @@
 use byteorder::ByteOrder;
 use byteorder::LE;
+use std::io::IoSlice;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -180,16 +181,13 @@ where
 		});
 
 		// Keep writing the header until it is done.
-		while this.bytes_written < FRAMED_HEADER_LEN {
+		while this.bytes_written < FRAMED_HEADER_LEN + body.len() {
 			let stream = Pin::new(&mut this.stream);
-			this.bytes_written += ready!(stream.poll_write(context, &header_buffer[this.bytes_written..]))?;
-		}
-
-		// Keep writing the body contents until it is done.
-		while this.bytes_written - FRAMED_HEADER_LEN < body.len() {
-			let body_written = this.bytes_written - FRAMED_HEADER_LEN;
-			let stream = Pin::new(&mut this.stream);
-			this.bytes_written += ready!(stream.poll_write(context, &body.data[body_written..]))?;
+			if this.bytes_written < FRAMED_HEADER_LEN {
+				this.bytes_written = ready!(stream.poll_write_vectored(context, &[IoSlice::new(&header_buffer[this.bytes_written..]), IoSlice::new(&body.data)]))?;
+			} else {
+				this.bytes_written = ready!(stream.poll_write_vectored(context, &[IoSlice::new(&body.data[this.bytes_written - FRAMED_HEADER_LEN..])]))?;
+			}
 		}
 
 		// Reset internal state and return success.
