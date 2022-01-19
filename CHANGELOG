@@ -1,3 +1,6 @@
+# Unreleased
+- [impl][patch] use a single `poll_write_vectored` call instead of two separate `poll_write` calls in tcp transport implementation.
+
 # Version 0.5.0-alpha7 - 2022-01-10
 - [add][minor] Add a specific `Format` trait for generated interaces to avoid writing overly long trait bounds.
 
