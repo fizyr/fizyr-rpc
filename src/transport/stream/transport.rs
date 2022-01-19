@@ -183,10 +183,11 @@ where
 		// Keep writing the header until it is done.
 		while this.bytes_written < FRAMED_HEADER_LEN + body.len() {
 			let stream = Pin::new(&mut this.stream);
-			this.bytes_written = match this.bytes_written {
-				bytes if bytes < FRAMED_HEADER_LEN =>  ready!(stream.poll_write_vectored(context, &[IoSlice::new(&header_buffer[bytes..]), IoSlice::new(&body.data)])),
-				bytes =>  ready!(stream.poll_write_vectored(context, &[IoSlice::new(&body.data[bytes - FRAMED_HEADER_LEN..])])),
-			}?;
+			if this.bytes_written < FRAMED_HEADER_LEN {
+				this.bytes_written = ready!(stream.poll_write_vectored(context, &[IoSlice::new(&header_buffer[this.bytes_written..]), IoSlice::new(&body.data)]))?;
+			} else {
+				this.bytes_written = ready!(stream.poll_write_vectored(context, &[IoSlice::new(&body.data[this.bytes_written - FRAMED_HEADER_LEN..])]))?;
+			}
 		}
 
 		// Reset internal state and return success.
