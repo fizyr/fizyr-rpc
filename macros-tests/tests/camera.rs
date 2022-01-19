@@ -138,11 +138,11 @@ fn interface_introspection_camera() {
 	let interface = camera::Interface::definition::<Json>();
 	assert!(interface.name == "Camera");
 	assert!(interface.doc == concat!(
-		" Interface to a camera server.\n",
+		"Interface to a camera server.\n",
 		"\n",
-		" A camera server can represent many different types of cameras,\n",
-		" like a simple 2D camera, a 3D camera with or without RGB data,\n",
-		" or even a line scanner.\n",
+		"A camera server can represent many different types of cameras,\n",
+		"like a simple 2D camera, a 3D camera with or without RGB data,\n",
+		"or even a line scanner.\n",
 	));
 
 	assert!(interface.services.len() == 2);
@@ -150,10 +150,10 @@ fn interface_introspection_camera() {
 	assert!(interface.services[0].name == "ping");
 	assert!(interface.services[0].service_id == 0);
 	assert!(interface.services[0].doc == concat!(
-		" Ping the server.\n",
+		"Ping the server.\n",
 		"\n",
-		" A succesful ping indicates that the server is running,\n",
-		" but it does not guarantee that it is connected to a camera.\n",
+		"A succesful ping indicates that the server is running,\n",
+		"but it does not guarantee that it is connected to a camera.\n",
 	));
 	assert!(interface.services[0].request_body == "()");
 	assert!(interface.services[0].response_body == "()");
@@ -162,31 +162,31 @@ fn interface_introspection_camera() {
 
 	assert!(interface.services[1].name == "record");
 	assert!(interface.services[1].service_id == 1);
-	assert!(interface.services[1].doc == " Record an image.\n");
+	assert!(interface.services[1].doc == "Record an image.\n");
 	assert!(interface.services[1].request_body == "macros_tests::camera::RecordRequest");
 	assert!(interface.services[1].response_body == "()");
 	assert!(interface.services[1].request_updates.len() == 1);
 	assert!(interface.services[1].request_updates[0].name == "cancel");
-	assert!(interface.services[1].request_updates[0].doc == " Cancel the recording prematurely.\n");
+	assert!(interface.services[1].request_updates[0].doc == "Cancel the recording prematurely.\n");
 	assert!(interface.services[1].request_updates[0].service_id == 10);
 	assert!(interface.services[1].request_updates[0].body == "macros_tests::camera::CancelReason");
 
 	assert!(interface.services[1].response_updates.len() == 2);
 	assert!(interface.services[1].response_updates[0].name == "state");
 	assert!(interface.services[1].response_updates[0].doc == concat!(
-		" Update sent by the server to notify the client about recording progress.\n",
+		"Update sent by the server to notify the client about recording progress.\n",
 		"\n",
-		" When the record state goes to `RecordState::Processing`,\n",
-		" the camera field of view may be obstructed by a robot again.\n",
+		"When the record state goes to `RecordState::Processing`,\n",
+		"the camera field of view may be obstructed by a robot again.\n",
 	));
 	assert!(interface.services[1].response_updates[0].service_id == 11);
 	assert!(interface.services[1].response_updates[0].body == "macros_tests::camera::RecordState");
 
 	assert!(interface.services[1].response_updates[1].name == "image");
 	assert!(interface.services[1].response_updates[1].doc == concat!(
-			" Update sent by the server when an image is available.\n",
+			"Update sent by the server when an image is available.\n",
 			"\n",
-			" The camera may send multiple image updates depending on the configuration.\n",
+			"The camera may send multiple image updates depending on the configuration.\n",
 	));
 	assert!(interface.services[1].response_updates[1].service_id == 12);
 	assert!(interface.services[1].response_updates[1].body == "macros_tests::camera::Image");
@@ -203,7 +203,7 @@ fn interface_introspection_camera_events() {
 	assert!(interface.streams.len() == 1);
 
 	assert!(interface.streams[0].name == "record_state");
-	assert!(interface.streams[0].doc == " Notifications whenever the camera changes record state.\n");
+	assert!(interface.streams[0].doc == "Notifications whenever the camera changes record state.\n");
 	assert!(interface.streams[0].service_id == 11);
 	assert!(interface.streams[0].body == "macros_tests::camera::RecordState");
 }

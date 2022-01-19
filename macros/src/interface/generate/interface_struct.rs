@@ -190,11 +190,35 @@ fn stream_definitions(format_bounds: &mut TokenStream, fizyr_rpc: &syn::Ident, s
 	})
 }
 
+/// Collect the doc string lines into one string.
+///
+/// Common leading whitespace is stripped from each line.
+/// Lines consisting of only spaces are replaced with empty lines and are ignored when counting common leading whitespace.
 fn to_doc_string(attrs: &[WithSpan<String>]) -> String {
-	let mut doc = String::new();
+	let mut lines = Vec::new();
+	let mut common_leading_spaces = usize::MAX;
+	let mut string_size = 0;
+	let mut empty_lines = 0;
 	for line in attrs {
-		doc.push_str(&line.value);
-		doc.push('\n');
+		let leading_spaces = line.value.as_bytes().iter().take_while(|&&c| c == b' ').count();
+		if line.value.len() > leading_spaces {
+			common_leading_spaces = common_leading_spaces.min(leading_spaces);
+			string_size += line.value.len() + 1;
+			lines.push(line.value.clone());
+		} else {
+			empty_lines += 1;
+			lines.push("".into());
+		}
 	}
-	doc
+
+	let total_size = string_size - (lines.len() - empty_lines) * common_leading_spaces + empty_lines;
+	let mut doc_str = String::with_capacity(total_size);
+	for line in lines {
+		if !line.is_empty() {
+			doc_str += &line[common_leading_spaces..];
+		}
+		doc_str.push('\n');
+	}
+
+	doc_str
 }
