@@ -11,11 +11,11 @@ pub fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, in
 	let visibility = interface.visibility();
 	item_tokens.extend(quote! {
 		#[doc = #client_doc]
-		#visibility struct Client<F: #fizyr_rpc::util::format::Format> {
+		#visibility struct Client<F: #fizyr_rpc::format::Format> {
 			peer: #fizyr_rpc::PeerWriteHandle<F::Body>,
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::fmt::Debug for Client<F> {
+		impl<F: #fizyr_rpc::format::Format> ::core::fmt::Debug for Client<F> {
 			fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
 				f.debug_struct(::core::any::type_name::<Self>())
 					.field("peer", &self.peer)
@@ -23,7 +23,7 @@ pub fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, in
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::clone::Clone for Client<F> {
+		impl<F: #fizyr_rpc::format::Format> ::core::clone::Clone for Client<F> {
 			fn clone(&self) -> Self {
 				Self {
 					peer: self.peer.clone(),
@@ -31,20 +31,20 @@ pub fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, in
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::convert::From<#fizyr_rpc::PeerWriteHandle<F::Body>> for Client<F> {
+		impl<F: #fizyr_rpc::format::Format> ::core::convert::From<#fizyr_rpc::PeerWriteHandle<F::Body>> for Client<F> {
 			fn from(other: #fizyr_rpc::PeerWriteHandle<F::Body>) -> Self {
 				Self::new(other)
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::convert::From<#fizyr_rpc::PeerHandle<F::Body>> for Client<F> {
+		impl<F: #fizyr_rpc::format::Format> ::core::convert::From<#fizyr_rpc::PeerHandle<F::Body>> for Client<F> {
 			fn from(other: #fizyr_rpc::PeerHandle<F::Body>) -> Self {
 				let (_read, write) = other.split();
 				Self::new(write)
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> Client<F> {
+		impl<F: #fizyr_rpc::format::Format> Client<F> {
 			/// Create a new interface-specific RPC client from a raw write handle.
 			pub fn new(peer: #fizyr_rpc::PeerWriteHandle<F::Body>) -> Self {
 				Self { peer }

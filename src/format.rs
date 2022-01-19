@@ -1,4 +1,8 @@
 //! Traits for converting between RPC messages and Rust values.
+//!
+//! These traits are used by generated interfaces from the [`interface!`] macro.
+//! Normally, you would only implement these traits for your own serialization format.
+//! However, the traits are covered by semver guarantees, so feel free to use them in your own code.
 
 use crate::Error;
 

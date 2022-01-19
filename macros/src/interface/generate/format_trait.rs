@@ -22,10 +22,10 @@ pub fn generate_format_trait(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 		types.push(stream.body_type())
 	}
 
-	let mut bounds = quote!(#fizyr_rpc::util::format::Format);
+	let mut bounds = quote!(#fizyr_rpc::format::Format);
 	for typ in &types {
-		bounds.extend(quote!( + #fizyr_rpc::util::format::EncodeBody<#typ>));
-		bounds.extend(quote!( + #fizyr_rpc::util::format::DecodeBody<#typ>));
+		bounds.extend(quote!( + #fizyr_rpc::format::EncodeBody<#typ>));
+		bounds.extend(quote!( + #fizyr_rpc::format::DecodeBody<#typ>));
 	}
 
 	let visibility = interface.visibility();

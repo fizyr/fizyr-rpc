@@ -35,7 +35,7 @@ pub fn generate_streams(item_tokens: &mut TokenStream, client_impl_tokens: &mut 
 			#[allow(clippy::ptr_arg)]
 			pub async fn #fn_name(&self, #body_arg) -> ::core::result::Result<(), #fizyr_rpc::Error>
 			where
-				F: #fizyr_rpc::util::format::EncodeBody<#body_type>,
+				F: #fizyr_rpc::format::EncodeBody<#body_type>,
 			{
 				let encoded = F::encode_body(#body_val).map_err(#fizyr_rpc::Error::encode_failed)?;
 				self.peer.send_stream(#service_id, encoded).await?;

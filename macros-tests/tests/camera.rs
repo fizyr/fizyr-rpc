@@ -1,10 +1,10 @@
 use assert2::{let_assert, assert};
 use fizyr_rpc::{UnixStreamPeer, UnixStreamTransport};
-use fizyr_rpc::util::format::Format;
+use fizyr_rpc::format::Format;
 
 use macros_tests::{camera, Json};
 
-fn client_server_pair<F: fizyr_rpc::util::format::Format<Body = fizyr_rpc::StreamBody>>() -> std::io::Result<(camera::Client<F>, camera::Server<F>)> {
+fn client_server_pair<F: fizyr_rpc::format::Format<Body = fizyr_rpc::StreamBody>>() -> std::io::Result<(camera::Client<F>, camera::Server<F>)> {
 	let (client, server) = tokio::net::UnixStream::pair()?;
 	let client = UnixStreamPeer::spawn(UnixStreamTransport::new(client, Default::default()));
 	let server = UnixStreamPeer::spawn(UnixStreamTransport::new(server, Default::default()));
@@ -84,7 +84,7 @@ async fn record() {
 async fn record_state() {
 	use camera::camera_events;
 
-	fn client_server_pair<F: fizyr_rpc::util::format::Format<Body = fizyr_rpc::StreamBody>>() -> std::io::Result<(camera_events::Client<F>, camera_events::Server<F>)> {
+	fn client_server_pair<F: fizyr_rpc::format::Format<Body = fizyr_rpc::StreamBody>>() -> std::io::Result<(camera_events::Client<F>, camera_events::Server<F>)> {
 		let (client, server) = tokio::net::UnixStream::pair()?;
 		let client = UnixStreamPeer::spawn(UnixStreamTransport::new(client, Default::default()));
 		let server = UnixStreamPeer::spawn(UnixStreamTransport::new(server, Default::default()));

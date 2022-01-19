@@ -45,8 +45,8 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 			#[allow(clippy::ptr_arg)]
 			pub async fn #service_name(&self, #request_param) -> ::core::result::Result<#response_type, #fizyr_rpc::Error>
 			where
-				F: #fizyr_rpc::util::format::EncodeBody<#request_type>,
-				F: #fizyr_rpc::util::format::DecodeBody<#response_type>,
+				F: #fizyr_rpc::format::EncodeBody<#request_type>,
+				F: #fizyr_rpc::format::DecodeBody<#response_type>,
 			{
 				let request_body = #request_body.map_err(#fizyr_rpc::Error::encode_failed)?;
 				let mut request = self.peer.send_request(#service_id, request_body).await?;
@@ -71,8 +71,8 @@ fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut Toke
 			#[allow(clippy::ptr_arg)]
 			pub async fn #service_name(&self, #request_param) -> ::core::result::Result<#service_name::SentRequestHandle<F>, #fizyr_rpc::Error>
 			where
-				F: #fizyr_rpc::util::format::EncodeBody<#request_type>,
-				F: #fizyr_rpc::util::format::DecodeBody<#response_type>,
+				F: #fizyr_rpc::format::EncodeBody<#request_type>,
+				F: #fizyr_rpc::format::DecodeBody<#response_type>,
 			{
 				let request_body = #request_body.map_err(#fizyr_rpc::Error::encode_failed)?;
 				let mut request = self.peer.send_request(#service_id, request_body).await?;
@@ -125,7 +125,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 		#doc_recv_update
 		pub async fn recv_response(&mut self) -> ::core::result::Result<#response_type, #fizyr_rpc::Error>
 		where
-			F: #fizyr_rpc::util::format::DecodeBody<#response_type>,
+			F: #fizyr_rpc::format::DecodeBody<#response_type>,
 		{
 			let response = self.request.recv_response().await?;
 			if response.header.service_id == #fizyr_rpc::service_id::ERROR {
@@ -168,16 +168,16 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 
 	item_tokens.extend(quote! {
 		#[doc = #handle_doc]
-		pub struct SentRequestHandle<F: #fizyr_rpc::util::format::Format> {
+		pub struct SentRequestHandle<F: #fizyr_rpc::format::Format> {
 			pub(super) request: #fizyr_rpc::SentRequestHandle<F::Body>,
 		}
 
 		#[doc = #write_handle_doc]
-		pub struct SentRequestWriteHandle<F: #fizyr_rpc::util::format::Format> {
+		pub struct SentRequestWriteHandle<F: #fizyr_rpc::format::Format> {
 			pub(super) request: #fizyr_rpc::SentRequestWriteHandle<F::Body>,
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::fmt::Debug for SentRequestHandle<F> {
+		impl<F: #fizyr_rpc::format::Format> ::core::fmt::Debug for SentRequestHandle<F> {
 			fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
 				f.debug_struct(::core::any::type_name::<Self>())
 					.field("request_id", &self.request_id())
@@ -187,7 +187,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::fmt::Debug for SentRequestWriteHandle<F> {
+		impl<F: #fizyr_rpc::format::Format> ::core::fmt::Debug for SentRequestWriteHandle<F> {
 			fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
 				f.debug_struct(::core::any::type_name::<Self>())
 					.field("request_id", &self.request_id())
@@ -197,7 +197,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::clone::Clone for SentRequestWriteHandle<F> {
+		impl<F: #fizyr_rpc::format::Format> ::core::clone::Clone for SentRequestWriteHandle<F> {
 			fn clone(&self) -> Self {
 				Self {
 					request: self.request.clone(),
@@ -205,7 +205,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> SentRequestHandle<F> {
+		impl<F: #fizyr_rpc::format::Format> SentRequestHandle<F> {
 			/// Get the raw request.
 			pub fn inner(&self) -> &#fizyr_rpc::SentRequestHandle<F::Body> {
 				&self.request
@@ -246,7 +246,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			#write_handle_impl_tokens
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> SentRequestWriteHandle<F> {
+		impl<F: #fizyr_rpc::format::Format> SentRequestWriteHandle<F> {
 			/// Get the raw request.
 			pub fn inner(&self) -> &#fizyr_rpc::SentRequestWriteHandle<F::Body> {
 				&self.request
@@ -296,7 +296,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 		#[allow(clippy::ptr_arg)]
 		pub async fn send_response(&self, response: &#response_type) -> ::core::result::Result<(), #fizyr_rpc::Error>
 		where
-			F: #fizyr_rpc::util::format::EncodeBody<#response_type>,
+			F: #fizyr_rpc::format::EncodeBody<#response_type>,
 		{
 			let encoded = F::encode_body(response).map_err(#fizyr_rpc::Error::encode_failed)?;
 			let response = self.request.send_response(#service_id, encoded).await?;
@@ -313,16 +313,16 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 	let write_handle_doc = format!("Write-only handle for a received `{}` request.", service.name());
 	item_tokens.extend(quote! {
 		#[doc = #handle_doc]
-		pub struct ReceivedRequestHandle<F: #fizyr_rpc::util::format::Format> {
+		pub struct ReceivedRequestHandle<F: #fizyr_rpc::format::Format> {
 			pub(super) request: #fizyr_rpc::ReceivedRequestHandle<F::Body>,
 		}
 
 		#[doc = #write_handle_doc]
-		pub struct ReceivedRequestWriteHandle<F: #fizyr_rpc::util::format::Format> {
+		pub struct ReceivedRequestWriteHandle<F: #fizyr_rpc::format::Format> {
 			pub(super) request: #fizyr_rpc::ReceivedRequestWriteHandle<F::Body>,
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::fmt::Debug for ReceivedRequestHandle<F> {
+		impl<F: #fizyr_rpc::format::Format> ::core::fmt::Debug for ReceivedRequestHandle<F> {
 			fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
 				f.debug_struct(::core::any::type_name::<Self>())
 					.field("request_id", &self.request_id())
@@ -332,7 +332,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::fmt::Debug for ReceivedRequestWriteHandle<F> {
+		impl<F: #fizyr_rpc::format::Format> ::core::fmt::Debug for ReceivedRequestWriteHandle<F> {
 			fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
 				f.debug_struct(::core::any::type_name::<Self>())
 					.field("request_id", &self.request_id())
@@ -342,7 +342,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::clone::Clone for ReceivedRequestWriteHandle<F> {
+		impl<F: #fizyr_rpc::format::Format> ::core::clone::Clone for ReceivedRequestWriteHandle<F> {
 			fn clone(&self) -> Self {
 				Self {
 					request: self.request.clone(),
@@ -350,7 +350,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ReceivedRequestHandle<F> {
+		impl<F: #fizyr_rpc::format::Format> ReceivedRequestHandle<F> {
 			/// Get the raw request.
 			///
 			/// Note that the request body has been consumed when it was parsed.
@@ -400,7 +400,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			#write_handle_impl_tokens
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ReceivedRequestWriteHandle<F> {
+		impl<F: #fizyr_rpc::format::Format> ReceivedRequestWriteHandle<F> {
 			/// Get the raw request.
 			///
 			/// Note that the request body has been consumed when it was parsed.
@@ -446,7 +446,7 @@ fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 		#[allow(clippy::ptr_arg)]
 		pub async fn send_update(&self, update: &#enum_type) -> ::core::result::Result<(), #fizyr_rpc::Error>
 		where
-			#enum_type: #fizyr_rpc::util::format::ToMessage<F>,
+			#enum_type: #fizyr_rpc::format::ToMessage<F>,
 		{
 			let (service_id, body) = F::encode_message(update).map_err(#fizyr_rpc::Error::encode_failed)?;
 			self.request.send_update(service_id, body).await?;
@@ -473,7 +473,7 @@ fn generate_send_update_functions(impl_tokens: &mut TokenStream, fizyr_rpc: &syn
 			#[allow(clippy::ptr_arg)]
 			pub async fn #function_name(&self, #body_arg) -> ::core::result::Result<(), #fizyr_rpc::Error>
 			where
-				F: #fizyr_rpc::util::format::EncodeBody<#body_type>,
+				F: #fizyr_rpc::format::EncodeBody<#body_type>,
 			{
 				let body = F::encode_body(#body_val).map_err(#fizyr_rpc::Error::encode_failed)?;
 				self.request.send_update(#service_id, body).await?;
@@ -511,7 +511,7 @@ fn generate_recv_update_function(impl_tokens: &mut TokenStream, fizyr_rpc: &syn:
 		let body_type = update.body_type();
 		let variant_name = syn::Ident::new(&to_upper_camel_case(&update.name().to_string()), Span::call_site());
 		where_clause.extend(quote! {
-			F: #fizyr_rpc::util::format::DecodeBody<#body_type>,
+			F: #fizyr_rpc::format::DecodeBody<#body_type>,
 		});
 		decode_arms.extend(quote! {
 			#service_id =>  {
