@@ -6,7 +6,7 @@ fizyr_rpc::interface! {
 	/// A camera server can represent many different types of cameras,
 	/// like a simple 2D camera, a 3D camera with or without RGB data,
 	/// or even a line scanner.
-	pub interface camera {
+	pub interface Camera {
 		/// Ping the server.
 		///
 		/// A succesful ping indicates that the server is running,
@@ -34,7 +34,7 @@ fizyr_rpc::interface! {
 
 pub mod camera_events {
 	fizyr_rpc::interface! {
-		pub interface camera_events {
+		pub interface CameraEvents {
 			/// Notifications whenever the camera changes record state.
 			stream 11 record_state: super::RecordState,
 		}
