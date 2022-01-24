@@ -105,6 +105,7 @@ mod peer_handle;
 mod request;
 mod request_tracker;
 
+pub mod introspection;
 pub mod transport;
 pub mod util;
 
