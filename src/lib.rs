@@ -106,6 +106,7 @@ mod request;
 mod request_tracker;
 
 pub mod introspection;
+pub mod format;
 pub mod transport;
 pub mod util;
 

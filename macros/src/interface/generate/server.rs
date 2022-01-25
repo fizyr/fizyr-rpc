@@ -30,7 +30,7 @@ pub fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, in
 		let variant_name = syn::Ident::new(&to_upper_camel_case(&stream_name.to_string()), Span::call_site());
 		let body_type = stream.body_type();
 		recv_message_where.extend(quote! {
-			F: #fizyr_rpc::util::format::DecodeBody<#body_type>,
+			F: #fizyr_rpc::format::DecodeBody<#body_type>,
 		});
 		decode_stream_arms.extend(quote! {
 			#service_id =>  {
@@ -48,7 +48,7 @@ pub fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, in
 
 	if !interface.streams().is_empty() {
 		recv_message_where.extend(quote! {
-			StreamMessage: #fizyr_rpc::util::format::FromMessage<F>,
+			StreamMessage: #fizyr_rpc::format::FromMessage<F>,
 		});
 		received_msg_variants.extend(quote! {
 			/// A stream message.
@@ -69,7 +69,7 @@ pub fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, in
 		let variant_name = syn::Ident::new(&to_upper_camel_case(&service_name.to_string()), Span::call_site());
 		let request_type = service.request_type();
 		recv_message_where.extend(quote! {
-			F: #fizyr_rpc::util::format::DecodeBody<#request_type>,
+			F: #fizyr_rpc::format::DecodeBody<#request_type>,
 		});
 		decode_request_arms.extend(quote! {
 			#service_id =>  {
@@ -89,7 +89,7 @@ pub fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, in
 	if !interface.services().is_empty() {
 		received_msg_generics.extend(quote!(F));
 		received_msg_where.extend(quote! {
-			F: #fizyr_rpc::util::format::Format,
+			F: #fizyr_rpc::format::Format,
 		});
 		received_msg_variants.extend(quote! {
 			/// A request message.
@@ -108,11 +108,11 @@ pub fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, in
 	let server_doc = format!("RPC server for the {} interface.", interface.name());
 	item_tokens.extend(quote! {
 		#[doc = #server_doc]
-		#visibility struct Server<F: #fizyr_rpc::util::format::Format> {
+		#visibility struct Server<F: #fizyr_rpc::format::Format> {
 			peer: #fizyr_rpc::PeerReadHandle<F::Body>,
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::fmt::Debug for Server<F> {
+		impl<F: #fizyr_rpc::format::Format> ::core::fmt::Debug for Server<F> {
 			fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
 				f.debug_struct(::core::any::type_name::<Self>())
 					.field("peer", &self.peer)
@@ -120,7 +120,7 @@ pub fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, in
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> Server<F> {
+		impl<F: #fizyr_rpc::format::Format> Server<F> {
 			/// Create a new interface-specific RPC server from a raw write handle.
 			fn new(peer: #fizyr_rpc::PeerReadHandle<F::Body>) -> Self {
 				Self { peer }
@@ -161,13 +161,13 @@ pub fn generate_server(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, in
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::convert::From<#fizyr_rpc::PeerReadHandle<F::Body>> for Server<F> {
+		impl<F: #fizyr_rpc::format::Format> ::core::convert::From<#fizyr_rpc::PeerReadHandle<F::Body>> for Server<F> {
 			fn from(other: #fizyr_rpc::PeerReadHandle<F::Body>) -> Self {
 				Self::new(other)
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::convert::From<#fizyr_rpc::PeerHandle<F::Body>> for Server<F> {
+		impl<F: #fizyr_rpc::format::Format> ::core::convert::From<#fizyr_rpc::PeerHandle<F::Body>> for Server<F> {
 			fn from(other: #fizyr_rpc::PeerHandle<F::Body>) -> Self {
 				let (read, _write) = other.split();
 				Self::new(read)
@@ -222,11 +222,11 @@ fn generate_received_request_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn
 	let visibility = interface.visibility();
 	item_tokens.extend(quote! {
 		#[doc = #enum_doc]
-		#visibility enum ReceivedRequestHandle<F: #fizyr_rpc::util::format::Format> {
+		#visibility enum ReceivedRequestHandle<F: #fizyr_rpc::format::Format> {
 			#variant_tokens
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> ::core::fmt::Debug for ReceivedRequestHandle<F> {
+		impl<F: #fizyr_rpc::format::Format> ::core::fmt::Debug for ReceivedRequestHandle<F> {
 			fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
 				match self {
 					#debug_tokens

@@ -86,7 +86,7 @@ pub struct StreamDefinition<TypeInfo> {
 }
 
 /// Trait for formats that can provide runtime type information.
-pub trait IntrospectableFormat: crate::util::format::Format {
+pub trait IntrospectableFormat: crate::format::Format {
 	/// The return type for the [`Self::type_info()`] function.
 	type TypeInfo;
 }

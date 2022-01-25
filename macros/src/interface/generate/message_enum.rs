@@ -31,7 +31,7 @@ pub fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 		});
 
 		decode_all.extend(quote! {
-			F: #fizyr_rpc::util::format::DecodeBody<#body_type>,
+			F: #fizyr_rpc::format::DecodeBody<#body_type>,
 		});
 
 		to_message.extend(quote! {
@@ -43,7 +43,7 @@ pub fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 		});
 
 		encode_all.extend(quote! {
-			F: #fizyr_rpc::util::format::EncodeBody<#body_type>,
+			F: #fizyr_rpc::format::EncodeBody<#body_type>,
 		});
 
 		let is_fn_name = syn::Ident::new(&format!("is_{}", message.name()), Span::call_site());
@@ -104,7 +104,7 @@ pub fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			#impl_tokens
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> #fizyr_rpc::util::format::FromMessage<F> for #enum_name
+		impl<F: #fizyr_rpc::format::Format> #fizyr_rpc::format::FromMessage<F> for #enum_name
 		where
 			#decode_all
 		{
@@ -116,7 +116,7 @@ pub fn generate_message_enum(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 			}
 		}
 
-		impl<F: #fizyr_rpc::util::format::Format> #fizyr_rpc::util::format::ToMessage<F> for #enum_name
+		impl<F: #fizyr_rpc::format::Format> #fizyr_rpc::format::ToMessage<F> for #enum_name
 		where
 			#encode_all
 		{
