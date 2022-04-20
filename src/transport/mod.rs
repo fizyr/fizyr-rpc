@@ -160,8 +160,8 @@ where
 {
 	type Body = T::Body;
 
-	fn poll_read_msg(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>> {
-		self.as_mut().poll_read_msg(context)
+	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>> {
+		T::poll_read_msg(Pin::new(*self.get_mut()), context)
 	}
 }
 
@@ -171,8 +171,8 @@ where
 {
 	type Body = T::Body;
 
-	fn poll_read_msg(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>> {
-		self.as_mut().poll_read_msg(context)
+	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>> {
+		T::poll_read_msg(Pin::new(&mut *self.get_mut()), context)
 	}
 }
 
@@ -184,7 +184,7 @@ where
 	type Body = <P::Target as TransportReadHalf>::Body;
 
 	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>> {
-		self.get_mut().as_mut().poll_read_msg(context)
+		P::Target::poll_read_msg(Pin::new(&mut *self.get_mut()), context)
 	}
 }
 
@@ -195,12 +195,12 @@ where
 	type Body = T::Body;
 
 	fn poll_write_msg(
-		mut self: Pin<&mut Self>,
+		self: Pin<&mut Self>,
 		context: &mut Context,
 		header: &MessageHeader,
 		body: &Self::Body,
 	) -> Poll<Result<(), Error>> {
-		self.as_mut().poll_write_msg(context, header, body)
+		T::poll_write_msg(Pin::new(*self.get_mut()), context, header, body)
 	}
 }
 
@@ -211,12 +211,12 @@ where
 	type Body = T::Body;
 
 	fn poll_write_msg(
-		mut self: Pin<&mut Self>,
+		self: Pin<&mut Self>,
 		context: &mut Context,
 		header: &MessageHeader,
 		body: &Self::Body,
 	) -> Poll<Result<(), Error>> {
-		self.as_mut().poll_write_msg(context, header, body)
+		T::poll_write_msg(Pin::new(&mut *self.get_mut()), context, header, body)
 	}
 }
 
@@ -228,6 +228,6 @@ where
 	type Body = <P::Target as TransportWriteHalf>::Body;
 
 	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), Error>> {
-		self.get_mut().as_mut().poll_write_msg(context, header, body)
+		P::Target::poll_write_msg(Pin::new(&mut *self.get_mut()), context, header, body)
 	}
 }

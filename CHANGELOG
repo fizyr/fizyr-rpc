@@ -1,3 +1,6 @@
+# Unreleased
+- [fix][minor] Fix unintended infinite recursion in generic trait implementations.
+
 # Version 0.5.0-alpha8 - 2022-01-25
 - [rename][major] Rename `crate::util::format` module to `crate::format`.
 - [add][minor] Add runtime interface introspection.
