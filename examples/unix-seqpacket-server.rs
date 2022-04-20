@@ -1,18 +1,15 @@
 use fizyr_rpc::UnixSeqpacketListener;
 use std::path::PathBuf;
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
-#[structopt(setting = structopt::clap::AppSettings::ColoredHelp)]
-#[structopt(setting = structopt::clap::AppSettings::UnifiedHelpMessage)]
-#[structopt(setting = structopt::clap::AppSettings::DeriveDisplayOrder)]
+#[derive(clap::Parser)]
+#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
 struct Options {
 	socket: PathBuf,
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-	if let Err(e) = do_main(&Options::from_args()).await {
+	if let Err(e) = do_main(&clap::Parser::parse()).await {
 		eprintln!("Error: {}", e);
 		std::process::exit(1);
 	}
