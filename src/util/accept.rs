@@ -90,8 +90,8 @@ where
 	type Address = T::Address;
 	type Connection = T::Connection;
 
-	fn poll_accept(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
-		self.as_mut().poll_accept(context)
+	fn poll_accept(self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
+		T::poll_accept(Pin::new(self.get_mut()), context)
 	}
 }
 
@@ -102,8 +102,8 @@ where
 	type Address = T::Address;
 	type Connection = T::Connection;
 
-	fn poll_accept(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
-		self.as_mut().poll_accept(context)
+	fn poll_accept(self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
+		T::poll_accept(Pin::new(self.get_mut()), context)
 	}
 }
 
@@ -116,6 +116,6 @@ where
 	type Connection = <P::Target as Listener>::Connection;
 
 	fn poll_accept(self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>> {
-		self.get_mut().as_mut().poll_accept(context)
+		<P::Target as Listener>::poll_accept(self.get_mut().as_mut(), context)
 	}
 }
