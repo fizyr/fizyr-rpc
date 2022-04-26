@@ -165,10 +165,10 @@ impl<Transport: crate::transport::Transport> Peer<Transport> {
 					.expect("command loop did not stop yet but command channel is closed");
 				command_loop.await;
 			},
-			Either::Right((read_loop, ())) => {
+			Either::Right((_read_loop, ())) => {
 				// If the command loop stopped, the read loop is pointless.
 				// Nobody will ever observe any effects of the read loop without the command loop.
-				drop(read_loop);
+				// The read loop is dropped here.
 			},
 		}
 	}

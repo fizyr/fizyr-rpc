@@ -19,6 +19,7 @@ pub fn generate_services(item_tokens: &mut TokenStream, client_impl_tokens: &mut
 }
 
 /// Generate the support types and function definitions for each service.
+#[allow(clippy::needless_late_init)]
 fn generate_service(item_tokens: &mut TokenStream, client_impl_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, service: &ServiceDefinition, visibility: &syn::Visibility) {
 	let service_name = service.name();
 	let service_doc = to_doc_attrs(service.doc());
