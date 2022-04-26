@@ -1,5 +1,6 @@
 # Unreleased
 - [fix][minor] Fix unintended infinite recursion in generic trait implementations.
+- [fix][patch] Fix `needless_question_mark` clippy warnings in generated code.
 - [change][patch] Switch to `clap` v3 in the examples.
 
 # Version 0.5.0-alpha8 - 2022-01-25
