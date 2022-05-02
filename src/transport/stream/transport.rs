@@ -24,9 +24,9 @@ pub struct StreamTransport<Stream> {
 
 /// The read half of a [`StreamTransport`].
 #[allow(dead_code)] // Not used when transports are disabled.
-pub struct StreamReadHalf<R> {
+pub struct StreamReadHalf<ReadStream> {
 	/// The read half of the underlying stream.
-	pub(super) stream: R,
+	pub(super) stream: ReadStream,
 
 	/// The maximum body length to accept when reading messages.
 	pub(super) max_body_len: u32,
@@ -46,9 +46,9 @@ pub struct StreamReadHalf<R> {
 
 /// The write half of a [`StreamTransport`].
 #[allow(dead_code)] // Not used when transports are disabled.
-pub struct StreamWriteHalf<W> {
+pub struct StreamWriteHalf<WriteStream> {
 	/// The write half of the underlying stream.
-	pub(super) stream: W,
+	pub(super) stream: WriteStream,
 
 	/// The maximum body length to enforce for messages.
 	pub(super) max_body_len: u32,
@@ -73,11 +73,26 @@ where
 	pub fn new_default(stream: Stream) -> Self {
 		Self::new(stream, StreamConfig::default())
 	}
+
+	/// Get direct access to the underlying stream.
+	pub fn stream(&self) -> &Stream {
+		&self.stream
+	}
+
+	/// Get direct mutable access to the underlying stream.
+	pub fn stream_mut(&mut self) -> &Stream {
+		&mut self.stream
+	}
+
+	/// Consume the stream transport to retrieve the underlying stream.
+	pub fn into_stream(self) -> Stream {
+		self.stream
+	}
 }
 
-impl<R> StreamReadHalf<R> {
+impl<ReadStream> StreamReadHalf<ReadStream> {
 	#[allow(dead_code)] // Not used when transports are disabled.
-	pub(super) fn new(stream: R, max_body_len: u32) -> Self {
+	pub(super) fn new(stream: ReadStream, max_body_len: u32) -> Self {
 		Self {
 			stream,
 			max_body_len,
@@ -87,17 +102,41 @@ impl<R> StreamReadHalf<R> {
 			body_buffer: Vec::new(),
 		}
 	}
+
+	/// Get direct access to the underlying stream.
+	#[allow(dead_code)] // Not used when transports are disabled.
+	pub fn stream(&self) -> &ReadStream {
+		&self.stream
+	}
+
+	/// Get direct mutable access to the underlying stream.
+	#[allow(dead_code)] // Not used when transports are disabled.
+	pub fn stream_mut(&mut self) -> &ReadStream {
+		&mut self.stream
+	}
 }
 
-impl<W> StreamWriteHalf<W> {
+impl<WriteStream> StreamWriteHalf<WriteStream> {
 	#[allow(dead_code)] // Not used when transports are disabled.
-	pub(super) fn new(stream: W, max_body_len: u32) -> Self {
+	pub(super) fn new(stream: WriteStream, max_body_len: u32) -> Self {
 		Self {
 			stream,
 			max_body_len,
 			header_buffer: None,
 			bytes_written: 0,
 		}
+	}
+
+	/// Get direct access to the underlying stream.
+	#[allow(dead_code)] // Not used when transports are disabled.
+	pub fn stream(&self) -> &WriteStream {
+		&self.stream
+	}
+
+	/// Get direct mutable access to the underlying stream.
+	#[allow(dead_code)] // Not used when transports are disabled.
+	pub fn stream_mut(&mut self) -> &WriteStream {
+		&mut self.stream
 	}
 }
 

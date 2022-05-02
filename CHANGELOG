@@ -2,6 +2,7 @@
 - [add][minor] Add utility functions for working with `RecvMessageError`.
 - [add][minor] Add `Transport::info()` function to get information about a transport.
 - [add][minor] Allow direct access to the underlying `Transport` of a `Peer`.
+- [add][minor] Allow direct access to the underlying stream or socket of a `Transport`.
 
 # Version 0.5.0-alpha9 - 2022-04-26
 - [fix][minor] Fix unintended infinite recursion in generic trait implementations.

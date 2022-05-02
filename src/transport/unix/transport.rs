@@ -12,9 +12,9 @@ pub struct UnixTransport<Socket> {
 
 /// The read half of a [`UnixTransport`].
 #[allow(dead_code)] // Not used when transports are disabled.
-pub struct UnixReadHalf<R> {
+pub struct UnixReadHalf<SocketReadHalf> {
 	/// The read half of the underlying socket.
-	pub(super) socket: R,
+	pub(super) socket: SocketReadHalf,
 
 	/// The maximum body length to accept when reading messages.
 	pub(super) max_body_len: u32,
@@ -28,9 +28,9 @@ pub struct UnixReadHalf<R> {
 
 /// The write half of a [`UnixTransport`].
 #[allow(dead_code)] // Not used when transports are disabled.
-pub struct UnixWriteHalf<W> {
+pub struct UnixWriteHalf<SocketWriteHalf> {
 	/// The write half of the underlying socket.
-	pub(super) socket: W,
+	pub(super) socket: SocketWriteHalf,
 
 	/// The maximum body length to enforce for messages.
 	pub(super) max_body_len: u32,
@@ -52,11 +52,26 @@ where
 	pub fn new_default(socket: Socket) -> Self {
 		Self::new(socket, UnixConfig::default())
 	}
+
+	/// Get direct access to the underlying socket.
+	pub fn socket(&self) -> &Socket {
+		&self.socket
+	}
+
+	/// Get direct mutable access to the underlying socket.
+	pub fn socket_mut(&mut self) -> &Socket {
+		&mut self.socket
+	}
+
+	/// Consume the socket transport to retrieve the underlying socket.
+	pub fn into_socket(self) -> Socket {
+		self.socket
+	}
 }
 
-impl<R> UnixReadHalf<R> {
+impl<SocketReadHalf> UnixReadHalf<SocketReadHalf> {
 	#[allow(dead_code)] // Not used when transports are disabled.
-	pub(super) fn new(socket: R, max_body_len: u32, max_fds: u32) -> Self {
+	pub(super) fn new(socket: SocketReadHalf, max_body_len: u32, max_fds: u32) -> Self {
 		Self {
 			socket,
 			max_body_len,
@@ -64,16 +79,40 @@ impl<R> UnixReadHalf<R> {
 			body_buffer: Vec::new(),
 		}
 	}
+
+	/// Get direct access to the underlying socket.
+	#[allow(dead_code)] // Not used when transports are disabled.
+	pub fn socket(&self) -> &SocketReadHalf {
+		&self.socket
+	}
+
+	/// Get direct mutable access to the underlying socket.
+	#[allow(dead_code)] // Not used when transports are disabled.
+	pub fn socket_mut(&mut self) -> &SocketReadHalf {
+		&mut self.socket
+	}
 }
 
-impl<W> UnixWriteHalf<W> {
+impl<SocketWriteHalf> UnixWriteHalf<SocketWriteHalf> {
 	#[allow(dead_code)] // Not used when transports are disabled.
-	pub(super) fn new(socket: W, max_body_len: u32, max_fds: u32) -> Self {
+	pub(super) fn new(socket: SocketWriteHalf, max_body_len: u32, max_fds: u32) -> Self {
 		Self {
 			socket,
 			max_body_len,
 			max_fds,
 		}
+	}
+
+	/// Get direct access to the underlying socket.
+	#[allow(dead_code)] // Not used when transports are disabled.
+	pub fn socket(&self) -> &SocketWriteHalf {
+		&self.socket
+	}
+
+	/// Get direct mutable access to the underlying socket.
+	#[allow(dead_code)] // Not used when transports are disabled.
+	pub fn socket_mut(&mut self) -> &SocketWriteHalf {
+		&mut self.socket
 	}
 }
 
