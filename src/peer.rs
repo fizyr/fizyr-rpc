@@ -172,6 +172,16 @@ impl<Transport: crate::transport::Transport> Peer<Transport> {
 			},
 		}
 	}
+
+	/// Get direct access to the underlying transport.
+	pub fn transport(&self) -> &Transport {
+		&self.transport
+	}
+
+	/// Get direct mutable access to the underlying transport.
+	pub fn transport_mut(&mut self) -> &mut Transport {
+		&mut self.transport
+	}
 }
 
 /// Implementation of the read loop of a peer.
