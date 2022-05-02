@@ -1,5 +1,6 @@
 # Unreleased
 - [add][minor] Add utility functions for working with `RecvMessageError`.
+- [add][minor] Add `Transport::info()` function to get information about a transport.
 
 # Version 0.5.0-alpha9 - 2022-04-26
 - [fix][minor] Fix unintended infinite recursion in generic trait implementations.
