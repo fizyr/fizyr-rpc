@@ -147,6 +147,49 @@ impl Error {
 	}
 }
 
+impl<Body> RecvMessageError<Body> {
+	/// Check if this error is caused by the remote peer closing the connection cleanly.
+	pub fn is_connection_aborted(&self) -> bool {
+		if let Self::Other(e) = self {
+			e.is_connection_aborted()
+		} else {
+			false
+		}
+	}
+
+	/// Get the raw request handle associated with the received message.
+	///
+	/// The request handle can be used to send an error response to unknown or invalid requests.
+	///
+	/// For errors other than [`Self::UnknownRequest`] and [`Self::InvalidRequest`],
+	/// this function returns [`None`].
+	pub fn request_handle(&self) -> Option<&crate::ReceivedRequestHandle<Body>> {
+		match self {
+			Self::Other(_error) => None,
+			Self::UnknownStream(_message) => None,
+			Self::UnknownRequest(request, _body) => Some(request),
+			Self::InvalidStream(_message, _error) => None,
+			Self::InvalidRequest(request, _error) => Some(request),
+		}
+	}
+
+	/// Get the a mutable reference to the raw request handle associated with the received message.
+	///
+	/// The request handle can be used to send an error response to unknown or invalid requests.
+	///
+	/// For errors other than [`Self::UnknownRequest`] and [`Self::InvalidRequest`],
+	/// this function returns [`None`].
+	pub fn request_handle_mut(&mut self) -> Option<&mut crate::ReceivedRequestHandle<Body>> {
+		match self {
+			Self::Other(_error) => None,
+			Self::UnknownStream(_message) => None,
+			Self::UnknownRequest(request, _body) => Some(request),
+			Self::InvalidStream(_message, _error) => None,
+			Self::InvalidRequest(request, _error) => Some(request),
+		}
+	}
+}
+
 impl From<std::io::Error> for Error {
 	fn from(other: std::io::Error) -> Self {
 		Self::io_error(other)
