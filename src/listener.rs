@@ -1,6 +1,7 @@
 use crate::Peer;
 use crate::PeerHandle;
 use crate::util;
+use crate::transport::Transport;
 
 /// Listener that spawns peers for all accepted connections.
 pub struct Listener<Socket>
@@ -28,10 +29,19 @@ pub trait ListeningSocket: util::Listener + Unpin {
 	type Config: Clone + Send + Sync + 'static;
 
 	#[doc(hidden)]
-	type Transport: Send + 'static;
+	type Transport: Transport + Send + 'static;
 
 	#[doc(hidden)]
-	fn spawn(connection: Self::Connection, config: Self::Config) -> PeerHandle<Self::Body>;
+	type TransportInfo: Send + 'static;
+
+	#[doc(hidden)]
+	fn into_transport(connection: Self::Connection, config: Self::Config) -> Self::Transport;
+
+	#[doc(hidden)]
+	fn transport_info(connection: &Self::Transport) -> std::io::Result<Self::TransportInfo>;
+
+	#[doc(hidden)]
+	fn spawn(transport: Self::Transport) -> PeerHandle<Self::Body>;
 }
 
 impl<Socket> ListeningSocket for Socket
@@ -42,10 +52,19 @@ where
 	type Body = <Socket::Connection as util::IntoTransport>::Body;
 	type Config = <Socket::Connection as util::IntoTransport>::Config;
 	type Transport = <Socket::Connection as util::IntoTransport>::Transport;
+	type TransportInfo = <Self::Transport as Transport>::Info;
 
-	fn spawn(connection: Self::Connection, config: Self::Config) -> PeerHandle<Self::Body> {
+	fn into_transport(connection: Self::Connection, config: Self::Config) -> Self::Transport {
 		use util::IntoTransport;
-		Peer::spawn(connection.into_transport(config))
+		connection.into_transport(config)
+	}
+
+	fn transport_info(connection: &Self::Transport) -> std::io::Result<Self::TransportInfo> {
+		connection.info()
+	}
+
+	fn spawn(transport: Self::Transport) -> PeerHandle<Self::Body> {
+		Peer::spawn(transport)
 	}
 }
 
@@ -76,13 +95,13 @@ impl<Socket: ListeningSocket> Listener<Socket> {
 	/// The server will accept connections in a loop and spawn a user task for each new peer.
 	pub async fn run<F, R>(&mut self, task: F) -> std::io::Result<()>
 	where
-		F: FnMut(PeerHandle<Socket::Body>) -> R,
+		F: FnMut(PeerHandle<Socket::Body>, Socket::TransportInfo) -> R,
 		R: std::future::Future<Output = ()> + Send + 'static,
 	{
 		let mut task = task;
 		loop {
-			let peer = self.accept().await?;
-			let join_handle = tokio::spawn((task)(peer));
+			let (peer, info) = self.accept().await?;
+			let join_handle = tokio::spawn((task)(peer, info));
 			// TODO: keep join handles around so we can await them later.
 			// If we do, we should also clean them from time to time though.
 			drop(join_handle);
@@ -93,8 +112,10 @@ impl<Socket: ListeningSocket> Listener<Socket> {
 	///
 	/// A [`Peer`] is spawned for the new connection,
 	/// and a [`PeerHandle`] is returned to allow interaction with the peer.
-	pub async fn accept(&mut self) -> std::io::Result<PeerHandle<Socket::Body>> {
+	pub async fn accept(&mut self) -> std::io::Result<(PeerHandle<Socket::Body>, Socket::TransportInfo)> {
 		let (connection, _addr) = self.listener.accept().await?;
-		Ok(Socket::spawn(connection, self.config.clone()))
+		let transport = Socket::into_transport(connection, self.config.clone());
+		let info = Socket::transport_info(&transport)?;
+		Ok((Socket::spawn(transport), info))
 	}
 }

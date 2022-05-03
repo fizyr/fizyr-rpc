@@ -64,7 +64,7 @@ impl<Transport: crate::transport::Transport> Peer<Transport> {
 	/// The returned [`PeerHandle`] is used to send and receive requests and stream messages.
 	///
 	/// If [`Self::run()`] is not called (or aborted),
-	/// then none of the functions of the [`PeerHandle`] will work.
+	/// none of the functions of the [`PeerHandle`] will work.
 	/// They will just wait forever.
 	///
 	/// You can also use [`Self::spawn()`] to run the read/write loop in a newly spawned task,
@@ -113,13 +113,14 @@ impl<Transport: crate::transport::Transport> Peer<Transport> {
 	/// The type of address accepted depends on the transport.
 	/// For internet transports such as TCP, the address must implement [`tokio::net::ToSocketAddrs`].
 	/// For unix transports, the address must implement [`AsRef<std::path::Path>`].
-	pub async fn connect<'a, Address>(address: Address, config: Transport::Config) -> std::io::Result<PeerHandle<Transport::Body>>
+	pub async fn connect<'a, Address>(address: Address, config: Transport::Config) -> std::io::Result<(PeerHandle<Transport::Body>, Transport::Info)>
 	where
 		Address: 'a,
 		Transport: util::Connect<'a, Address>,
 	{
 		let transport = Transport::connect(address, config).await?;
-		Ok(Self::spawn(transport))
+		let info = transport.info()?;
+		Ok((Self::spawn(transport), info))
 	}
 
 	/// Run the read/write loop.
