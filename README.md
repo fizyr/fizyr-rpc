@@ -21,13 +21,13 @@ to allow moving the handles into different tasks.
 The write handle can also be cloned and used in multiple tasks.
 
 To obtain a [`PeerHandle`], you can call [`Peer::connect()`].
-This will connect to a remote server and spawn a background task to read and write messages over the connection.
+This will connect to a remote listener and spawn a background task to read and write messages over the connection.
 If you need full control over tasks, you can instead create a [`Peer`] object
 and call [`Peer::run()`] manually.
 
-### Server
+### Listener
 
-The [`Server`] struct is used to accept incoming connections
+The [`Listener`] struct is used to accept incoming connections
 and gives you a [`PeerHandle`] for each incoming connection.
 You can then use the handle to process incoming messages and to send messages to the peer.
 Usually, you will want to spawn a task for each accepted connection that handles the communication.
@@ -37,7 +37,7 @@ Usually, you will want to spawn a task for each accepted connection that handles
 Each peer internally uses a [`Transport`][transport::Transport].
 The transport is responsible for reading and writing raw messages.
 By abstracting away the message transport,
-the library can expose a single generic [`Peer`] and [`Server`] struct.
+the library can expose a single generic [`Peer`] and [`Listener`] struct.
 
 There are different transports for different socket types.
 Different transports may also use different types as message body.
@@ -64,21 +64,18 @@ Currently, the library has these features:
 ```rust
 use fizyr_rpc::{TcpPeer, StreamConfig};
 
-let mut peer = TcpPeer::connect("localhost:1337", StreamConfig::default()).await?;
+let (peer, info) = TcpPeer::connect("localhost:1337", StreamConfig::default()).await?;
+eprintln!("Connected to: {}", info.remote_address());
 let mut request = peer.send_request(1, &b"Hello World!"[..]).await?;
 
-loop {
-    let message = request.next_message().await?;
-    let body = std::str::from_utf8(&message.body)?;
-
-    if message.header.message_type.is_responder_update() {
-        eprintln!("Received update: {}", body);
-    } else if message.header.message_type.is_response() {
-        eprintln!("Received response: {}", body);
-        break;
-    }
+while let Some(update) = request.recv_update().await {
+    let body = std::str::from_utf8(&update.body)?;
+    eprintln!("Received update: {}", body);
 }
 
+let response = request.recv_response().await?;
+let body = std::str::from_utf8(&response.body)?;
+eprintln!("Received response: {}", body);
 ```
 
 [`Peer`]: https://docs.rs/fizyr-rpc/latest/fizyr_rpc/struct.Peer.html
