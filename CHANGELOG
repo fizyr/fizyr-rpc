@@ -1,4 +1,5 @@
 # Unreleased
+- [add][major] Have `Transport` implementations decide which I/O errors are fatal.
 - [add][major] Provide transport info when spawning peers without giving access to the transport.
 - [add][minor] Add utility functions for working with `RecvMessageError`.
 - [add][minor] Add `Transport::info()` function to get information about a transport.

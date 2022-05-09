@@ -9,7 +9,6 @@ use crate::{
 	SentRequestHandle,
 };
 use crate::request_tracker::RequestTracker;
-use crate::error::private::InnerError;
 use crate::util::{select, Either};
 
 /// Message for the internal peer command loop.
@@ -206,7 +205,8 @@ where
 		loop {
 			// Read a message, and stop the read loop on errors.
 			let message = self.read_half.read_msg().await;
-			let stop = message.is_err();
+			let stop = matches!(&message, Err(e) if e.is_fatal());
+			let message = message.map_err(|e| e.into_inner());
 
 			// But first send the error to the command loop so it can be delivered to the peer.
 			// If that fails the command loop already closed, so just stop the read loop.
@@ -376,6 +376,8 @@ where
 					let error_msg = format!("unexpected request for service {}", request.service_id());
 					let response = Message::error_response(request.request_id(), &error_msg);
 					if self.write_message(&response).await.is_err() {
+						// If we can't send the error to the remote peer, just close the connection.
+						// Even if the transport doesn't say that the write error is fatal.
 						LoopFlow::Stop
 					} else {
 						LoopFlow::Continue
@@ -397,14 +399,15 @@ where
 	}
 
 	async fn write_message(&mut self, message: &Message<W::Body>) -> Result<(), (Error, LoopFlow)> {
-		// TODO: let transport indicate if it is broken after a failed write instead of looking at PayloadTooLarge.
 		match self.write_half.write_msg(&message.header, &message.body).await {
 			Ok(()) => Ok(()),
 			Err(e) => {
-				match &e.inner {
-					InnerError::PayloadTooLarge { .. } => Err((e, LoopFlow::Continue)),
-					_ => Err((e, LoopFlow::Stop)),
-				}
+				let flow = if e.is_fatal() {
+					LoopFlow::Stop
+				} else {
+					LoopFlow::Continue
+				};
+				Err((e.into_inner(), flow))
 			},
 		}
 	}
