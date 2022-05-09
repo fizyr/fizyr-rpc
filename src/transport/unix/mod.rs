@@ -6,6 +6,38 @@ pub use body::UnixBody;
 pub use config::UnixConfig;
 pub use transport::{UnixReadHalf, UnixTransport, UnixWriteHalf};
 
+/// Information about the remote peer of a Unix stream.
+#[derive(Debug, Clone)]
+#[cfg(feature = "unix-seqpacket")]
+pub struct UnixSeqpacketInfo {
+	/// The user ID of the remote process.
+	user_id: u32,
+
+	/// The group ID of the remote process.
+	group_id: u32,
+
+	/// The process ID of the remote process.
+	process_id: Option<i32>,
+}
+
+#[cfg(feature = "unix-seqpacket")]
+impl UnixSeqpacketInfo {
+	/// Get the user ID of the process.
+	pub fn user_id(&self) -> u32 {
+		self.user_id
+	}
+
+	/// Get the group ID of the process.
+	pub fn group_id(&self) -> u32 {
+		self.group_id
+	}
+
+	/// Get the process ID of the remote process (if available).
+	pub fn process_id(&self) -> Option<i32> {
+		self.process_id
+	}
+}
+
 #[cfg(feature = "unix-seqpacket")]
 mod impl_unix_seqpacket {
 	use std::future::Future;
@@ -14,6 +46,7 @@ mod impl_unix_seqpacket {
 
 	impl crate::transport::Transport for UnixTransport<tokio_seqpacket::UnixSeqpacket> {
 		type Body = UnixBody;
+		type Info = UnixSeqpacketInfo;
 		type Config = UnixConfig;
 		type ReadHalf = ReadHalfType;
 		type WriteHalf = WriteHalfType;
@@ -23,6 +56,15 @@ mod impl_unix_seqpacket {
 			let read_half = UnixReadHalf::new(read_half, self.config.max_body_len_read, self.config.max_fds_read);
 			let write_half = UnixWriteHalf::new(write_half, self.config.max_body_len_write, self.config.max_fds_write);
 			(read_half, write_half)
+		}
+
+		fn info(&self) -> std::io::Result<Self::Info> {
+			let creds = self.socket.peer_cred()?;
+			Ok(Self::Info {
+				user_id: creds.uid(),
+				group_id: creds.gid(),
+				process_id: creds.pid(),
+			})
 		}
 	}
 

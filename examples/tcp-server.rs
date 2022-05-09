@@ -20,11 +20,12 @@ async fn do_main(options: &Options) -> Result<(), String> {
 	let mut server = TcpListener::bind(options.bind.as_str(), Default::default())
 		.await
 		.map_err(|e| format!("failed to bind to {}: {}", options.bind, e))?;
-	eprintln!("listening on {}", options.bind);
+	eprintln!("Listening on {}", options.bind);
 
 	// Run the accept loop.
 	// The lambda returns a future that will be spawned in a new task for each peer.
-	let result = server.run(|peer| async {
+	let result = server.run(|peer, info| async move {
+		eprintln!("Accepted connection from: {}", info.remote_address());
 		if let Err(e) = handle_peer(peer).await {
 			eprintln!("Error: {}", e);
 		}

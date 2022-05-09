@@ -15,8 +15,17 @@ use crate::{Error, Message, MessageHeader};
 pub(crate) mod stream;
 pub use stream::StreamTransport;
 
+#[cfg(feature = "tcp")]
+pub use stream::TcpStreamInfo;
+
+#[cfg(feature = "unix-stream")]
+pub use stream::UnixStreamInfo;
+
 pub(crate) mod unix;
 pub use unix::UnixTransport;
+
+#[cfg(feature = "unix-seqpacket")]
+pub use unix::UnixSeqpacketInfo;
 
 /// Trait for types that represent a bi-direction message transport.
 ///
@@ -25,6 +34,9 @@ pub use unix::UnixTransport;
 pub trait Transport: Send + 'static {
 	/// The body type for the messages.
 	type Body: crate::Body;
+
+	/// Information about the underlying stream or connection of the transport.
+	type Info: Clone + Send + 'static;
 
 	/// The configuration type for the transport.
 	type Config: Clone + Default + Send + Sync + 'static;
@@ -38,6 +50,12 @@ pub trait Transport: Send + 'static {
 	/// Split the transport into a read half and a write half.
 	#[allow(clippy::needless_lifetimes)]
 	fn split<'a>(&'a mut self) -> (<Self::ReadHalf as ReadHalfType<'a>>::ReadHalf, <Self::WriteHalf as WriteHalfType<'a>>::WriteHalf);
+
+	/// Get information about the peer on the other end of the transport.
+	///
+	/// For TCP streams, this includes a socket address with an IP address and port number.
+	/// For Unix streams and seqpacket streams this includes the credentials of the remote process.
+	fn info(&self) -> std::io::Result<Self::Info>;
 }
 
 // TODO: Replace this with a generic associated type once it hits stable.

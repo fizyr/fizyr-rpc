@@ -24,7 +24,12 @@ async fn do_main(options: &Options) -> Result<(), String> {
 
 	// Run the accept loop.
 	// The lambda returns a future that will be spawned in a new task for each peer.
-	let result = server.run(|peer| async {
+	let result = server.run(|peer, info| async move {
+		if let Some(pid) = info.process_id() {
+			eprintln!("Accepted connection from process {} of user {}", pid, info.user_id());
+		} else {
+			eprintln!("Accepted connection from process of user {}", info.user_id());
+		}
 		if let Err(e) = handle_peer(peer).await {
 			eprintln!("Error: {}", e);
 		}

@@ -17,8 +17,9 @@ async fn main() {
 
 async fn do_main(options: &Options) -> Result<(), String> {
 	// Connect to a remote server.
-	let peer = TcpPeer::connect(&options.address, Default::default()).await
+	let (peer, info) = TcpPeer::connect(&options.address, Default::default()).await
 		.map_err(|e| format!("failed to connect to {}: {}", options.address, e))?;
+	eprintln!("Connected to: {}", info.remote_address());
 
 	// Send a request to the remote peer.
 	let mut request = peer

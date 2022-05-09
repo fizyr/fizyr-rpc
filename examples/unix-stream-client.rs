@@ -18,8 +18,13 @@ async fn main() {
 
 async fn do_main(options: &Options) -> Result<(), String> {
 	// Connect to a remote server.
-	let peer = UnixStreamPeer::connect(&options.socket, Default::default()).await
+	let (peer, info) = UnixStreamPeer::connect(&options.socket, Default::default()).await
 		.map_err(|e| format!("failed to connect to {}: {}", options.socket.display(), e))?;
+	if let Some(pid) = info.process_id() {
+		eprintln!("Connected to process {} of user {}", pid, info.user_id());
+	} else {
+		eprintln!("Connected to process of user {}", info.user_id());
+	}
 
 	// Send a request to the remote peer.
 	let mut request = peer

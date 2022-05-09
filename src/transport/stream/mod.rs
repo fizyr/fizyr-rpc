@@ -6,6 +6,38 @@ pub use body::StreamBody;
 pub use config::StreamConfig;
 pub use transport::{StreamReadHalf, StreamTransport, StreamWriteHalf};
 
+/// Information about the remote peer of a Unix stream.
+#[derive(Debug, Clone)]
+#[cfg(feature = "unix-stream")]
+pub struct UnixStreamInfo {
+	/// The user ID of the remote process.
+	user_id: u32,
+
+	/// The group ID of the remote process.
+	group_id: u32,
+
+	/// The process ID of the remote process.
+	process_id: Option<i32>,
+}
+
+#[cfg(feature = "unix-stream")]
+impl UnixStreamInfo {
+	/// Get the user ID of the remote process.
+	pub fn user_id(&self) -> u32 {
+		self.user_id
+	}
+
+	/// Get the group ID of the remote process.
+	pub fn group_id(&self) -> u32 {
+		self.group_id
+	}
+
+	/// Get the process ID of the remote process (if available).
+	pub fn process_id(&self) -> Option<i32> {
+		self.process_id
+	}
+}
+
 #[cfg(feature = "unix-stream")]
 mod impl_unix_stream {
 	use std::future::Future;
@@ -14,6 +46,7 @@ mod impl_unix_stream {
 
 	impl crate::transport::Transport for StreamTransport<tokio::net::UnixStream> {
 		type Body = StreamBody;
+		type Info = UnixStreamInfo;
 		type Config = StreamConfig;
 		type ReadHalf = ReadHalfType;
 		type WriteHalf = WriteHalfType;
@@ -23,6 +56,15 @@ mod impl_unix_stream {
 			let read_half = StreamReadHalf::new(read_half, self.config.max_body_len_read);
 			let write_half = StreamWriteHalf::new(write_half, self.config.max_body_len_write);
 			(read_half, write_half)
+		}
+
+		fn info(&self) -> std::io::Result<Self::Info> {
+			let creds = self.stream.peer_cred()?;
+			Ok(Self::Info {
+				user_id: creds.uid(),
+				group_id: creds.gid(),
+				process_id: creds.pid(),
+			})
 		}
 	}
 
@@ -90,6 +132,30 @@ mod impl_unix_stream {
 	}
 }
 
+/// Information about the remote peer of a Unix stream.
+#[derive(Debug, Clone)]
+#[cfg(feature = "tcp")]
+pub struct TcpStreamInfo {
+	/// The local address of the TCP stream.
+	local_address: std::net::SocketAddr,
+
+	/// The remote addess of the TCP stream.
+	remote_address: std::net::SocketAddr,
+}
+
+#[cfg(feature = "tcp")]
+impl TcpStreamInfo {
+	/// Get the local address of the TCP stream.
+	pub fn local_address(&self) -> &std::net::SocketAddr {
+		&self.local_address
+	}
+
+	/// Get the remote address of the TCP stream.
+	pub fn remote_address(&self) -> &std::net::SocketAddr {
+		&self.remote_address
+	}
+}
+
 #[cfg(feature = "tcp")]
 mod impl_tcp {
 	use std::future::Future;
@@ -98,6 +164,7 @@ mod impl_tcp {
 
 	impl crate::transport::Transport for StreamTransport<tokio::net::TcpStream> {
 		type Body = StreamBody;
+		type Info = TcpStreamInfo;
 		type Config = StreamConfig;
 		type ReadHalf = ReadHalfType;
 		type WriteHalf = WriteHalfType;
@@ -107,6 +174,13 @@ mod impl_tcp {
 			let read_half = StreamReadHalf::new(read_half, self.config.max_body_len_read);
 			let write_half = StreamWriteHalf::new(write_half, self.config.max_body_len_write);
 			(read_half, write_half)
+		}
+
+		fn info(&self) -> std::io::Result<Self::Info> {
+			Ok(Self::Info {
+				local_address: self.stream.local_addr()?,
+				remote_address: self.stream.peer_addr()?,
+			})
 		}
 	}
 
