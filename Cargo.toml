@@ -18,10 +18,10 @@ categories = ["asynchronous", "network-programming"]
 edition = "2021"
 
 [features]
-tcp = ["tokio/net"]
-unix-stream = ["tokio/net"]
-unix-seqpacket = ["tokio-seqpacket"]
 macros = ["fizyr-rpc-macros"]
+tcp = ["tokio/net"]
+unix-seqpacket = ["tokio-seqpacket"]
+unix-stream = ["tokio/net"]
 
 [dependencies]
 byteorder = "1.3.4"
@@ -39,7 +39,7 @@ fizyr-rpc = { path = ".", features = ["unix-seqpacket", "unix-stream", "tcp"] }
 memfile = "0.2.0"
 
 [package.metadata.docs.rs]
-features = ["tcp", "unix-stream", "unix-seqpacket"]
+features = ["macros", "tcp", "unix-stream", "unix-seqpacket"]
 
 [workspace]
 members = ["macros", "macros-tests"]
