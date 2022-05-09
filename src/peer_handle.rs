@@ -217,23 +217,20 @@ impl<Body> PeerCloseHandle<Body> {
 impl<Body> std::fmt::Debug for PeerHandle<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		f.debug_struct(core::any::type_name::<Self>())
-			// TODO: use finish_non_exhaustive when it hits stable
-			.finish()
+			.finish_non_exhaustive()
 	}
 }
 
 impl<Body> std::fmt::Debug for PeerReadHandle<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		f.debug_struct(core::any::type_name::<Self>())
-			// TODO: use finish_non_exhaustive when it hits stable
-			.finish()
+			.finish_non_exhaustive()
 	}
 }
 
 impl<Body> std::fmt::Debug for PeerWriteHandle<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		f.debug_struct(core::any::type_name::<Self>())
-			// TODO: use finish_non_exhaustive when it hits stable
-			.finish()
+			.finish_non_exhaustive()
 	}
 }
