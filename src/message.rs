@@ -257,7 +257,8 @@ impl MessageHeader {
 
 impl<Body> std::fmt::Debug for Message<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		// TODO: use finish_non_exhaustive when it hits stable.
-		f.debug_struct("Message").field("header", &self.header).finish()
+		f.debug_struct("Message")
+			.field("header", &self.header)
+			.finish_non_exhaustive()
 	}
 }

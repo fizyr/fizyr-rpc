@@ -7,7 +7,8 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 use super::{StreamBody, StreamConfig};
 use crate::error::private::check_payload_too_large;
-use crate::{Error, Message, MessageHeader};
+use crate::transport::TransportError;
+use crate::{Message, MessageHeader};
 
 /// Length of a message frame and header.
 const FRAMED_HEADER_LEN: usize = 4 + crate::HEADER_LEN as usize;
@@ -157,7 +158,7 @@ where
 {
 	type Body = StreamBody;
 
-	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>> {
+	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, TransportError>> {
 		// Get the original &mut Self from the pin.
 		let this = self.get_mut();
 
@@ -165,18 +166,21 @@ where
 		while this.bytes_read < FRAMED_HEADER_LEN {
 			// Read more header data.
 			let stream = Pin::new(&mut this.stream);
-			this.bytes_read += ready!(poll_read(stream, context, &mut this.header_buffer[this.bytes_read..]))?;
+			this.bytes_read += ready!(poll_read(stream, context, &mut this.header_buffer[this.bytes_read..]))
+				.map_err(TransportError::new_fatal)?;
 			assert!(this.bytes_read <= FRAMED_HEADER_LEN);
 
 			// Check if we have the whole frame + header.
 			if this.bytes_read == FRAMED_HEADER_LEN {
 				// Parse frame and header.
 				let length = LE::read_u32(&this.header_buffer[0..]);
-				this.parsed_header = MessageHeader::decode(&this.header_buffer[4..])?;
+				this.parsed_header = MessageHeader::decode(&this.header_buffer[4..])
+					.map_err(TransportError::new_fatal)?;
 
 				// Check body length and create body buffer.
 				let body_len = length - crate::HEADER_LEN as u32;
-				check_payload_too_large(body_len as usize, this.max_body_len as usize)?;
+				check_payload_too_large(body_len as usize, this.max_body_len as usize)
+					.map_err(TransportError::new_fatal)?;
 				this.body_buffer = vec![0; body_len as usize];
 			}
 		}
@@ -186,7 +190,8 @@ where
 			// Read body data.
 			let stream = Pin::new(&mut this.stream);
 			let body_read = this.bytes_read - FRAMED_HEADER_LEN;
-			this.bytes_read += ready!(poll_read(stream, context, &mut this.body_buffer[body_read..]))?;
+			this.bytes_read += ready!(poll_read(stream, context, &mut this.body_buffer[body_read..]))
+					.map_err(TransportError::new_fatal)?;
 			let body_read = this.bytes_read - FRAMED_HEADER_LEN;
 			assert!(body_read <= this.body_buffer.len());
 		}
@@ -205,11 +210,12 @@ where
 {
 	type Body = StreamBody;
 
-	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), Error>> {
+	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), TransportError>> {
 		let this = self.get_mut();
 
 		// Make sure the body length doesn't exceed the maximum.
-		check_payload_too_large(body.len(), this.max_body_len as usize)?;
+		check_payload_too_large(body.len(), this.max_body_len as usize)
+			.map_err(TransportError::new_non_fatal)?;
 
 		// Encode the header if we haven't done that yet.
 		let header_buffer = this.header_buffer.get_or_insert_with(|| {
@@ -223,9 +229,11 @@ where
 		while this.bytes_written < FRAMED_HEADER_LEN + body.len() {
 			let stream = Pin::new(&mut this.stream);
 			if this.bytes_written < FRAMED_HEADER_LEN {
-				this.bytes_written = ready!(stream.poll_write_vectored(context, &[IoSlice::new(&header_buffer[this.bytes_written..]), IoSlice::new(&body.data)]))?;
+				this.bytes_written = ready!(stream.poll_write_vectored(context, &[IoSlice::new(&header_buffer[this.bytes_written..]), IoSlice::new(&body.data)]))
+					.map_err(TransportError::new_fatal)?;
 			} else {
-				this.bytes_written = ready!(stream.poll_write_vectored(context, &[IoSlice::new(&body.data[this.bytes_written - FRAMED_HEADER_LEN..])]))?;
+				this.bytes_written = ready!(stream.poll_write_vectored(context, &[IoSlice::new(&body.data[this.bytes_written - FRAMED_HEADER_LEN..])]))
+					.map_err(TransportError::new_fatal)?;
 			}
 		}
 

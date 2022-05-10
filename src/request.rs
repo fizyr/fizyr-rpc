@@ -337,41 +337,37 @@ impl<Body> ReceivedRequestWriteHandle<Body> {
 
 impl<Body> std::fmt::Debug for SentRequestHandle<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		// TODO: use finish_non_exhaustive when it hits stable.
 		f.debug_struct("SentRequestHandle")
 			.field("request_id", &self.request_id())
 			.field("service_id", &self.service_id())
-			.finish()
+			.finish_non_exhaustive()
 	}
 }
 
 impl<Body> std::fmt::Debug for SentRequestWriteHandle<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		// TODO: use finish_non_exhaustive when it hits stable.
 		f.debug_struct("SentRequestWriteHandle")
 			.field("request_id", &self.request_id())
 			.field("service_id", &self.service_id())
-			.finish()
+			.finish_non_exhaustive()
 	}
 }
 
 impl<Body> std::fmt::Debug for ReceivedRequestHandle<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		// TODO: use finish_non_exhaustive when it hits stable.
 		f.debug_struct("ReceivedRequestHandle")
 			.field("request_id", &self.request_id())
 			.field("service_id", &self.service_id())
-			.finish()
+			.finish_non_exhaustive()
 	}
 }
 
 impl<Body> std::fmt::Debug for ReceivedRequestWriteHandle<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		// TODO: use finish_non_exhaustive when it hits stable.
 		f.debug_struct("ReceivedRequestWriteHandle")
 			.field("request_id", &self.request_id())
 			.field("service_id", &self.service_id())
-			.finish()
+			.finish_non_exhaustive()
 	}
 }
 

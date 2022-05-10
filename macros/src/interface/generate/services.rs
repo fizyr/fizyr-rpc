@@ -181,8 +181,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 				f.debug_struct(::core::any::type_name::<Self>())
 					.field("request_id", &self.request_id())
 					.field("service_id", &self.service_id())
-					// TODO: use finish_non_exhaustive when it hits stable
-					.finish()
+					.finish_non_exhaustive()
 			}
 		}
 
@@ -191,8 +190,7 @@ fn generate_sent_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 				f.debug_struct(::core::any::type_name::<Self>())
 					.field("request_id", &self.request_id())
 					.field("service_id", &self.service_id())
-					// TODO: use finish_non_exhaustive when it hits stable
-					.finish()
+					.finish_non_exhaustive()
 			}
 		}
 
@@ -326,8 +324,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 				f.debug_struct(::core::any::type_name::<Self>())
 					.field("request_id", &self.request_id())
 					.field("service_id", &self.service_id())
-					// TODO: use finish_non_exhaustive when it hits stable
-					.finish()
+					.finish_non_exhaustive()
 			}
 		}
 
@@ -336,8 +333,7 @@ fn generate_received_request(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ide
 				f.debug_struct(::core::any::type_name::<Self>())
 					.field("request_id", &self.request_id())
 					.field("service_id", &self.service_id())
-					// TODO: use finish_non_exhaustive when it hits stable
-					.finish()
+					.finish_non_exhaustive()
 			}
 		}
 

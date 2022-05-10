@@ -129,12 +129,13 @@ mod implementation {
 		check_message_too_short,
 		check_payload_too_large, connection_aborted,
 	};
-	use crate::{Error, Message, MessageHeader, UnixBody};
+	use crate::transport::TransportError;
+	use crate::{Message, MessageHeader, UnixBody};
 
 	impl crate::transport::TransportReadHalf for UnixReadHalf<&tokio_seqpacket::UnixSeqpacket> {
 		type Body = UnixBody;
 
-		fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>> {
+		fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, TransportError>> {
 			use tokio_seqpacket::ancillary::SocketAncillary;
 
 			let this = self.get_mut();
@@ -149,25 +150,26 @@ mod implementation {
 			let mut ancillary = SocketAncillary::new(&mut ancillary);
 
 			// Read the incoming datagram.
-			let bytes_read = ready!(this.socket.poll_recv_vectored_with_ancillary(
-				context,
-				&mut [IoSliceMut::new(&mut header_buffer), IoSliceMut::new(&mut this.body_buffer)],
-				&mut ancillary
-			))?;
+			let mut buffers = [IoSliceMut::new(&mut header_buffer), IoSliceMut::new(&mut this.body_buffer)];
+			let bytes_read = ready!(this.socket.poll_recv_vectored_with_ancillary(context, &mut buffers, &mut ancillary))
+				.map_err(TransportError::new_fatal)?;
 
 			// Immediately wrap all file descriptors to prevent leaking any of them.
 			// We must always do this directly after a successful read.
-			let fds = extract_file_descriptors(&ancillary)?;
+			let fds = extract_file_descriptors(&ancillary)
+				.map_err(TransportError::new_fatal)?;
 
 			if bytes_read == 0 {
-				return Poll::Ready(Err(connection_aborted()));
+				return Poll::Ready(Err(TransportError::new_fatal(connection_aborted())));
 			}
 
 			// Make sure we received an entire header.
-			check_message_too_short(bytes_read)?;
+			check_message_too_short(bytes_read)
+				.map_err(TransportError::new_fatal)?;
 
 			// Parse the header.
-			let header = MessageHeader::decode(&header_buffer)?;
+			let header = MessageHeader::decode(&header_buffer)
+				.map_err(TransportError::new_fatal)?;
 
 			// Resize the body buffer to the actual body size.
 			let mut body = std::mem::take(&mut this.body_buffer);
@@ -180,13 +182,14 @@ mod implementation {
 	impl crate::transport::TransportWriteHalf for UnixWriteHalf<&tokio_seqpacket::UnixSeqpacket> {
 		type Body = UnixBody;
 
-		fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), Error>> {
+		fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), TransportError>> {
 			use tokio_seqpacket::ancillary::SocketAncillary;
 
 			let this = self.get_mut();
 
 			// Check the outgoing body size.
-			check_payload_too_large(body.data.len(), this.max_body_len as usize)?;
+			check_payload_too_large(body.data.len(), this.max_body_len as usize)
+				.map_err(TransportError::new_non_fatal)?;
 
 			// Prepare a buffer for the message header.
 			let mut header_buffer = [0; crate::HEADER_LEN as usize];
@@ -199,17 +202,15 @@ mod implementation {
 
 			let raw_fds: Vec<_> = body.fds.iter().map(|fd| fd.as_raw_fd()).collect();
 			if !ancillary.add_fds(&raw_fds) {
-				return Poll::Ready(Err(std::io::Error::new(
+				return Poll::Ready(Err(TransportError::new_non_fatal(std::io::Error::new(
 					std::io::ErrorKind::Other,
 					"not enough space for file descriptors",
-				).into()));
+				))));
 			}
 
-			ready!(this.socket.poll_send_vectored_with_ancillary(
-				context,
-				&[IoSlice::new(&header_buffer), IoSlice::new(&body.data)]
-				, &mut ancillary
-			))?;
+			let buffers = [IoSlice::new(&header_buffer), IoSlice::new(&body.data)];
+			ready!(this.socket.poll_send_vectored_with_ancillary(context, &buffers, &mut ancillary))
+				.map_err(TransportError::new_fatal)?;
 
 			Poll::Ready(Ok(()))
 		}

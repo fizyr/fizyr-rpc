@@ -58,6 +58,67 @@ pub trait Transport: Send + 'static {
 	fn info(&self) -> std::io::Result<Self::Info>;
 }
 
+/// An error from the transport layer.
+///
+/// This is a regular [`crate::Error`],
+/// but also indicates if it is fatal for the transport or not.
+#[derive(Debug)]
+pub struct TransportError {
+	/// The actual error that occured.
+	inner: Error,
+
+	/// If true, the error was fatal and the transport is no longer usable.
+	is_fatal: bool,
+}
+
+impl TransportError {
+	/// Create a new fatal transport error from an inner error.
+	///
+	/// After a transport returns a fatal error, the transport should not be used anymore.
+	fn new_fatal(inner: impl Into<Error>) -> Self {
+		Self {
+			inner: inner.into(),
+			is_fatal: true,
+		}
+	}
+
+	/// Create a new non-fatal transport error from an inner error.
+	///
+	/// A transport may still be used after returning a non-fatal error.
+	fn new_non_fatal(inner: impl Into<Error>) -> Self {
+		Self {
+			inner: inner.into(),
+			is_fatal: false,
+		}
+	}
+
+	/// Get the inner error.
+	pub fn inner(&self) -> &Error {
+		&self.inner
+	}
+
+	/// Consume `self` to get the inner error.
+	pub fn into_inner(self) -> Error {
+		self.inner
+	}
+
+	/// Check if the error is fatal for the transport.
+	///
+	/// If the error is fatal,
+	/// the transport that generated it is no longer usable.
+	pub fn is_fatal(&self) -> bool {
+		self.is_fatal
+	}
+}
+
+impl std::error::Error for TransportError {}
+
+impl std::fmt::Display for TransportError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.inner.fmt(f)
+	}
+}
+
 // TODO: Replace this with a generic associated type once it hits stable.
 /// Helper trait to define the type of a read half for a transport.
 ///
@@ -93,7 +154,7 @@ pub trait TransportReadHalf: Send + Unpin {
 	///
 	/// If the function returns [`Poll::Pending`],
 	/// the current task is scheduled to wake when more data is available.
-	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>>;
+	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, TransportError>>;
 
 	/// Asynchronously read a complete message from the transport.
 	fn read_msg(&mut self) -> ReadMsg<Self>
@@ -122,7 +183,7 @@ pub trait TransportWriteHalf: Send + Unpin {
 	///
 	/// If the function returns [`Poll::Pending`],
 	/// the current task is scheduled to wake when the transport is ready for more data.
-	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), Error>>;
+	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), TransportError>>;
 
 	/// Asynchronously write a message to the transport.
 	fn write_msg<'c>(&'c mut self, header: &'c MessageHeader, body: &'c Self::Body) -> WriteMsg<Self> {
@@ -152,7 +213,7 @@ impl<T> Future for ReadMsg<'_, T>
 where
 	T: TransportReadHalf + ?Sized + Unpin,
 {
-	type Output = Result<Message<T::Body>, Error>;
+	type Output = Result<Message<T::Body>, TransportError>;
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		Pin::new(&mut *self.get_mut().inner).poll_read_msg(cx)
@@ -163,7 +224,7 @@ impl<T> Future for WriteMsg<'_, T>
 where
 	T: TransportWriteHalf + ?Sized + Unpin,
 {
-	type Output = Result<(), Error>;
+	type Output = Result<(), TransportError>;
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		let header = self.header;
@@ -178,7 +239,7 @@ where
 {
 	type Body = T::Body;
 
-	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>> {
+	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, TransportError>> {
 		T::poll_read_msg(Pin::new(*self.get_mut()), context)
 	}
 }
@@ -189,7 +250,7 @@ where
 {
 	type Body = T::Body;
 
-	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>> {
+	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, TransportError>> {
 		T::poll_read_msg(Pin::new(&mut *self.get_mut()), context)
 	}
 }
@@ -201,7 +262,7 @@ where
 {
 	type Body = <P::Target as TransportReadHalf>::Body;
 
-	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, Error>> {
+	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, TransportError>> {
 		P::Target::poll_read_msg(Pin::new(&mut *self.get_mut()), context)
 	}
 }
@@ -217,7 +278,7 @@ where
 		context: &mut Context,
 		header: &MessageHeader,
 		body: &Self::Body,
-	) -> Poll<Result<(), Error>> {
+	) -> Poll<Result<(), TransportError>> {
 		T::poll_write_msg(Pin::new(*self.get_mut()), context, header, body)
 	}
 }
@@ -233,7 +294,7 @@ where
 		context: &mut Context,
 		header: &MessageHeader,
 		body: &Self::Body,
-	) -> Poll<Result<(), Error>> {
+	) -> Poll<Result<(), TransportError>> {
 		T::poll_write_msg(Pin::new(&mut *self.get_mut()), context, header, body)
 	}
 }
@@ -245,7 +306,7 @@ where
 {
 	type Body = <P::Target as TransportWriteHalf>::Body;
 
-	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), Error>> {
+	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), TransportError>> {
 		P::Target::poll_write_msg(Pin::new(&mut *self.get_mut()), context, header, body)
 	}
 }
