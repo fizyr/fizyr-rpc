@@ -1,3 +1,27 @@
+# Version 0.5.0 - 2022-05-23
+- [rename][major] Rename `Server` to `Listener` to avoid confusion with generated interfaces.
+- [change][major] Switch to a single opaque error type.
+- [rename][major] Rename `Incoming` to `ReceivedMessage`.
+- [remove][major] Remove unused `Outgoing` type.
+- [rename][major] Rename `PeerHandle::next_message()` to `recv_message()`.
+- [change][major] Move message body out of `ReceivedRequest`.
+- [change][major] Change `SentRequest/ReceivedRequest::recv_update()` to return an `Option<Message>`.
+- [rename][major] Rename `SentRequest` and `ReceivedRequest` to `SentRequestHandle` and `ReceivedRequestHandle`.
+- [add][major] Have `Transport` implementations decide which I/O errors are fatal.
+- [add][major] Provide transport info when spawning peers without giving access to the transport.
+- [add][minor] Add utility functions for working with `RecvMessageError`.
+- [add][minor] Add `Transport::info()` function to get information about a transport.
+- [add][minor] Allow direct access to the underlying `Transport` of a `Peer`.
+- [add][minor] Allow direct access to the underlying stream or socket of a `Transport`.
+- [fix][minor] Fix unintended infinite recursion in generic trait implementations.
+- [add][minor] Add `interface!()` macro to generate client/server structs with typed interfaces.
+- [change][minor] Try unlinking Unix sockets before binding them.
+- [add][minor] Add `SentRequestWriteHandle` and `ReceivedRequestWriteHandle` to support parallel reading and writing.
+- [add][minor] Add `Body::as_error()` and `Body::into_error()` as required functions on the `Body` trait.
+- [fix][patch] Fixed accepting connections with Unix stream sockets.
+- [impl][patch] Use `poll_write_vectored` in the TCP transport to write the header and body with a single syscall.
+- [add][patch] Add Wireshark dissector for TCP and UDP transports for easier debugging.
+
 # Version 0.5.0-alpha10 - 2022-05-23
 - [add][major] Have `Transport` implementations decide which I/O errors are fatal.
 - [add][major] Provide transport info when spawning peers without giving access to the transport.
