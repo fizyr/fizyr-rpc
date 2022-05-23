@@ -1,3 +1,6 @@
+# Unreleased
+- [fix][patch] Fix version of macro crate dependency.
+
 # Version 0.5.0 - 2022-05-23
 - [rename][major] Rename `Server` to `Listener` to avoid confusion with generated interfaces.
 - [change][major] Switch to a single opaque error type.
