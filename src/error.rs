@@ -1,7 +1,5 @@
 //! Error types.
 
-use std::fmt::{Display, Formatter, Result};
-
 /// Opaque error for all RPC operations.
 #[derive(Debug)]
 pub struct Error {
@@ -10,9 +8,9 @@ pub struct Error {
 
 impl std::error::Error for Error {}
 
-impl Display for Error {
-	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-		write!(f, "(inner)")
+impl std::fmt::Display for Error {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.inner)
 	}
 }
 
@@ -344,8 +342,8 @@ pub(crate) mod private {
 
 	impl std::error::Error for InnerError {}
 
-	impl Display for InnerError {
-		fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+	impl std::fmt::Display for InnerError {
+		fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 			match self {
 				InnerError::Io(error) => write!(f, "{}", error),
 				InnerError::MessageTooShort { message_len } => write!(
@@ -378,7 +376,7 @@ pub(crate) mod private {
 
 	/// Check if a message size is large enough to contain a valid message.
 	#[allow(dead_code)] // not used when all transports are disabled.
-	pub fn check_message_too_short(message_len: usize) -> std::result::Result<(), InnerError> {
+	pub fn check_message_too_short(message_len: usize) -> Result<(), InnerError> {
 		if message_len >= crate::HEADER_LEN as usize {
 			Ok(())
 		} else {
@@ -387,7 +385,7 @@ pub(crate) mod private {
 	}
 
 	/// Check if a payload length is small enough to fit in a message body.
-	pub fn check_payload_too_large(body_len: usize, max_len: usize) -> std::result::Result<(), InnerError> {
+	pub fn check_payload_too_large(body_len: usize, max_len: usize) -> Result<(), InnerError> {
 		if body_len <= max_len as usize {
 			Ok(())
 		} else {
