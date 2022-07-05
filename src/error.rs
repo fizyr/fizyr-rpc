@@ -241,13 +241,8 @@ impl<Body> std::fmt::Display for RecvMessageError<Body> {
 impl<Body> std::fmt::Debug for ParseUpdateError<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::UnknownUpdate(message) => f.debug_tuple("UnknownUpdate")
-				.field(message)
-				.finish(),
-			Self::InvalidUpdate(header, error) => f.debug_tuple("InvalidUpdate")
-				.field(header)
-				.field(error)
-				.finish(),
+			Self::UnknownUpdate(message) => f.debug_tuple("UnknownUpdate").field(message).finish(),
+			Self::InvalidUpdate(header, error) => f.debug_tuple("InvalidUpdate").field(header).field(error).finish(),
 		}
 	}
 }
@@ -255,23 +250,11 @@ impl<Body> std::fmt::Debug for ParseUpdateError<Body> {
 impl<Body> std::fmt::Debug for RecvMessageError<Body> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::Other(e) => f.debug_tuple("Other")
-				.field(e)
-				.finish(),
-			Self::UnknownStream(message) => f.debug_tuple("UnknownStream")
-				.field(message)
-				.finish(),
-			Self::UnknownRequest(request, _body) => f.debug_tuple("UnknownStream")
-				.field(request)
-				.finish(),
-			Self::InvalidStream(header, error) => f.debug_tuple("InvalidStread")
-				.field(header)
-				.field(error)
-				.finish(),
-			Self::InvalidRequest(request, error) => f.debug_tuple("InvalidRequest")
-				.field(request)
-				.field(error)
-				.finish(),
+			Self::Other(e) => f.debug_tuple("Other").field(e).finish(),
+			Self::UnknownStream(message) => f.debug_tuple("UnknownStream").field(message).finish(),
+			Self::UnknownRequest(request, _body) => f.debug_tuple("UnknownStream").field(request).finish(),
+			Self::InvalidStream(header, error) => f.debug_tuple("InvalidStread").field(header).field(error).finish(),
+			Self::InvalidRequest(request, error) => f.debug_tuple("InvalidRequest").field(request).field(error).finish(),
 		}
 	}
 }
@@ -290,9 +273,7 @@ pub(crate) mod private {
 		Io(std::io::Error),
 
 		/// The received message is too short to be valid.
-		MessageTooShort {
-			message_len: usize,
-		},
+		MessageTooShort { message_len: usize },
 
 		/// The received message has an invalid type.
 		InvalidMessageType {
@@ -349,7 +330,6 @@ pub(crate) mod private {
 		Custom(String),
 	}
 
-
 	impl From<std::io::Error> for private::InnerError {
 		fn from(error: std::io::Error) -> Self {
 			private::InnerError::Io(error)
@@ -367,15 +347,26 @@ pub(crate) mod private {
 	impl Display for InnerError {
 		fn fmt(&self, f: &mut Formatter<'_>) -> Result {
 			match self {
-				InnerError::MessageTooShort { message_len } => write!(f, "the message is too short to be valid: need at least {} for the header, got only {message_len} bytes", crate::HEADER_LEN),
+				InnerError::MessageTooShort { message_len } => write!(
+					f,
+					"the message is too short to be valid: need at least {} for the header, got only {message_len} bytes",
+					crate::HEADER_LEN
+				),
 				InnerError::InvalidMessageType { value } => write!(f, "invalid message type: expected a value in the range [0..4], got {value}"),
-				InnerError::PayloadTooLarge { body_len, max_len } => write!(f, "payload too large: maximum payload size is {max_len}, got {body_len}"),
-				InnerError::DuplicateRequestId { request_id } => write!(f, "duplicate request ID: request ID {request_id} is already associated with an open request"),
-				InnerError::UnknownRequestId { request_id } => write!(f, "unknown request ID: request ID {request_id} is not associated with an open request"),
+				InnerError::PayloadTooLarge { body_len, max_len } => {
+					write!(f, "payload too large: maximum payload size is {max_len}, got {body_len}")
+				},
+				InnerError::DuplicateRequestId { request_id } => write!(
+					f,
+					"duplicate request ID: request ID {request_id} is already associated with an open request"
+				),
+				InnerError::UnknownRequestId { request_id } => {
+					write!(f, "unknown request ID: request ID {request_id} is not associated with an open request")
+				},
 				InnerError::UnexpectedServiceId { service_id } => write!(f, "unexpected service ID: {service_id}"),
 				InnerError::NoFreeRequestIdFound => write!(f, "no free request ID was found"),
 				InnerError::RequestClosed => write!(f, "the request is already closed"),
-				_ => write!(f, "{}", self),
+				_ => write!(f, "{{0}}"),
 			}
 		}
 	}
@@ -395,7 +386,7 @@ pub(crate) mod private {
 		if body_len <= max_len as usize {
 			Ok(())
 		} else {
-			Err(InnerError::PayloadTooLarge{ body_len, max_len })
+			Err(InnerError::PayloadTooLarge { body_len, max_len })
 		}
 	}
 
@@ -423,7 +414,12 @@ pub(crate) mod private {
 				crate::MessageType::ResponderUpdate => "an update message",
 				crate::MessageType::Stream => "a streaming message",
 			};
-			write!(f, "unexpected message type: expected {}, got {}", to_str(self.expected), to_str(self.value))
+			write!(
+				f,
+				"unexpected message type: expected {}, got {}",
+				to_str(self.expected),
+				to_str(self.value)
+			)
 		}
 	}
 }
