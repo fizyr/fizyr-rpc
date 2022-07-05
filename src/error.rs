@@ -347,6 +347,7 @@ pub(crate) mod private {
 	impl Display for InnerError {
 		fn fmt(&self, f: &mut Formatter<'_>) -> Result {
 			match self {
+				InnerError::Io(error) => write!(f, "{}", error),
 				InnerError::MessageTooShort { message_len } => write!(
 					f,
 					"the message is too short to be valid: need at least {} for the header, got only {message_len} bytes",
@@ -363,10 +364,14 @@ pub(crate) mod private {
 				InnerError::UnknownRequestId { request_id } => {
 					write!(f, "unknown request ID: request ID {request_id} is not associated with an open request")
 				},
+				InnerError::UnexpectedMessageType(error) => write!(f, "{}", error),
 				InnerError::UnexpectedServiceId { service_id } => write!(f, "unexpected service ID: {service_id}"),
 				InnerError::NoFreeRequestIdFound => write!(f, "no free request ID was found"),
 				InnerError::RequestClosed => write!(f, "the request is already closed"),
-				_ => write!(f, "{{0}}"),
+				InnerError::EncodeFailed(error) => write!(f, "{}", error),
+				InnerError::DecodeFailed(error) => write!(f, "{}", error),
+				InnerError::RemoteError(error) => write!(f, "{}", error),
+				InnerError::Custom(error) => write!(f, "{}", error),
 			}
 		}
 	}
