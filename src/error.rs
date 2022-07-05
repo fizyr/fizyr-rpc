@@ -16,9 +16,9 @@ impl Display for Error {
 	}
 }
 
-impl From<std::io::Error> for private::InnerError {
-	fn from(error: std::io::Error) -> Self {
-		private::InnerError::Io(error)
+impl From<private::InnerError> for Error {
+	fn from(error: private::InnerError) -> Error {
+		Self { inner: error }
 	}
 }
 
@@ -349,6 +349,13 @@ pub(crate) mod private {
 		Custom(String),
 	}
 
+
+	impl From<std::io::Error> for private::InnerError {
+		fn from(error: std::io::Error) -> Self {
+			private::InnerError::Io(error)
+		}
+	}
+
 	impl From<UnexpectedMessageType> for private::InnerError {
 		fn from(error: UnexpectedMessageType) -> Self {
 			private::InnerError::UnexpectedMessageType(error)
@@ -368,14 +375,14 @@ pub(crate) mod private {
 				InnerError::UnexpectedServiceId { service_id } => write!(f, "unexpected service ID: {service_id}"),
 				InnerError::NoFreeRequestIdFound => write!(f, "no free request ID was found"),
 				InnerError::RequestClosed => write!(f, "the request is already closed"),
-				_ => write!(f, "{}", self.0),
+				_ => write!(f, "{}", self),
 			}
 		}
 	}
 
 	/// Check if a message size is large enough to contain a valid message.
 	#[allow(dead_code)] // not used when all transports are disabled.
-	pub fn check_message_too_short(message_len: usize) -> Result<(), InnerError> {
+	pub fn check_message_too_short(message_len: usize) -> std::result::Result<(), InnerError> {
 		if message_len >= crate::HEADER_LEN as usize {
 			Ok(())
 		} else {
@@ -384,7 +391,7 @@ pub(crate) mod private {
 	}
 
 	/// Check if a payload length is small enough to fit in a message body.
-	pub fn check_payload_too_large(body_len: usize, max_len: usize) -> Result<(), InnerError> {
+	pub fn check_payload_too_large(body_len: usize, max_len: usize) -> std::result::Result<(), InnerError> {
 		if body_len <= max_len as usize {
 			Ok(())
 		} else {
