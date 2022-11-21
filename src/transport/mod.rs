@@ -48,8 +48,7 @@ pub trait Transport: Send + 'static {
 	type WriteHalf<'a>: TransportWriteHalf<Body = Self::Body> + 'a;
 
 	/// Split the transport into a read half and a write half.
-	#[allow(clippy::needless_lifetimes)]
-	fn split<'a>(&'a mut self) -> (Self::ReadHalf<'a>, Self::WriteHalf<'a>);
+	fn split(&mut self) -> (Self::ReadHalf<'_>, Self::WriteHalf<'_>);
 
 	/// Get information about the peer on the other end of the transport.
 	///
