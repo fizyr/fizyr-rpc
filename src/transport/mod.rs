@@ -42,14 +42,14 @@ pub trait Transport: Send + 'static {
 	type Config: Clone + Default + Send + Sync + 'static;
 
 	/// The type of the read half of the transport.
-	type ReadHalf: for<'a> ReadHalfType<'a, Body = Self::Body>;
+	type ReadHalf<'a>: TransportReadHalf<Body = Self::Body> + 'a;
 
 	/// The type of the write half of the transport.
-	type WriteHalf: for<'a> WriteHalfType<'a, Body = Self::Body>;
+	type WriteHalf<'a>: TransportWriteHalf<Body = Self::Body> + 'a;
 
 	/// Split the transport into a read half and a write half.
 	#[allow(clippy::needless_lifetimes)]
-	fn split<'a>(&'a mut self) -> (<Self::ReadHalf as ReadHalfType<'a>>::ReadHalf, <Self::WriteHalf as WriteHalfType<'a>>::WriteHalf);
+	fn split<'a>(&'a mut self) -> (Self::ReadHalf<'a>, Self::WriteHalf<'a>);
 
 	/// Get information about the peer on the other end of the transport.
 	///
@@ -117,30 +117,6 @@ impl std::fmt::Display for TransportError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		self.inner.fmt(f)
 	}
-}
-
-// TODO: Replace this with a generic associated type once it hits stable.
-/// Helper trait to define the type of a read half for a transport.
-///
-/// Used to work around the lack of generic associated types.
-pub trait ReadHalfType<'a> {
-	/// The body type for the transport.
-	type Body: crate::Body;
-
-	/// The concrete type of the read half.
-	type ReadHalf: TransportReadHalf<Body = Self::Body>;
-}
-
-// TODO: Replace this with a generic associated type once it hits stable.
-/// Helper trait to define the type of a write half for a transport.
-///
-/// Used to work around the lack of generic associated types.
-pub trait WriteHalfType<'a> {
-	/// The body type for the transport.
-	type Body: crate::Body;
-
-	/// The concrete type of the write half.
-	type WriteHalf: TransportWriteHalf<Body = Self::Body>;
 }
 
 /// Trait for the read half of a transport type.

@@ -48,8 +48,8 @@ mod impl_unix_seqpacket {
 		type Body = UnixBody;
 		type Info = UnixSeqpacketInfo;
 		type Config = UnixConfig;
-		type ReadHalf = ReadHalfType;
-		type WriteHalf = WriteHalfType;
+		type ReadHalf<'a> = UnixReadHalf<&'a tokio_seqpacket::UnixSeqpacket>;
+		type WriteHalf<'a> = UnixWriteHalf<&'a tokio_seqpacket::UnixSeqpacket>;
 
 		fn split(&mut self) -> (UnixReadHalf<&tokio_seqpacket::UnixSeqpacket>, UnixWriteHalf<&tokio_seqpacket::UnixSeqpacket>) {
 			let (read_half, write_half) = (&self.socket, &self.socket);
@@ -113,22 +113,6 @@ mod impl_unix_seqpacket {
 				Self::bind(address)
 			})
 		}
-	}
-
-	/// Helper struct to provide the read half types with a lifetime.
-	pub struct ReadHalfType;
-
-	/// Helper struct to provide the write half types with a lifetime.
-	pub struct WriteHalfType;
-
-	impl<'a> crate::transport::ReadHalfType<'a> for ReadHalfType {
-		type Body = UnixBody;
-		type ReadHalf = UnixReadHalf<&'a tokio_seqpacket::UnixSeqpacket>;
-	}
-
-	impl<'a> crate::transport::WriteHalfType<'a> for WriteHalfType {
-		type Body = UnixBody;
-		type WriteHalf = UnixWriteHalf<&'a tokio_seqpacket::UnixSeqpacket>;
 	}
 }
 
