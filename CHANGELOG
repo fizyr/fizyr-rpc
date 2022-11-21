@@ -1,5 +1,6 @@
 # Unreleased
 - [change][minor] Replace `WriteHalfType` and `ReadHalfType` with generic associated types.
+- [change][minor] Bump minimum Rust version to 1.65.
 
 # Version 0.5.1 - 2022-05-24
 - [fix][patch] Fix version of macro crate dependency.
