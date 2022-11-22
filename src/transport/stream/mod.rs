@@ -48,8 +48,8 @@ mod impl_unix_stream {
 		type Body = StreamBody;
 		type Info = UnixStreamInfo;
 		type Config = StreamConfig;
-		type ReadHalf = ReadHalfType;
-		type WriteHalf = WriteHalfType;
+		type ReadHalf<'a> = StreamReadHalf<tokio::net::unix::ReadHalf<'a>>;
+		type WriteHalf<'a> = StreamWriteHalf<tokio::net::unix::WriteHalf<'a>>;
 
 		fn split(&mut self) -> (StreamReadHalf<tokio::net::unix::ReadHalf>, StreamWriteHalf<tokio::net::unix::WriteHalf>) {
 			let (read_half, write_half) = self.stream.split();
@@ -114,22 +114,6 @@ mod impl_unix_stream {
 			})
 		}
 	}
-
-	/// Helper struct to provide the read half types with a lifetime.
-	pub struct ReadHalfType;
-
-	/// Helper struct to provide the write half types with a lifetime.
-	pub struct WriteHalfType;
-
-	impl<'a> crate::transport::ReadHalfType<'a> for ReadHalfType {
-		type Body = StreamBody;
-		type ReadHalf = StreamReadHalf<tokio::net::unix::ReadHalf<'a>>;
-	}
-
-	impl<'a> crate::transport::WriteHalfType<'a> for WriteHalfType {
-		type Body = StreamBody;
-		type WriteHalf = StreamWriteHalf<tokio::net::unix::WriteHalf<'a>>;
-	}
 }
 
 /// Information about the remote peer of a Unix stream.
@@ -166,8 +150,8 @@ mod impl_tcp {
 		type Body = StreamBody;
 		type Info = TcpStreamInfo;
 		type Config = StreamConfig;
-		type ReadHalf = ReadHalfType;
-		type WriteHalf = WriteHalfType;
+		type ReadHalf<'a> = StreamReadHalf<tokio::net::tcp::ReadHalf<'a>>;
+		type WriteHalf<'a> = StreamWriteHalf<tokio::net::tcp::WriteHalf<'a>>;
 
 		fn split(&mut self) -> (StreamReadHalf<tokio::net::tcp::ReadHalf>, StreamWriteHalf<tokio::net::tcp::WriteHalf>) {
 			let (read_half, write_half) = self.stream.split();
@@ -217,22 +201,6 @@ mod impl_tcp {
 		fn bind(address: Address) -> Self::Future {
 			Box::pin(Self::bind(address))
 		}
-	}
-
-	/// Helper struct to provide the read half types with a lifetime.
-	pub struct ReadHalfType;
-
-	/// Helper struct to provide the write half types with a lifetime.
-	pub struct WriteHalfType;
-
-	impl<'a> crate::transport::ReadHalfType<'a> for ReadHalfType {
-		type Body = StreamBody;
-		type ReadHalf = StreamReadHalf<tokio::net::tcp::ReadHalf<'a>>;
-	}
-
-	impl<'a> crate::transport::WriteHalfType<'a> for WriteHalfType {
-		type Body = StreamBody;
-		type WriteHalf = StreamWriteHalf<tokio::net::tcp::WriteHalf<'a>>;
 	}
 }
 
