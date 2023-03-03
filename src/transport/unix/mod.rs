@@ -167,8 +167,8 @@ mod test {
 		let_assert!(Ok(fd) = memfile::MemFile::create_default(name));
 		let mut file = fd.into_file();
 		let_assert!(Ok(_) = file.write_all(data));
-		assert!(let Ok(_) = file.seek(std::io::SeekFrom::Start(0)));
-		unsafe { filedesc::FileDesc::new(file) }
+		assert!(let Ok(_) = file.rewind());
+		filedesc::FileDesc::new(file.into())
 	}
 
 	fn read_blob(fd: &FileDesc) -> std::io::Result<Vec<u8>> {
