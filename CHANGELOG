@@ -1,4 +1,6 @@
 # Unreleased
+- [change][major] Update `filedesc` to `v0.6.0`.
+- [change][minor] Update `tokio-seqpacket` to `v0.7.0`.
 - [change][minor] Replace `WriteHalfType` and `ReadHalfType` with generic associated types.
 - [change][minor] Bump minimum Rust version to 1.65.
 
