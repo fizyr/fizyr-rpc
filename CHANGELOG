@@ -1,3 +1,6 @@
+# Unreleased
+- [add][minor] Add `same_channel` function to `PeerWriteHandle` and `Client`.
+
 # Version 0.5.1 - 2022-05-24
 - [fix][patch] Fix version of macro crate dependency.
 
