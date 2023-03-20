@@ -1,6 +1,12 @@
 # Unreleased
 - [add][minor] Add `same_channel` function to `PeerWriteHandle` and `Client`.
 
+# Version 0.6.0 - 2023-03-03
+- [change][major] Update `filedesc` to `v0.6.0`.
+- [change][minor] Update `tokio-seqpacket` to `v0.7.0`.
+- [change][minor] Replace `WriteHalfType` and `ReadHalfType` with generic associated types.
+- [change][minor] Bump minimum Rust version to 1.65.
+
 # Version 0.5.1 - 2022-05-24
 - [fix][patch] Fix version of macro crate dependency.
 
@@ -98,11 +104,11 @@
 - [remove][major] Removed `error::ProcessIncomingMessageError` from public the API.
 
 # Version v0.3.1 - 2021-01-27
-- Updated to tokio-seqpacket 0.5.
+- [change][minor] Updated to tokio-seqpacket 0.5.
 
 # Version v0.3.0 - 2020-12-25
-- Updated to tokio 1.0 and tokio-seqpacket 0.4.
-- Removed meaningless addresses from Accept implementation for Unix sockets.
+- [change][major] Updated to tokio 1.0 and tokio-seqpacket 0.4.
+- [change][major] Removed meaningless addresses from Accept implementation for Unix sockets.
 
 # Version v0.2.1 - 2020-09-03
 - [fix][patch] Fixed link in README.

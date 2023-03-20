@@ -518,7 +518,6 @@ pub mod raw {
 	}
 
 	impl syn::parse::Parse for InterfaceDefinition {
-		#[allow(clippy::eval_order_dependence)]
 		fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
 			let body;
 			Ok(Self {
@@ -564,7 +563,6 @@ pub mod raw {
 	}
 
 	impl syn::parse::Parse for MaybeServiceBody {
-		#[allow(clippy::eval_order_dependence)]
 		fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
 			if input.peek(syn::token::Comma) {
 				Ok(Self::NoBody(input.parse()?))
@@ -577,7 +575,6 @@ pub mod raw {
 	}
 
 	impl syn::parse::Parse for ServiceBody {
-		#[allow(clippy::eval_order_dependence)]
 		fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
 			let braced;
 			Ok(Self {

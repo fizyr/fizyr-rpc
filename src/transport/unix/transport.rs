@@ -121,6 +121,7 @@ mod implementation {
 	use super::*;
 
 	use filedesc::FileDesc;
+	use tokio_seqpacket::ancillary::{OwnedAncillaryMessage, AncillaryMessageWriter};
 	use std::io::{IoSlice, IoSliceMut};
 	use std::pin::Pin;
 	use std::task::{Context, Poll};
@@ -136,8 +137,6 @@ mod implementation {
 		type Body = UnixBody;
 
 		fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, TransportError>> {
-			use tokio_seqpacket::ancillary::SocketAncillary;
-
 			let this = self.get_mut();
 
 			// Prepare buffers for the message header and body.
@@ -147,17 +146,20 @@ mod implementation {
 			// Prepare a buffer for the ancillary data.
 			// TODO: properly compute size of ancillary buffer.
 			let mut ancillary = vec![0u8; 32 + 16 * this.max_fds as usize];
-			let mut ancillary = SocketAncillary::new(&mut ancillary);
 
 			// Read the incoming datagram.
 			let mut buffers = [IoSliceMut::new(&mut header_buffer), IoSliceMut::new(&mut this.body_buffer)];
-			let bytes_read = ready!(this.socket.poll_recv_vectored_with_ancillary(context, &mut buffers, &mut ancillary))
+			let (bytes_read, ancillary) = ready!(this.socket.poll_recv_vectored_with_ancillary(context, &mut buffers, &mut ancillary))
 				.map_err(TransportError::new_fatal)?;
 
 			// Immediately wrap all file descriptors to prevent leaking any of them.
 			// We must always do this directly after a successful read.
-			let fds = extract_file_descriptors(&ancillary)
-				.map_err(TransportError::new_fatal)?;
+			let mut fds = Vec::new();
+			for msg in ancillary.into_messages() {
+				if let OwnedAncillaryMessage::FileDescriptors(msg) = msg {
+					fds.extend(msg.map(FileDesc::new))
+				}
+			};
 
 			if bytes_read == 0 {
 				return Poll::Ready(Err(TransportError::new_fatal(connection_aborted())));
@@ -183,8 +185,6 @@ mod implementation {
 		type Body = UnixBody;
 
 		fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), TransportError>> {
-			use tokio_seqpacket::ancillary::SocketAncillary;
-
 			let this = self.get_mut();
 
 			// Check the outgoing body size.
@@ -198,15 +198,14 @@ mod implementation {
 			// Prepare a buffer for the ancillary data.
 			// TODO: properly compute size of ancillary buffer.
 			let mut ancillary = vec![0u8; 32 + 16 * this.max_fds as usize];
-			let mut ancillary = SocketAncillary::new(&mut ancillary);
+			let mut ancillary = AncillaryMessageWriter::new(&mut ancillary);
 
-			let raw_fds: Vec<_> = body.fds.iter().map(|fd| fd.as_raw_fd()).collect();
-			if !ancillary.add_fds(&raw_fds) {
-				return Poll::Ready(Err(TransportError::new_non_fatal(std::io::Error::new(
+			let fds: Vec<_> = body.fds.iter().collect();
+			ancillary.add_fds(&fds)
+				.map_err(|_e| TransportError::new_non_fatal(std::io::Error::new(
 					std::io::ErrorKind::Other,
 					"not enough space for file descriptors",
-				))));
-			}
+				)))?;
 
 			let buffers = [IoSlice::new(&header_buffer), IoSlice::new(&body.data)];
 			ready!(this.socket.poll_send_vectored_with_ancillary(context, &buffers, &mut ancillary))
@@ -215,66 +214,4 @@ mod implementation {
 			Poll::Ready(Ok(()))
 		}
 	}
-
-	/// Extract all file descriptors from ancillary data.
-	///
-	/// If the function encounters an unknown or malformed control message in the ancillary data,
-	/// all received file descriptors will be closed.
-	/// This includes file descriptors from later control messages.
-	/// This is done to ensure no file descriptors are leaked.
-	fn extract_file_descriptors(ancillary: &tokio_seqpacket::ancillary::SocketAncillary<'_>) -> Result<Vec<FileDesc>, std::io::Error> {
-		use tokio_seqpacket::ancillary::AncillaryData;
-
-		let mut fds = Vec::new();
-		let mut error = None;
-		for msg in ancillary.messages() {
-			match msg {
-				// Wrap received file descriptors after wrapping.
-				Ok(AncillaryData::ScmRights(msg)) => {
-					if error.is_none() {
-						fds.extend(msg.map(|fd| unsafe { FileDesc::from_raw_fd(fd) }));
-					} else {
-						for fd in msg {
-							unsafe {
-								FileDesc::from_raw_fd(fd);
-							}
-						}
-					}
-				},
-
-				// Ignore Unix credentials.
-				Ok(AncillaryData::ScmCredentials(_)) => (),
-
-				// Can't return yet until we processed all file descriptors,
-				// so store the error in an Option.
-				Err(e) => {
-					if error.is_none() {
-						error = Some(convert_ancillary_error(e));
-					}
-				},
-			}
-		}
-
-		if let Some(error) = error {
-			Err(error)
-		} else {
-			Ok(fds)
-		}
-	}
-
-	/// Convert an AncillaryError into an I/O error.
-	fn convert_ancillary_error(error: tokio_seqpacket::ancillary::AncillaryError) -> std::io::Error {
-		use tokio_seqpacket::ancillary::AncillaryError;
-		let message = match error {
-			AncillaryError::Unknown { cmsg_level, cmsg_type } => format!(
-				"unknown cmsg in ancillary data with cmsg_level {} and cmsg_type {}",
-				cmsg_level,
-				cmsg_type
-			),
-			e => format!("error in ancillary data: {:?}", e),
-		};
-
-		std::io::Error::new(std::io::ErrorKind::Other, message)
-	}
-
 }
