@@ -191,6 +191,11 @@ impl<Body> PeerWriteHandle<Body> {
 			command_tx: self.command_tx.clone(),
 		}
 	}
+
+	/// Check if this handle has the same underlying channel as `other`.
+	pub fn same_channel(&self, other: &Self) -> bool {
+		self.command_tx.same_channel(&other.command_tx)
+	}
 }
 
 impl<Body> Clone for PeerWriteHandle<Body> {
