@@ -16,6 +16,9 @@ async fn same_channel() {
 	let (client, _) = client_server_pair::<Json>().unwrap();
 	let duplicate = client.clone();
 	assert!(client.same_channel(&duplicate));
+	
+	let (new_client, _) = client_server_pair::<Json>().unwrap();
+	assert!(!client.same_channel(&new_client));
 }
 
 #[tokio::test]
