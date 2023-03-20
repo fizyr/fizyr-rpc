@@ -11,7 +11,6 @@ fn client_server_pair<F: fizyr_rpc::format::Format<Body = fizyr_rpc::StreamBody>
 	Ok((client.into(), server.into()))
 }
 
-
 #[tokio::test]
 async fn same_channel() {
 	let (client, _) = client_server_pair::<Json>().unwrap();
