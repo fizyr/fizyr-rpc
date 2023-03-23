@@ -193,7 +193,7 @@ impl<Body> PeerWriteHandle<Body> {
 	}
 
 	/// Check if this handle has the same underlying channel as `other`.
-	pub fn same_channel(&self, other: &Self) -> bool {
+	pub fn same_peer(&self, other: &Self) -> bool {
 		self.command_tx.same_channel(&other.command_tx)
 	}
 }
