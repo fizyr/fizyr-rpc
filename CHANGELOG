@@ -1,5 +1,5 @@
 # Unreleased
-- [add][minor] Add `same_channel` function to `PeerWriteHandle` and `Client`.
+- [add][minor] Add `same_channel` function to `PeerWriteHandle`.
 
 # Version 0.6.0 - 2023-03-03
 - [change][major] Update `filedesc` to `v0.6.0`.
