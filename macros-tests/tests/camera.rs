@@ -12,16 +12,6 @@ fn client_server_pair<F: fizyr_rpc::format::Format<Body = fizyr_rpc::StreamBody>
 }
 
 #[tokio::test]
-async fn same_channel() {
-	let (client, _) = client_server_pair::<Json>().unwrap();
-	let duplicate = client.clone();
-	assert!(client.same_channel(&duplicate));
-	
-	let (new_client, _) = client_server_pair::<Json>().unwrap();
-	assert!(!client.same_channel(&new_client));
-}
-
-#[tokio::test]
 async fn ping() {
 	let_assert!(Ok((client, mut server)) = client_server_pair::<Json>());
 

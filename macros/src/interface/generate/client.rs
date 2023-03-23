@@ -63,11 +63,6 @@ pub fn generate_client(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, in
 				self.peer.close_handle()
 			}
 
-			/// Check if this `Client` contains the same underlying channel as `other`.
-			pub fn same_channel(&self, other: &Self) -> bool {
-				self.peer.same_channel(&other.peer)
-			}
-
 			#extra_impl
 		}
 	})
