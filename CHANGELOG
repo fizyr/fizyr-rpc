@@ -1,4 +1,4 @@
-# Unreleased
+# Version 0.6.1 - 2023-03-24
 - [add][minor] Add `same_peer` function to `PeerWriteHandle`.
 - [fix][patch] Fix clippy warnings for unnecessary casting.
 
