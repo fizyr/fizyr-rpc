@@ -178,7 +178,7 @@ where
 					.map_err(TransportError::new_fatal)?;
 
 				// Check body length and create body buffer.
-				let body_len = length - crate::HEADER_LEN as u32;
+				let body_len = length - crate::HEADER_LEN;
 				check_payload_too_large(body_len as usize, this.max_body_len as usize)
 					.map_err(TransportError::new_fatal)?;
 				this.body_buffer = vec![0; body_len as usize];

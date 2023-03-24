@@ -386,7 +386,7 @@ pub(crate) mod private {
 
 	/// Check if a payload length is small enough to fit in a message body.
 	pub fn check_payload_too_large(body_len: usize, max_len: usize) -> Result<(), InnerError> {
-		if body_len <= max_len as usize {
+		if body_len <= max_len {
 			Ok(())
 		} else {
 			Err(InnerError::PayloadTooLarge { body_len, max_len })

@@ -239,3 +239,28 @@ impl<Body> std::fmt::Debug for PeerWriteHandle<Body> {
 			.finish_non_exhaustive()
 	}
 }
+
+#[cfg(test)]
+mod test {
+	use fizyr_rpc::UnixSeqpacketTransport;
+
+	use assert2::assert;
+	use assert2::let_assert;
+	use tokio_seqpacket::UnixSeqpacket;
+
+	#[tokio::test]
+	async fn test_same_peer() {
+		let_assert!(Ok((peer_a, peer_b)) = UnixSeqpacket::pair());
+		let transport_a = UnixSeqpacketTransport::new(peer_a, Default::default());
+		let peer_handle = fizyr_rpc::UnixSeqpacketPeer::spawn(transport_a);
+
+		let (_, write_handle_a) = peer_handle.split();
+		let duplicate = write_handle_a.clone();
+		assert!(write_handle_a.same_peer(&duplicate));
+
+		let transport_b = UnixSeqpacketTransport::new(peer_b, Default::default());
+		let peer_handle = fizyr_rpc::UnixSeqpacketPeer::spawn(transport_b);
+		let (_, write_handle_b) = peer_handle.split();
+		assert!(!write_handle_a.same_peer(&write_handle_b));
+	}
+}
