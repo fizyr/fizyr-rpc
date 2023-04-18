@@ -1,4 +1,5 @@
 # Unreleased
+- [add][minor] Add asciidoc documentation.
 - [add][minor] Add `same_peer` function to `PeerWriteHandle`.
 - [fix][patch] Fix clippy warnings for unnecessary casting.
 
