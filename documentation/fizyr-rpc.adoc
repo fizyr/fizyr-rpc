@@ -1,3 +1,7 @@
+:sectanchors:
+:sectlinks:
+:toc:
+:nofooter:
 = Fizyr RPC
 
 This document describes the RPC protocol used by Fizyr applications.
@@ -50,7 +54,7 @@ Any remaining bytes in the message are service specific data.
 
 The layout of an RPC message and it's header is illustrated in the table below.
 
-[%header%unbreakable, width=100%, cols="20,10,70a"]
+[%header%unbreakable, width=100%, cols="~,~,~a"]
 |===
 <| Field
 >| Size
@@ -81,7 +85,7 @@ The layout of an RPC message and it's header is illustrated in the table below.
 
 Message types and their values are illustrated below:
 
-[%header%unbreakable, width=100%, cols="20,10"]
+[%header%unbreakable%autowidth, cols="~,~"]
 |===
 <| Message Type
 >| Value
@@ -119,7 +123,7 @@ This framing consists of a 32 bit unsigned integer denoting the message length.
 This length is excluding the size of the 32 bit integer itself.
 The layout of a framed RPC message for TCP is illustrated in the table below.
 
-[%header%unbreakable, width=100%, cols="20,10,70a"]
+[%header%unbreakable, width=100%, cols="~,~,~a"]
 |===
 <| Field
 >| Size
@@ -165,7 +169,7 @@ The server will response to an echo request by copying the data into a response.
 Example of the "echo" request message:
 
 
-[%header%unbreakable, width=100%, cols="20,10,70a"]
+[%header%unbreakable, width=100%, cols="~,~,~a"]
 |===
 <| Field
 >| Size
@@ -203,7 +207,7 @@ Example of the "echo" request message:
 Example of the "echo" response message:
 
 
-[%header%unbreakable, width=100%, cols="20,10,70a"]
+[%header%unbreakable, width=100%, cols="~,~,~a"]
 |===
 <| Field
 >| Size
@@ -241,7 +245,7 @@ Example of the "echo" response message:
 Suppose that the server encountered an error while processing the echo request, it could reply with an error response:
 
 
-[%header%unbreakable, width=100%, cols="20,10,70a"]
+[%header%unbreakable, cols="~,~,~a"]
 |===
 <| Field
 >| Size
