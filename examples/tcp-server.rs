@@ -1,7 +1,6 @@
 use fizyr_rpc::TcpListener;
 
 #[derive(clap::Parser)]
-#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
 struct Options {
 	#[clap(default_value = "[::]:12345")]
 	bind: String,

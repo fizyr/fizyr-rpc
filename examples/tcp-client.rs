@@ -1,7 +1,6 @@
 use fizyr_rpc::TcpPeer;
 
 #[derive(clap::Parser)]
-#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
 struct Options {
 	#[clap(default_value = "localhost:12345")]
 	address: String,

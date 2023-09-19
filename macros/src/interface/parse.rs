@@ -366,13 +366,13 @@ pub mod cooked {
 			let mut doc = Vec::new();
 
 			for attr in attrs {
-				if attr.path.is_ident("doc") {
-					match parse_doc_attr_contents(attr.tokens) {
+				if attr.path().is_ident("doc") {
+					match parse_doc_attr_contents(attr) {
 						Ok(x) => doc.push(x),
 						Err(e) => errors.push(e),
 					}
 				} else {
-					errors.push(syn::Error::new_spanned(attr.path, "unknown attribute"));
+					errors.push(syn::Error::new_spanned(attr.path(), "unknown attribute"));
 				}
 			}
 
