@@ -7,6 +7,7 @@ use crate::{interface::parse::cooked::{InterfaceDefinition, ServiceDefinition, U
 pub fn generate_interface_struct(item_tokens: &mut TokenStream, fizyr_rpc: &syn::Ident, interface: &InterfaceDefinition) {
 	let name = interface.name().to_string();
 	let doc = to_doc_string(interface.doc());
+	let hidden = interface.hidden().is_some();
 
 	let interface_doc = format!("Introspection for the {} RPC interface.", interface.name());
 	let visibility = interface.visibility();
@@ -48,6 +49,7 @@ pub fn generate_interface_struct(item_tokens: &mut TokenStream, fizyr_rpc: &syn:
 				#fizyr_rpc::introspection::InterfaceDefinition {
 					name: #name.to_string(),
 					doc: #doc.to_string(),
+					hidden: #hidden,
 					services: Self::services::<F>(),
 					streams: Self::streams::<F>(),
 				}
@@ -88,6 +90,7 @@ fn service_definitions(format_bounds: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 	for service in services {
 		let name = service.name().to_string();
 		let doc = to_doc_string(service.doc());
+		let hidden = service.hidden().is_some();
 		let service_id = service.service_id().value;
 		let request_type = service.request_type();
 		let response_type = service.response_type();
@@ -103,6 +106,7 @@ fn service_definitions(format_bounds: &mut TokenStream, fizyr_rpc: &syn::Ident, 
 			vector.push(#fizyr_rpc::introspection::ServiceDefinition {
 				name: #name.to_string(),
 				doc: #doc.to_string(),
+				hidden: #hidden,
 				service_id: #service_id,
 				request_body: <F as #fizyr_rpc::introspection::FormatTypeInfo<#request_type>>::type_info(),
 				response_body: <F as #fizyr_rpc::introspection::FormatTypeInfo<#response_type>>::type_info(),
@@ -130,6 +134,7 @@ fn update_definitions(format_bounds: &mut TokenStream, fizyr_rpc: &syn::Ident, u
 	for update in updates {
 		let name = update.name().to_string();
 		let doc = to_doc_string(update.doc());
+		let hidden = update.hidden().is_some();
 		let service_id = update.service_id().value;
 		let body_type = update.body_type();
 
@@ -141,6 +146,7 @@ fn update_definitions(format_bounds: &mut TokenStream, fizyr_rpc: &syn::Ident, u
 			vector.push(#fizyr_rpc::introspection::UpdateDefinition {
 				name: #name.to_string(),
 				doc: #doc.to_string(),
+				hidden: #hidden,
 				service_id: #service_id,
 				body: <F as #fizyr_rpc::introspection::FormatTypeInfo<#body_type>>::type_info(),
 			});
@@ -162,11 +168,12 @@ fn update_definitions(format_bounds: &mut TokenStream, fizyr_rpc: &syn::Ident, u
 /// It also pushes required trait bounds to `format_bounds`.
 fn stream_definitions(format_bounds: &mut TokenStream, fizyr_rpc: &syn::Ident, streams: &[StreamDefinition]) -> TokenStream {
 	let mut push_items = TokenStream::new();
-	for streams in streams {
-		let name = streams.name().to_string();
-		let doc = to_doc_string(streams.doc());
-		let service_id = streams.service_id().value;
-		let body_type = streams.body_type();
+	for stream in streams {
+		let name = stream.name().to_string();
+		let doc = to_doc_string(stream.doc());
+		let hidden = stream.hidden().is_some();
+		let service_id = stream.service_id().value;
+		let body_type = stream.body_type();
 
 		format_bounds.extend(quote! {
 			F: #fizyr_rpc::introspection::FormatTypeInfo<#body_type>,
@@ -176,6 +183,7 @@ fn stream_definitions(format_bounds: &mut TokenStream, fizyr_rpc: &syn::Ident, s
 			vector.push(#fizyr_rpc::introspection::StreamDefinition {
 				name: #name.to_string(),
 				doc: #doc.to_string(),
+				hidden: #hidden,
 				service_id: #service_id,
 				body: <F as #fizyr_rpc::introspection::FormatTypeInfo<#body_type>>::type_info(),
 			});

@@ -18,6 +18,16 @@ fizyr_rpc::interface! {
 			/// Cancel the recording prematurely.
 			request_update 10 cancel: CancelReason,
 
+			/// Forcibly disconnect during the recording to test error condition.
+			#[hidden]
+			request_update 101 disconnect: (),
+
+			/// Enable tracing for this request.
+			///
+			/// The server will start sending tracing updates.
+			#[hidden]
+			request_update 102 enable_tracing: (),
+
 			/// Update sent by the server to notify the client about recording progress.
 			///
 			/// When the record state goes to `RecordState::Processing`,
@@ -28,7 +38,19 @@ fizyr_rpc::interface! {
 			///
 			/// The camera may send multiple image updates depending on the configuration.
 			response_update 12 image: Image,
+
+			/// Update with tracing information.
+			///
+			/// Only sent if you send a `enable_tracing` request update.
+			#[hidden]
+			response_update 202 tracing: Tracing,
 		},
+
+		#[hidden]
+		service 2 hidden_service: () -> (),
+
+		#[hidden]
+		stream 3 hidden_stream: (),
 	}
 }
 
@@ -66,4 +88,9 @@ pub struct Image {
 	pub height: u32,
 	pub format: u32,
 	pub data: Vec<u8>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Tracing {
+	pub message: String,
 }
