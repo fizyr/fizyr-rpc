@@ -9,6 +9,7 @@ authors = [
 
 license = "BSD-2-Clause OR Apache-2.0"
 repository = "https://github.com/fizyr/fizyr-rpc"
+publish = ["crates-io"]
 
 edition = "2021"
 

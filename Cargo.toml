@@ -11,6 +11,7 @@ license = "BSD-2-Clause OR Apache-2.0"
 repository = "https://github.com/fizyr/fizyr-rpc"
 documentation = "https://docs.rs/fizyr-rpc"
 readme = "README.md"
+publish = ["crates-io"]
 
 keywords = ["rpc", "shared-memory"]
 categories = ["asynchronous", "network-programming"]
