@@ -2,7 +2,6 @@ use fizyr_rpc::UnixStreamListener;
 use std::path::PathBuf;
 
 #[derive(clap::Parser)]
-#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
 struct Options {
 	socket: PathBuf,
 }

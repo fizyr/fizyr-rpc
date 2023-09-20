@@ -11,7 +11,16 @@
 pub mod cooked {
 	use crate::util::{parse_doc_attr_contents, WithSpan};
 	use proc_macro2::Span;
+	use syn::spanned::Spanned;
 	use super::raw;
+
+	/// Marker to indicate an item should be hidden.
+	#[derive(Copy, Clone)]
+	pub struct Hidden {
+		/// The span of the #[hidden] attribute.
+		#[allow(unused)]
+		span: Span,
+	}
 
 	/// A parsed interface definition.
 	pub struct InterfaceDefinition {
@@ -23,6 +32,9 @@ pub mod cooked {
 
 		/// The doc comments of the interface.
 		doc: Vec<WithSpan<String>>,
+
+		/// If set, the interface should be hidden from documentation.
+		hidden: Option<Hidden>,
 
 		/// The services in the interface.
 		services: Vec<ServiceDefinition>,
@@ -41,6 +53,9 @@ pub mod cooked {
 
 		/// The doc comments of the service.
 		doc: Vec<WithSpan<String>>,
+
+		/// If set, the service should be hidden from documentation.
+		hidden: Option<Hidden>,
 
 		/// The type of the request body.
 		request_type: Box<syn::Type>,
@@ -66,6 +81,9 @@ pub mod cooked {
 		/// The doc comments of the update.
 		doc: Vec<WithSpan<String>>,
 
+		/// If set, the update should be hidden from documentation.
+		hidden: Option<Hidden>,
+
 		/// The body type of the update.
 		body_type: Box<syn::Type>,
 	}
@@ -80,6 +98,9 @@ pub mod cooked {
 
 		/// The doc comments of the stream.
 		doc: Vec<WithSpan<String>>,
+
+		/// If set, the stream should be hidden from documentation.
+		hidden: Option<Hidden>,
 
 		/// The body type of the stream message.
 		body_type: Box<syn::Type>,
@@ -98,13 +119,17 @@ pub mod cooked {
 		/// The doc comments of the message.
 		fn doc(&self) -> &[WithSpan<String>];
 
+		/// Check if the message should be hidden from generated documentation.
+		fn hidden(&self) -> Option<Hidden>;
+
 		/// The type of the message body.
 		fn body_type(&self) -> &syn::Type;
 	}
 
 	/// Attributes that include only doc comments.
-	struct DocOnlyAttributes {
+	struct Attributes {
 		doc: Vec<WithSpan<String>>,
+		hidden: Option<Hidden>,
 	}
 
 	impl InterfaceDefinition {
@@ -123,6 +148,11 @@ pub mod cooked {
 			&self.doc
 		}
 
+		/// Check if the interface should be hidden from generated documentation.
+		pub fn hidden(&self) -> Option<Hidden> {
+			self.hidden
+		}
+
 		/// Get the list of services in the interface.
 		pub fn services(&self) -> &[ServiceDefinition] {
 			&self.services
@@ -135,7 +165,7 @@ pub mod cooked {
 
 		/// Process a raw interface definition into a cooked one.
 		pub fn from_raw(errors: &mut Vec<syn::Error>, raw: raw::InterfaceDefinition) -> Self {
-			let attrs = DocOnlyAttributes::from_raw(errors, raw.attrs);
+			let attrs = Attributes::from_raw(errors, raw.attrs);
 			let mut services = Vec::new();
 			let mut streams = Vec::new();
 			for item in raw.items {
@@ -186,6 +216,7 @@ pub mod cooked {
 				visibility: raw.visibility,
 				name: raw.name,
 				doc: attrs.doc,
+				hidden: attrs.hidden,
 				services,
 				streams,
 			}
@@ -206,6 +237,11 @@ pub mod cooked {
 		/// Get the doc comments of the service.
 		pub fn doc(&self) -> &[WithSpan<String>] {
 			&self.doc
+		}
+
+		/// Check if the service should be hidden from generated documentation.
+		pub fn hidden(&self) -> Option<Hidden> {
+			self.hidden
 		}
 
 		/// Get the type of the request body.
@@ -230,7 +266,7 @@ pub mod cooked {
 
 		/// Process a raw service definition into a cooked one.
 		fn from_raw(errors: &mut Vec<syn::Error>, raw: raw::ServiceDefinition) -> Self {
-			let attrs = DocOnlyAttributes::from_raw(errors, raw.attrs);
+			let attrs = Attributes::from_raw(errors, raw.attrs);
 			let mut request_updates = Vec::new();
 			let mut response_updates = Vec::new();
 			if let raw::MaybeServiceBody::Body(body, _) = raw.body {
@@ -283,6 +319,7 @@ pub mod cooked {
 				service_id: parse_i32(errors, raw.service_id),
 				name: raw.name,
 				doc: attrs.doc,
+				hidden: attrs.hidden,
 				request_type: raw.request_type,
 				response_type: raw.response_type,
 				request_updates,
@@ -307,6 +344,11 @@ pub mod cooked {
 			&self.doc
 		}
 
+		/// Check if the update should be hidden from generated documentation.
+		pub fn hidden(&self) -> Option<Hidden> {
+			self.hidden
+		}
+
 		/// Get the type of the update body.
 		pub fn body_type(&self) -> &syn::Type {
 			&self.body_type
@@ -314,12 +356,13 @@ pub mod cooked {
 
 		/// Process a raw update definition into a cooked one.
 		fn from_raw(errors: &mut Vec<syn::Error>, raw: raw::UpdateDefinition) -> (raw::UpdateKind, Self) {
-			let attrs = DocOnlyAttributes::from_raw(errors, raw.attrs);
+			let attrs = Attributes::from_raw(errors, raw.attrs);
 
 			(raw.kind, Self {
 				service_id: parse_i32(errors, raw.service_id),
 				name: raw.name,
 				doc: attrs.doc,
+				hidden: attrs.hidden,
 				body_type: raw.body_type,
 			})
 		}
@@ -341,6 +384,11 @@ pub mod cooked {
 			&self.doc
 		}
 
+		/// Check if the stream should be hidden from generated documentation.
+		pub fn hidden(&self) -> Option<Hidden> {
+			self.hidden
+		}
+
 		/// Get the type of the stream body.
 		pub fn body_type(&self) -> &syn::Type {
 			self.body_type.as_ref()
@@ -348,35 +396,43 @@ pub mod cooked {
 
 		/// Process a raw stream definition into a cooked one.
 		fn from_raw(errors: &mut Vec<syn::Error>, raw: raw::StreamDefinition) -> Self {
-			let attrs = DocOnlyAttributes::from_raw(errors, raw.attrs);
+			let attrs = Attributes::from_raw(errors, raw.attrs);
 
 			Self {
 				service_id: parse_i32(errors, raw.service_id),
 				name: raw.name,
 				doc: attrs.doc,
+				hidden: attrs.hidden,
 				body_type: raw.body_type,
 			}
 		}
 	}
 
 
-	impl DocOnlyAttributes {
+	impl Attributes {
 		/// Process raw attributes into cooked DocOnlyAttributes.
 		fn from_raw(errors: &mut Vec<syn::Error>, attrs: Vec<syn::Attribute>) -> Self {
 			let mut doc = Vec::new();
+			let mut hidden = None;
 
 			for attr in attrs {
-				if attr.path.is_ident("doc") {
-					match parse_doc_attr_contents(attr.tokens) {
+				if attr.path().is_ident("doc") {
+					match parse_doc_attr_contents(attr) {
 						Ok(x) => doc.push(x),
 						Err(e) => errors.push(e),
 					}
+				} else if attr.path().is_ident("hidden") {
+					if let Err(e) = attr.meta.require_path_only() {
+						errors.push(e);
+					} else {
+						hidden = Some(Hidden { span: attr.path().span() });
+					}
 				} else {
-					errors.push(syn::Error::new_spanned(attr.path, "unknown attribute"));
+					errors.push(syn::Error::new_spanned(attr.path(), "unknown attribute"));
 				}
 			}
 
-			Self { doc }
+			Self { doc, hidden }
 		}
 	}
 
@@ -404,6 +460,10 @@ pub mod cooked {
 			self.doc()
 		}
 
+		fn hidden(&self) -> Option<Hidden> {
+			self.hidden
+		}
+
 		fn body_type(&self) -> &syn::Type {
 			self.body_type()
 		}
@@ -422,6 +482,10 @@ pub mod cooked {
 			self.doc()
 		}
 
+		fn hidden(&self) -> Option<Hidden> {
+			self.hidden
+		}
+
 		fn body_type(&self) -> &syn::Type {
 			self.body_type()
 		}
@@ -433,12 +497,13 @@ pub mod cooked {
 /// The types in this modules still contain potentially invalid data.
 /// We want to fully parse this raw form before continuing to more detailed error checking.
 pub mod raw {
-	mod keyword {
+	pub mod keyword {
 		syn::custom_keyword!(interface);
 		syn::custom_keyword!(service);
 		syn::custom_keyword!(request_update);
 		syn::custom_keyword!(response_update);
 		syn::custom_keyword!(stream);
+		syn::custom_keyword!(hidden);
 	}
 
 	pub struct InterfaceInput {

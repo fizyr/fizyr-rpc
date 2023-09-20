@@ -15,6 +15,9 @@ pub struct InterfaceDefinition<TypeInfo> {
 	/// This string may contain rustdoc compatible markup.
 	pub doc: String,
 
+	/// If true, the item should be hidden from documentation by default.
+	pub hidden: bool,
+
 	/// The list of services in the interface.
 	pub services: Vec<ServiceDefinition<TypeInfo>>,
 
@@ -32,6 +35,9 @@ pub struct ServiceDefinition<TypeInfo> {
 	///
 	/// This string may contain rustdoc compatible markup.
 	pub doc: String,
+
+	/// If true, the item should be hidden from documentation by default.
+	pub hidden: bool,
 
 	/// The service ID of the service.
 	pub service_id: i32,
@@ -60,6 +66,9 @@ pub struct UpdateDefinition<TypeInfo> {
 	/// This string may contain rustdoc compatible markup.
 	pub doc: String,
 
+	/// If true, the item should be hidden from documentation by default.
+	pub hidden: bool,
+
 	/// The service ID of the update message.
 	pub service_id: i32,
 
@@ -77,6 +86,9 @@ pub struct StreamDefinition<TypeInfo> {
 	///
 	/// This string may contain rustdoc compatible markup.
 	pub doc: String,
+
+	/// If true, the item should be hidden from documentation by default.
+	pub hidden: bool,
 
 	/// The service ID of the stream message.
 	pub service_id: i32,

@@ -145,7 +145,7 @@ fn interface_introspection_camera() {
 		"or even a line scanner.\n",
 	));
 
-	assert!(interface.services.len() == 2);
+	assert!(interface.services.len() == 3);
 
 	assert!(interface.services[0].name == "ping");
 	assert!(interface.services[0].service_id == 0);
@@ -155,6 +155,7 @@ fn interface_introspection_camera() {
 		"A succesful ping indicates that the server is running,\n",
 		"but it does not guarantee that it is connected to a camera.\n",
 	));
+	assert!(interface.services[0].hidden == false);
 	assert!(interface.services[0].request_body == "()");
 	assert!(interface.services[0].response_body == "()");
 	assert!(interface.services[0].request_updates.len() == 0);
@@ -163,15 +164,34 @@ fn interface_introspection_camera() {
 	assert!(interface.services[1].name == "record");
 	assert!(interface.services[1].service_id == 1);
 	assert!(interface.services[1].doc == "Record an image.\n");
+	assert!(interface.services[1].hidden == false);
 	assert!(interface.services[1].request_body == "macros_tests::camera::RecordRequest");
 	assert!(interface.services[1].response_body == "()");
-	assert!(interface.services[1].request_updates.len() == 1);
+	assert!(interface.services[1].request_updates.len() == 3);
+
 	assert!(interface.services[1].request_updates[0].name == "cancel");
 	assert!(interface.services[1].request_updates[0].doc == "Cancel the recording prematurely.\n");
+	assert!(interface.services[1].request_updates[0].hidden == false);
 	assert!(interface.services[1].request_updates[0].service_id == 10);
 	assert!(interface.services[1].request_updates[0].body == "macros_tests::camera::CancelReason");
 
-	assert!(interface.services[1].response_updates.len() == 2);
+	assert!(interface.services[1].request_updates[1].name == "disconnect");
+	assert!(interface.services[1].request_updates[1].doc == "Forcibly disconnect during the recording to test error condition.\n");
+	assert!(interface.services[1].request_updates[1].hidden == true);
+	assert!(interface.services[1].request_updates[1].service_id == 101);
+	assert!(interface.services[1].request_updates[1].body == "()");
+
+	assert!(interface.services[1].request_updates[2].name == "enable_tracing");
+	assert!(interface.services[1].request_updates[2].doc == concat!(
+		"Enable tracing for this request.\n",
+		"\n",
+		"The server will start sending tracing updates.\n",
+	));
+	assert!(interface.services[1].request_updates[2].hidden == true);
+	assert!(interface.services[1].request_updates[2].service_id == 102);
+	assert!(interface.services[1].request_updates[2].body == "()");
+
+	assert!(interface.services[1].response_updates.len() == 3);
 	assert!(interface.services[1].response_updates[0].name == "state");
 	assert!(interface.services[1].response_updates[0].doc == concat!(
 		"Update sent by the server to notify the client about recording progress.\n",
@@ -179,6 +199,7 @@ fn interface_introspection_camera() {
 		"When the record state goes to `RecordState::Processing`,\n",
 		"the camera field of view may be obstructed by a robot again.\n",
 	));
+	assert!(interface.services[1].response_updates[0].hidden == false);
 	assert!(interface.services[1].response_updates[0].service_id == 11);
 	assert!(interface.services[1].response_updates[0].body == "macros_tests::camera::RecordState");
 
@@ -188,8 +209,45 @@ fn interface_introspection_camera() {
 			"\n",
 			"The camera may send multiple image updates depending on the configuration.\n",
 	));
+	assert!(interface.services[1].response_updates[1].hidden == false);
 	assert!(interface.services[1].response_updates[1].service_id == 12);
 	assert!(interface.services[1].response_updates[1].body == "macros_tests::camera::Image");
+
+	assert!(interface.services[1].response_updates[2].name == "tracing");
+	assert!(interface.services[1].response_updates[2].doc == concat!(
+			"Update with tracing information.\n",
+			"\n",
+			"Only sent if you send a `enable_tracing` request update.\n",
+	));
+	assert!(interface.services[1].response_updates[2].hidden == true);
+	assert!(interface.services[1].response_updates[2].service_id == 202);
+	assert!(interface.services[1].response_updates[2].body == "macros_tests::camera::Tracing");
+
+	assert!(interface.services[2].name == "hidden_service");
+	assert!(interface.services[2].service_id == 2);
+	assert!(interface.services[2].doc == "");
+	assert!(interface.services[2].hidden == true);
+	assert!(interface.services[2].request_body == "()");
+	assert!(interface.services[2].response_body == "()");
+	assert!(interface.services[2].request_updates.len() == 0);
+	assert!(interface.services[2].response_updates.len() == 0);
+
+	assert!(interface.services[2].name == "hidden_service");
+	assert!(interface.services[2].service_id == 2);
+	assert!(interface.services[2].doc == "");
+	assert!(interface.services[2].hidden == true);
+	assert!(interface.services[2].request_body == "()");
+	assert!(interface.services[2].response_body == "()");
+	assert!(interface.services[2].request_updates.len() == 0);
+	assert!(interface.services[2].response_updates.len() == 0);
+
+	assert!(interface.streams.len() == 1);
+
+	assert!(interface.streams[0].name == "hidden_stream");
+	assert!(interface.streams[0].doc == "");
+	assert!(interface.streams[0].hidden == true);
+	assert!(interface.streams[0].service_id == 3);
+	assert!(interface.streams[0].body == "()");
 }
 
 #[test]
@@ -204,6 +262,7 @@ fn interface_introspection_camera_events() {
 
 	assert!(interface.streams[0].name == "record_state");
 	assert!(interface.streams[0].doc == "Notifications whenever the camera changes record state.\n");
+	assert!(interface.streams[0].hidden == false);
 	assert!(interface.streams[0].service_id == 11);
 	assert!(interface.streams[0].body == "macros_tests::camera::RecordState");
 }

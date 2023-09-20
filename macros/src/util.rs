@@ -36,31 +36,13 @@ pub fn parse_repeated<T: Parse>(input: ParseStream) -> syn::Result<Vec<T>> {
 	Ok(result)
 }
 
-/// Helper struct to parse `= T` from a token stream.
-struct EqAttrContents<T> {
-	_eq_token: syn::token::Eq,
-	value: T,
-}
-
-impl<T: Parse> Parse for EqAttrContents<T> {
-	fn parse(input: ParseStream) -> syn::Result<Self> {
-		Ok(Self {
-			_eq_token: input.parse()?,
-			value: input.parse()?,
-		})
-	}
-}
-
-/// Parse the input tokens as `= T`.
-///
-/// This is useful for parsing `#[attr = value]` style attributes.
-pub fn parse_eq_attr_contents<T: Parse>(input: TokenStream) -> syn::Result<T> {
-	let parsed: EqAttrContents<T> = syn::parse2(input)?;
-	Ok(parsed.value)
-}
-
 /// Parse the string value of a doc attribute.
-pub fn parse_doc_attr_contents(input: TokenStream) -> syn::Result<WithSpan<String>> {
-	let doc: syn::LitStr = parse_eq_attr_contents(input)?;
+pub fn parse_doc_attr_contents(attribute: syn::Attribute) -> syn::Result<WithSpan<String>> {
+	let meta = attribute.meta.require_name_value()?;
+	let doc = match &meta.value {
+		syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(value), .. }) => value,
+		_ => return Err(syn::Error::new_spanned(&meta.value, "expected a string literal")),
+	};
+
 	Ok(WithSpan::new(doc.span(), doc.value()))
 }

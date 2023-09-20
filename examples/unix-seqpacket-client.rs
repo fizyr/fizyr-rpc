@@ -3,7 +3,6 @@ use fizyr_rpc::UnixSeqpacketPeer;
 use std::path::PathBuf;
 
 #[derive(clap::Parser)]
-#[clap(setting = clap::AppSettings::DeriveDisplayOrder)]
 struct Options {
 	socket: PathBuf,
 }

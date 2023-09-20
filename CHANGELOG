@@ -1,4 +1,6 @@
 # Unreleased
+- [change][major] Add `hidden` field to items in interface introspection types.
+- [add][minor] Add `#[hidden]` attribute for interfaces, services, streams and updates in `interface! { ... }` macro.
 - [add][minor] Add asciidoc documentation.
 - [add][minor] Add `same_peer` function to `PeerWriteHandle`.
 - [fix][patch] Fix clippy warnings for unnecessary casting.
