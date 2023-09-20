@@ -1,4 +1,4 @@
-# Unreleased
+# Version 0.7.0 - 2023-09-20
 - [change][major] Add `hidden` field to items in interface introspection types.
 - [add][minor] Add `#[hidden]` attribute for interfaces, services, streams and updates in `interface! { ... }` macro.
 - [add][minor] Add documentation about the protocol itself.
