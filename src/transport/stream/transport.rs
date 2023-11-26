@@ -1,5 +1,3 @@
-use byteorder::ByteOrder;
-use byteorder::LE;
 use std::io::IoSlice;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -173,7 +171,7 @@ where
 			// Check if we have the whole frame + header.
 			if this.bytes_read == FRAMED_HEADER_LEN {
 				// Parse frame and header.
-				let length = LE::read_u32(&this.header_buffer[0..]);
+				let length = read_u32_le(&this.header_buffer[0..]);
 				this.parsed_header = MessageHeader::decode(&this.header_buffer[4..])
 					.map_err(TransportError::new_fatal)?;
 
@@ -220,7 +218,7 @@ where
 		// Encode the header if we haven't done that yet.
 		let header_buffer = this.header_buffer.get_or_insert_with(|| {
 			let mut buffer = [0u8; FRAMED_HEADER_LEN];
-			LE::write_u32(&mut buffer[0..], body.len() as u32 + crate::HEADER_LEN);
+			write_u32_le(&mut buffer[0..], body.len() as u32 + crate::HEADER_LEN);
 			header.encode(&mut buffer[4..]);
 			buffer
 		});
@@ -242,4 +240,14 @@ where
 		this.header_buffer = None;
 		Poll::Ready(Ok(()))
 	}
+}
+
+/// Read a [`u32`] from a buffer in little endian format.
+fn read_u32_le(buffer: &[u8]) -> u32 {
+	u32::from_le_bytes(buffer[0..4].try_into().unwrap())
+}
+
+/// Write a [`u32`] to a buffer in little endian format.
+fn write_u32_le(buffer: &mut [u8], value: u32) {
+	buffer[0..4].copy_from_slice(&value.to_le_bytes());
 }

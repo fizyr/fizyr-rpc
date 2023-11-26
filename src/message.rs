@@ -227,10 +227,9 @@ impl MessageHeader {
 	/// # Panic
 	/// This function panics if the buffer does not contain a full header.
 	pub fn decode(buffer: &[u8]) -> Result<Self, Error> {
-		use byteorder::{ByteOrder, LE};
-		let message_type = LE::read_u32(&buffer[0..]);
-		let request_id = LE::read_u32(&buffer[4..]);
-		let service_id = LE::read_i32(&buffer[8..]);
+		let message_type = read_u32_le(&buffer[0..]);
+		let request_id = read_u32_le(&buffer[4..]);
+		let service_id = read_i32_le(&buffer[8..]);
 
 		let message_type = MessageType::from_u32(message_type)?;
 		Ok(Self {
@@ -247,11 +246,10 @@ impl MessageHeader {
 	/// # Panic
 	/// This function panics if the buffer is not large enough to hold a full header.
 	pub fn encode(&self, buffer: &mut [u8]) {
-		use byteorder::{ByteOrder, LE};
 		assert!(buffer.len() >= 12);
-		LE::write_u32(&mut buffer[0..], self.message_type as u32);
-		LE::write_u32(&mut buffer[4..], self.request_id);
-		LE::write_i32(&mut buffer[8..], self.service_id);
+		write_u32_le(&mut buffer[0..], self.message_type as u32);
+		write_u32_le(&mut buffer[4..], self.request_id);
+		write_i32_le(&mut buffer[8..], self.service_id);
 	}
 }
 
@@ -261,4 +259,24 @@ impl<Body> std::fmt::Debug for Message<Body> {
 			.field("header", &self.header)
 			.finish_non_exhaustive()
 	}
+}
+
+/// Read a [`u32`] from a buffer in little endian format.
+fn read_u32_le(buffer: &[u8]) -> u32 {
+	u32::from_le_bytes(buffer[0..4].try_into().unwrap())
+}
+
+/// Read a [`i32`] from a buffer in little endian format.
+fn read_i32_le(buffer: &[u8]) -> i32 {
+	i32::from_le_bytes(buffer[0..4].try_into().unwrap())
+}
+
+/// Write a [`i32`] to a buffer in little endian format.
+fn write_i32_le(buffer: &mut [u8], value: i32) {
+	buffer[0..4].copy_from_slice(&value.to_le_bytes());
+}
+
+/// Write a [`u32`] to a buffer in little endian format.
+fn write_u32_le(buffer: &mut [u8], value: u32) {
+	buffer[0..4].copy_from_slice(&value.to_le_bytes());
 }
