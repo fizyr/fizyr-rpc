@@ -5,7 +5,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 use super::{StreamBody, StreamConfig};
 use crate::error::private::check_payload_too_large;
-use crate::transport::TransportError;
+use crate::transport::{TransportError, Endian};
 use crate::{Message, MessageHeader};
 
 /// Length of a message frame and header.
@@ -30,6 +30,9 @@ pub struct StreamReadHalf<ReadStream> {
 	/// The maximum body length to accept when reading messages.
 	pub(super) max_body_len: u32,
 
+	/// The endianness to use for decoding header fields.
+	pub(super) endian: Endian,
+
 	/// The number of bytes read for the current message.
 	pub(super) bytes_read: usize,
 
@@ -51,6 +54,9 @@ pub struct StreamWriteHalf<WriteStream> {
 
 	/// The maximum body length to enforce for messages.
 	pub(super) max_body_len: u32,
+
+	/// The endianness to use for encoding header fields.
+	pub(super) endian: Endian,
 
 	/// The number of bytes written for the current message.
 	pub(super) bytes_written: usize,
@@ -91,10 +97,11 @@ where
 
 impl<ReadStream> StreamReadHalf<ReadStream> {
 	#[allow(dead_code)] // Not used when transports are disabled.
-	pub(super) fn new(stream: ReadStream, max_body_len: u32) -> Self {
+	pub(super) fn new(stream: ReadStream, max_body_len: u32, endian: Endian) -> Self {
 		Self {
 			stream,
 			max_body_len,
+			endian,
 			header_buffer: [0u8; FRAMED_HEADER_LEN],
 			bytes_read: 0,
 			parsed_header: MessageHeader::request(0, 0),
@@ -117,10 +124,11 @@ impl<ReadStream> StreamReadHalf<ReadStream> {
 
 impl<WriteStream> StreamWriteHalf<WriteStream> {
 	#[allow(dead_code)] // Not used when transports are disabled.
-	pub(super) fn new(stream: WriteStream, max_body_len: u32) -> Self {
+	pub(super) fn new(stream: WriteStream, max_body_len: u32, endian: Endian) -> Self {
 		Self {
 			stream,
 			max_body_len,
+			endian,
 			header_buffer: None,
 			bytes_written: 0,
 		}
@@ -171,8 +179,8 @@ where
 			// Check if we have the whole frame + header.
 			if this.bytes_read == FRAMED_HEADER_LEN {
 				// Parse frame and header.
-				let length = read_u32_le(&this.header_buffer[0..]);
-				this.parsed_header = MessageHeader::decode(&this.header_buffer[4..])
+				let length = this.endian.read_u32(&this.header_buffer[0..]);
+				this.parsed_header = MessageHeader::decode(&this.header_buffer[4..], this.endian)
 					.map_err(TransportError::new_fatal)?;
 
 				// Check body length and create body buffer.
@@ -218,8 +226,8 @@ where
 		// Encode the header if we haven't done that yet.
 		let header_buffer = this.header_buffer.get_or_insert_with(|| {
 			let mut buffer = [0u8; FRAMED_HEADER_LEN];
-			write_u32_le(&mut buffer[0..], body.len() as u32 + crate::HEADER_LEN);
-			header.encode(&mut buffer[4..]);
+			this.endian.write_u32(&mut buffer[0..], body.len() as u32 + crate::HEADER_LEN);
+			header.encode(&mut buffer[4..], this.endian);
 			buffer
 		});
 
@@ -240,14 +248,4 @@ where
 		this.header_buffer = None;
 		Poll::Ready(Ok(()))
 	}
-}
-
-/// Read a [`u32`] from a buffer in little endian format.
-fn read_u32_le(buffer: &[u8]) -> u32 {
-	u32::from_le_bytes(buffer[0..4].try_into().unwrap())
-}
-
-/// Write a [`u32`] to a buffer in little endian format.
-fn write_u32_le(buffer: &mut [u8], value: u32) {
-	buffer[0..4].copy_from_slice(&value.to_le_bytes());
 }

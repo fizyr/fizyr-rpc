@@ -53,8 +53,8 @@ mod impl_unix_seqpacket {
 
 		fn split(&mut self) -> (UnixReadHalf<&tokio_seqpacket::UnixSeqpacket>, UnixWriteHalf<&tokio_seqpacket::UnixSeqpacket>) {
 			let (read_half, write_half) = (&self.socket, &self.socket);
-			let read_half = UnixReadHalf::new(read_half, self.config.max_body_len_read, self.config.max_fds_read);
-			let write_half = UnixWriteHalf::new(write_half, self.config.max_body_len_write, self.config.max_fds_write);
+			let read_half = UnixReadHalf::new(read_half, self.config.max_body_len_read, self.config.max_fds_read, self.config.endian);
+			let write_half = UnixWriteHalf::new(write_half, self.config.max_body_len_write, self.config.max_fds_write, self.config.endian);
 			(read_half, write_half)
 		}
 
