@@ -48,3 +48,69 @@ impl Endian {
 		buffer[0..4].copy_from_slice(&bytes);
 	}
 }
+
+#[cfg(test)]
+mod test {
+	use super::Endian;
+	use assert2::assert;
+
+	#[test]
+	fn write_u32_litte_endian_works() {
+		let mut buffer = [0u8; 4];
+		Endian::LittleEndian.write_u32(&mut buffer, 0x01020304);
+		assert!(buffer == [0x04, 0x03, 0x02, 0x01]);
+	}
+
+	#[test]
+	fn write_u32_big_endian_works() {
+		let mut buffer = [0u8; 4];
+		Endian::BigEndian.write_u32(&mut buffer, 0x01020304);
+		assert!(buffer == [0x01, 0x02, 0x03, 0x04]);
+	}
+
+	#[test]
+	fn read_u32_litte_endian_works() {
+		assert!(Endian::LittleEndian.read_u32(&[0x04, 0x03, 0x02, 0x01]) == 0x01020304);
+	}
+
+	#[test]
+	fn read_u32_big_endian_works() {
+		assert!(Endian::BigEndian.read_u32(&[0x01, 0x02, 0x03, 0x04]) == 0x01020304);
+	}
+
+	#[test]
+	fn write_i32_litte_endian_works() {
+		let mut buffer = [0u8; 4];
+		Endian::LittleEndian.write_i32(&mut buffer, 0x01020304);
+		assert!(buffer == [0x04, 0x03, 0x02, 0x01]);
+
+		// 0x80000000 - 0x7efdfcfd = 0x01020305
+		Endian::LittleEndian.write_i32(&mut buffer, -0x7efdfcfb);
+		assert!(buffer == [0x05, 0x03, 0x02, 0x81]);
+	}
+
+	#[test]
+	fn write_i32_big_endian_works() {
+		let mut buffer = [0u8; 4];
+		Endian::BigEndian.write_i32(&mut buffer, 0x01020304);
+		assert!(buffer == [0x01, 0x02, 0x03, 0x04]);
+
+		// 0x80000000 - 0x7efdfcfd = 0x01020305
+		Endian::BigEndian.write_i32(&mut buffer, -0x7efdfcfb);
+		assert!(buffer == [0x81, 0x02, 0x03, 0x05]);
+	}
+
+	#[test]
+	fn read_i32_litte_endian_works() {
+		assert!(Endian::LittleEndian.read_i32(&[0x04, 0x03, 0x02, 0x01]) == 0x01020304);
+		// 0x80000000 - 0x7efdfcfd = 0x01020305
+		assert!(Endian::LittleEndian.read_i32(&[0x05, 0x03, 0x02, 0x81]) == -0x7efdfcfb);
+	}
+
+	#[test]
+	fn read_i32_big_endian_works() {
+		assert!(Endian::BigEndian.read_i32(&[0x01, 0x02, 0x03, 0x04]) == 0x01020304);
+		// 0x80000000 - 0x7efdfcfd = 0x01020305
+		assert!(Endian::BigEndian.read_i32(&[0x81, 0x02, 0x03, 0x05]) == -0x7efdfcfb);
+	}
+}
