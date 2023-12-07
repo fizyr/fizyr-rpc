@@ -21,7 +21,7 @@ impl Endian {
 		}
 	}
 
-	/// Write a [`u32`] to a buffer in thcorrect endianness.
+	/// Write a [`u32`] to a buffer in the correct endianness.
 	pub(crate) fn write_u32(self, buffer: &mut [u8], value: u32) {
 		let bytes = match self {
 			Self::LittleEndian => value.to_le_bytes(),
@@ -39,7 +39,7 @@ impl Endian {
 		}
 	}
 
-	/// Write a [`i32`] to a buffer in thcorrect endianness.
+	/// Write a [`i32`] to a buffer in the correct endianness.
 	pub(crate) fn write_i32(self, buffer: &mut [u8], value: i32) {
 		let bytes = match self {
 			Self::LittleEndian => value.to_le_bytes(),
