@@ -1,5 +1,8 @@
+use crate::transport::Endian;
+
 /// Configuration for Unix datagram transports.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct UnixConfig {
 	/// The maximum body size for incoming messages.
 	///
@@ -22,6 +25,12 @@ pub struct UnixConfig {
 
 	/// The maximum number of attached file descriptors for sending messages.
 	pub max_fds_write: u32,
+
+	/// The endianness to use when encoding/decoding header fields.
+	///
+	/// The encoding and serialization of message bodies is up to the application code,
+	/// and it not affected by this configuration parameter.
+	pub endian: Endian,
 }
 
 impl Default for UnixConfig {
@@ -31,6 +40,7 @@ impl Default for UnixConfig {
 			max_body_len_write: 4 * 1024,
 			max_fds_read: 10,
 			max_fds_write: 10,
+			endian: Endian::NativeEndian,
 		}
 	}
 }

@@ -53,8 +53,8 @@ mod impl_unix_stream {
 
 		fn split(&mut self) -> (StreamReadHalf<tokio::net::unix::ReadHalf>, StreamWriteHalf<tokio::net::unix::WriteHalf>) {
 			let (read_half, write_half) = self.stream.split();
-			let read_half = StreamReadHalf::new(read_half, self.config.max_body_len_read);
-			let write_half = StreamWriteHalf::new(write_half, self.config.max_body_len_write);
+			let read_half = StreamReadHalf::new(read_half, self.config.max_body_len_read, self.config.endian);
+			let write_half = StreamWriteHalf::new(write_half, self.config.max_body_len_write, self.config.endian);
 			(read_half, write_half)
 		}
 
@@ -155,8 +155,8 @@ mod impl_tcp {
 
 		fn split(&mut self) -> (StreamReadHalf<tokio::net::tcp::ReadHalf>, StreamWriteHalf<tokio::net::tcp::WriteHalf>) {
 			let (read_half, write_half) = self.stream.split();
-			let read_half = StreamReadHalf::new(read_half, self.config.max_body_len_read);
-			let write_half = StreamWriteHalf::new(write_half, self.config.max_body_len_write);
+			let read_half = StreamReadHalf::new(read_half, self.config.max_body_len_read, self.config.endian);
+			let write_half = StreamWriteHalf::new(write_half, self.config.max_body_len_write, self.config.endian);
 			(read_half, write_half)
 		}
 

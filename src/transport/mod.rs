@@ -12,6 +12,9 @@ use std::task::{Context, Poll};
 
 use crate::{Error, Message, MessageHeader};
 
+mod endian;
+pub use endian::Endian;
+
 pub(crate) mod stream;
 pub use stream::StreamTransport;
 

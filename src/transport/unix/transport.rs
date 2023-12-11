@@ -1,4 +1,5 @@
 use crate::UnixConfig;
+use crate::transport::Endian;
 
 /// Transport layer for Unix datagram/seqpacket sockets.
 #[allow(dead_code)] // Fields are not used when transports are disabled.
@@ -22,6 +23,9 @@ pub struct UnixReadHalf<SocketReadHalf> {
 	/// The maximum number of file descriptors to accept when reading messages.
 	pub(super) max_fds: u32,
 
+	/// The endianness to use for decoding header fields.
+	pub(super) endian: Endian,
+
 	/// Buffer for reading the message body.
 	pub(super) body_buffer: Vec<u8>,
 }
@@ -37,6 +41,9 @@ pub struct UnixWriteHalf<SocketWriteHalf> {
 
 	/// The maximum number of file descriptors to accept when writing messages.
 	pub(super) max_fds: u32,
+
+	/// The endianness to use for encoding header fields.
+	pub(super) endian: Endian,
 }
 
 impl<Socket> UnixTransport<Socket>
@@ -71,11 +78,12 @@ where
 
 impl<SocketReadHalf> UnixReadHalf<SocketReadHalf> {
 	#[allow(dead_code)] // Not used when transports are disabled.
-	pub(super) fn new(socket: SocketReadHalf, max_body_len: u32, max_fds: u32) -> Self {
+	pub(super) fn new(socket: SocketReadHalf, max_body_len: u32, max_fds: u32, endian: Endian) -> Self {
 		Self {
 			socket,
 			max_body_len,
 			max_fds,
+			endian,
 			body_buffer: Vec::new(),
 		}
 	}
@@ -95,11 +103,12 @@ impl<SocketReadHalf> UnixReadHalf<SocketReadHalf> {
 
 impl<SocketWriteHalf> UnixWriteHalf<SocketWriteHalf> {
 	#[allow(dead_code)] // Not used when transports are disabled.
-	pub(super) fn new(socket: SocketWriteHalf, max_body_len: u32, max_fds: u32) -> Self {
+	pub(super) fn new(socket: SocketWriteHalf, max_body_len: u32, max_fds: u32, endian: Endian) -> Self {
 		Self {
 			socket,
 			max_body_len,
 			max_fds,
+			endian,
 		}
 	}
 
@@ -170,7 +179,7 @@ mod implementation {
 				.map_err(TransportError::new_fatal)?;
 
 			// Parse the header.
-			let header = MessageHeader::decode(&header_buffer)
+			let header = MessageHeader::decode(&header_buffer, this.endian)
 				.map_err(TransportError::new_fatal)?;
 
 			// Resize the body buffer to the actual body size.
@@ -193,7 +202,7 @@ mod implementation {
 
 			// Prepare a buffer for the message header.
 			let mut header_buffer = [0; crate::HEADER_LEN as usize];
-			header.encode(&mut header_buffer);
+			header.encode(&mut header_buffer, this.endian);
 
 			// Prepare a buffer for the ancillary data.
 			// TODO: properly compute size of ancillary buffer.
