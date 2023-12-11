@@ -40,7 +40,7 @@ impl Default for UnixConfig {
 			max_body_len_write: 4 * 1024,
 			max_fds_read: 10,
 			max_fds_write: 10,
-			endian: Endian::LittleEndian,
+			endian: Endian::NativeEndian,
 		}
 	}
 }
