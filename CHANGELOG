@@ -1,4 +1,4 @@
-# Unreleased
+# Version 0.8.0 - 2023-12-11
 - [change][major] Mark `StreamConfig` and `UnixConfig` as non-exhaustive structs.
 - [change][major] Make the `MessageHeader::encode/decode()` functions take an `endian` parameter.
 - [add][major] Add an `endian` field to `StreamConfig` and `UnixConfig`.
