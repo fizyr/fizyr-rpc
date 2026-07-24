@@ -119,10 +119,6 @@ pub mod cooked {
 		/// The doc comments of the message.
 		fn doc(&self) -> &[WithSpan<String>];
 
-		/// Check if the message should be hidden from generated documentation.
-		#[allow(dead_code)] // Used by generated code paths.
-		fn hidden(&self) -> Option<Hidden>;
-
 		/// The type of the message body.
 		fn body_type(&self) -> &syn::Type;
 	}
@@ -461,10 +457,6 @@ pub mod cooked {
 			self.doc()
 		}
 
-		fn hidden(&self) -> Option<Hidden> {
-			self.hidden
-		}
-
 		fn body_type(&self) -> &syn::Type {
 			self.body_type()
 		}
@@ -481,10 +473,6 @@ pub mod cooked {
 
 		fn doc(&self) -> &[WithSpan<String>] {
 			self.doc()
-		}
-
-		fn hidden(&self) -> Option<Hidden> {
-			self.hidden
 		}
 
 		fn body_type(&self) -> &syn::Type {
