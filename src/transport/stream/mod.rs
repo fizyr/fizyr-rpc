@@ -204,7 +204,7 @@ mod impl_tcp {
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "unix-stream"))]
 mod test {
 	use super::*;
 	use assert2::assert;

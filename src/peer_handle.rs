@@ -240,7 +240,7 @@ impl<Body> std::fmt::Debug for PeerWriteHandle<Body> {
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "unix-seqpacket"))]
 mod test {
 	use fizyr_rpc::UnixSeqpacketTransport;
 

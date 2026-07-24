@@ -116,7 +116,7 @@ mod impl_unix_seqpacket {
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "unix-seqpacket"))]
 mod test {
 	use assert2::assert;
 	use assert2::let_assert;

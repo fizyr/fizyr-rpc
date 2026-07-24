@@ -16,8 +16,8 @@ publish = ["crates-io"]
 keywords = ["rpc", "shared-memory"]
 categories = ["asynchronous", "network-programming"]
 
-rust-version = "1.65"
-edition = "2021"
+rust-version = "1.85"
+edition = "2024"
 
 [features]
 macros = ["fizyr-rpc-macros"]
