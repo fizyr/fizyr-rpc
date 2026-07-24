@@ -527,7 +527,7 @@ pub mod raw {
 		pub body: MaybeServiceBody,
 	}
 
-	#[allow(dead_code)] // Used by generated code paths.
+	#[allow(dead_code)]
 	pub enum MaybeServiceBody {
 		NoBody(syn::token::Comma),
 		Body(ServiceBody, Option<syn::token::Comma>),
@@ -547,7 +547,7 @@ pub mod raw {
 		pub body_type: Box<syn::Type>,
 	}
 
-	#[allow(dead_code)] // Used by generated code paths.
+	#[allow(dead_code)]
 	pub enum UpdateKind {
 		RequestUpdate(keyword::request_update),
 		ResponseUpdate(keyword::response_update),
