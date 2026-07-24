@@ -4,6 +4,7 @@ mod transport;
 
 pub use body::StreamBody;
 pub use config::StreamConfig;
+#[allow(unused_imports)] // Public re-exports, not used when only the core transport traits are enabled.
 pub use transport::{StreamReadHalf, StreamTransport, StreamWriteHalf};
 
 /// Information about the remote peer of a Unix stream.

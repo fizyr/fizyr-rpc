@@ -120,6 +120,7 @@ pub mod cooked {
 		fn doc(&self) -> &[WithSpan<String>];
 
 		/// Check if the message should be hidden from generated documentation.
+		#[allow(dead_code)] // Used by generated code paths.
 		fn hidden(&self) -> Option<Hidden>;
 
 		/// The type of the message body.
@@ -538,6 +539,7 @@ pub mod raw {
 		pub body: MaybeServiceBody,
 	}
 
+	#[allow(dead_code)] // Used by generated code paths.
 	pub enum MaybeServiceBody {
 		NoBody(syn::token::Comma),
 		Body(ServiceBody, Option<syn::token::Comma>),
@@ -557,6 +559,7 @@ pub mod raw {
 		pub body_type: Box<syn::Type>,
 	}
 
+	#[allow(dead_code)] // Used by generated code paths.
 	pub enum UpdateKind {
 		RequestUpdate(keyword::request_update),
 		ResponseUpdate(keyword::response_update),

@@ -385,6 +385,7 @@ pub(crate) mod private {
 	}
 
 	/// Check if a payload length is small enough to fit in a message body.
+	#[allow(dead_code)] // not used when all transports are disabled.
 	pub fn check_payload_too_large(body_len: usize, max_len: usize) -> Result<(), InnerError> {
 		if body_len <= max_len {
 			Ok(())

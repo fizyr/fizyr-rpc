@@ -77,6 +77,7 @@ impl TransportError {
 	/// Create a new fatal transport error from an inner error.
 	///
 	/// After a transport returns a fatal error, the transport should not be used anymore.
+	#[allow(dead_code)] // Used by transport-specific code.
 	fn new_fatal(inner: impl Into<Error>) -> Self {
 		Self {
 			inner: inner.into(),
@@ -87,6 +88,7 @@ impl TransportError {
 	/// Create a new non-fatal transport error from an inner error.
 	///
 	/// A transport may still be used after returning a non-fatal error.
+	#[allow(dead_code)] // Used by transport-specific code.
 	fn new_non_fatal(inner: impl Into<Error>) -> Self {
 		Self {
 			inner: inner.into(),
@@ -135,7 +137,7 @@ pub trait TransportReadHalf: Send + Unpin {
 	fn poll_read_msg(self: Pin<&mut Self>, context: &mut Context) -> Poll<Result<Message<Self::Body>, TransportError>>;
 
 	/// Asynchronously read a complete message from the transport.
-	fn read_msg(&mut self) -> ReadMsg<Self>
+	fn read_msg(&mut self) -> ReadMsg<'_, Self>
 	where
 		Self: Unpin,
 	{
@@ -164,7 +166,7 @@ pub trait TransportWriteHalf: Send + Unpin {
 	fn poll_write_msg(self: Pin<&mut Self>, context: &mut Context, header: &MessageHeader, body: &Self::Body) -> Poll<Result<(), TransportError>>;
 
 	/// Asynchronously write a message to the transport.
-	fn write_msg<'c>(&'c mut self, header: &'c MessageHeader, body: &'c Self::Body) -> WriteMsg<Self> {
+	fn write_msg<'c>(&'c mut self, header: &'c MessageHeader, body: &'c Self::Body) -> WriteMsg<'c, Self> {
 		WriteMsg { inner: self, header, body }
 	}
 }

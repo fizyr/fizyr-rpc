@@ -16,7 +16,7 @@ pub trait Listener {
 	fn poll_accept(self: Pin<&mut Self>, context: &mut Context) -> Poll<std::io::Result<(Self::Connection, Self::Address)>>;
 
 	/// Asynchronously accept a new connection.
-	fn accept(&mut self) -> Accept<Self>
+	fn accept(&mut self) -> Accept<'_, Self>
 	where
 		Self: Unpin,
 	{

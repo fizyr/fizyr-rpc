@@ -148,6 +148,7 @@ impl<WriteStream> StreamWriteHalf<WriteStream> {
 }
 
 /// Wrapper around [`AsyncRead::poll_read`] that turns zero-sized reads into ConnectionAborted errors.
+#[allow(dead_code)] // Used by transport-specific implementations.
 fn poll_read<R: AsyncRead>(stream: Pin<&mut R>, context: &mut Context, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
 	let mut buf = tokio::io::ReadBuf::new(buf);
 	ready!(stream.poll_read(context, &mut buf))?;
