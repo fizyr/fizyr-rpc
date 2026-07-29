@@ -77,7 +77,7 @@ impl TransportError {
 	/// Create a new fatal transport error from an inner error.
 	///
 	/// After a transport returns a fatal error, the transport should not be used anymore.
-	#[allow(dead_code)] // Used by transport-specific code.
+	#[allow(dead_code, reason = "Used by transport-specific code")]
 	fn new_fatal(inner: impl Into<Error>) -> Self {
 		Self {
 			inner: inner.into(),
@@ -88,7 +88,7 @@ impl TransportError {
 	/// Create a new non-fatal transport error from an inner error.
 	///
 	/// A transport may still be used after returning a non-fatal error.
-	#[allow(dead_code)] // Used by transport-specific code.
+	#[allow(dead_code, reason = "Used by transport-specific code")]
 	fn new_non_fatal(inner: impl Into<Error>) -> Self {
 		Self {
 			inner: inner.into(),

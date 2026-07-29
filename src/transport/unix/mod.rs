@@ -4,7 +4,7 @@ mod transport;
 
 pub use body::UnixBody;
 pub use config::UnixConfig;
-#[allow(unused_imports)] // Public re-exports, not used when only the core transport traits are enabled.
+#[allow(unused_imports, reason = "Used by transport-specific code")]
 pub use transport::{UnixReadHalf, UnixTransport, UnixWriteHalf};
 
 /// Information about the remote peer of a Unix stream.

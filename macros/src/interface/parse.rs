@@ -527,9 +527,10 @@ pub mod raw {
 		pub body: MaybeServiceBody,
 	}
 
-	#[allow(dead_code)]
 	pub enum MaybeServiceBody {
+		#[allow(dead_code, reason = "Preserve parsed syntax in the struct")]
 		NoBody(syn::token::Comma),
+		#[allow(dead_code, reason = "Preserve parsed syntax in the struct")]
 		Body(ServiceBody, Option<syn::token::Comma>),
 	}
 
@@ -547,9 +548,10 @@ pub mod raw {
 		pub body_type: Box<syn::Type>,
 	}
 
-	#[allow(dead_code)]
 	pub enum UpdateKind {
+		#[allow(dead_code, reason = "Preserve parsed syntax in the struct")]
 		RequestUpdate(keyword::request_update),
+		#[allow(dead_code, reason = "Preserve parsed syntax in the struct")]
 		ResponseUpdate(keyword::response_update),
 	}
 
