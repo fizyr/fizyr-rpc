@@ -16,17 +16,18 @@ publish = ["crates-io"]
 keywords = ["rpc", "shared-memory"]
 categories = ["asynchronous", "network-programming"]
 
-rust-version = "1.65"
-edition = "2021"
+rust-version = "1.85"
+edition = "2024"
 
 [features]
 macros = ["fizyr-rpc-macros"]
 tcp = ["tokio/net"]
-unix-seqpacket = ["tokio-seqpacket"]
+unix-seqpacket = ["tokio-seqpacket", "memfile"]
 unix-stream = ["tokio/net"]
 
 [dependencies]
 filedesc = { version = "0.6.1" }
+memfile = { version = "0.3.0", optional = true }
 tokio = { version = "1.32.0", features = ["rt", "sync"] }
 tokio-seqpacket = { version = "0.7.0", optional = true }
 fizyr-rpc-macros = { version = "0.8.0", path = "macros", optional = true }
@@ -35,8 +36,30 @@ fizyr-rpc-macros = { version = "0.8.0", path = "macros", optional = true }
 assert2 = "0.3.11"
 clap = { version = "4.4.4", features = ["derive"] }
 tokio = { version = "1.32.0", features = ["macros"] }
-fizyr-rpc = { path = ".", features = ["unix-seqpacket", "unix-stream", "tcp"] }
-memfile = "0.3.0"
+
+[[example]]
+name = "tcp-client"
+required-features = ["tcp"]
+
+[[example]]
+name = "tcp-server"
+required-features = ["tcp"]
+
+[[example]]
+name = "unix-stream-client"
+required-features = ["unix-stream"]
+
+[[example]]
+name = "unix-stream-server"
+required-features = ["unix-stream"]
+
+[[example]]
+name = "unix-seqpacket-client"
+required-features = ["unix-seqpacket"]
+
+[[example]]
+name = "unix-seqpacket-server"
+required-features = ["unix-seqpacket"]
 
 [package.metadata.docs.rs]
 features = ["macros", "tcp", "unix-stream", "unix-seqpacket"]

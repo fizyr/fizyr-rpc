@@ -4,6 +4,7 @@ mod transport;
 
 pub use body::UnixBody;
 pub use config::UnixConfig;
+#[allow(unused_imports, reason = "Used by transport-specific code")]
 pub use transport::{UnixReadHalf, UnixTransport, UnixWriteHalf};
 
 /// Information about the remote peer of a Unix stream.
@@ -116,7 +117,7 @@ mod impl_unix_seqpacket {
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "unix-seqpacket"))]
 mod test {
 	use assert2::assert;
 	use assert2::let_assert;

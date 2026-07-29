@@ -12,7 +12,7 @@ use crate::{Message, MessageHeader};
 const FRAMED_HEADER_LEN: usize = 4 + crate::HEADER_LEN as usize;
 
 /// Transport layer for byte-stream sockets.
-#[allow(dead_code)] // Fields are not used when transports are disabled.
+#[allow(dead_code, reason = "Used by transport-specific code")]
 pub struct StreamTransport<Stream> {
 	/// The stream to use for sending/receiving messages.
 	pub(super) stream: Stream,
@@ -22,7 +22,7 @@ pub struct StreamTransport<Stream> {
 }
 
 /// The read half of a [`StreamTransport`].
-#[allow(dead_code)] // Not used when transports are disabled.
+#[allow(dead_code, reason = "Used by transport-specific code")]
 pub struct StreamReadHalf<ReadStream> {
 	/// The read half of the underlying stream.
 	pub(super) stream: ReadStream,
@@ -47,7 +47,7 @@ pub struct StreamReadHalf<ReadStream> {
 }
 
 /// The write half of a [`StreamTransport`].
-#[allow(dead_code)] // Not used when transports are disabled.
+#[allow(dead_code, reason = "Used by transport-specific code")]
 pub struct StreamWriteHalf<WriteStream> {
 	/// The write half of the underlying stream.
 	pub(super) stream: WriteStream,
@@ -96,7 +96,7 @@ where
 }
 
 impl<ReadStream> StreamReadHalf<ReadStream> {
-	#[allow(dead_code)] // Not used when transports are disabled.
+	#[allow(dead_code, reason = "Used by transport-specific code")]
 	pub(super) fn new(stream: ReadStream, max_body_len: u32, endian: Endian) -> Self {
 		Self {
 			stream,
@@ -110,20 +110,20 @@ impl<ReadStream> StreamReadHalf<ReadStream> {
 	}
 
 	/// Get direct access to the underlying stream.
-	#[allow(dead_code)] // Not used when transports are disabled.
+	#[allow(dead_code, reason = "Used by transport-specific code")]
 	pub fn stream(&self) -> &ReadStream {
 		&self.stream
 	}
 
 	/// Get direct mutable access to the underlying stream.
-	#[allow(dead_code)] // Not used when transports are disabled.
+	#[allow(dead_code, reason = "Used by transport-specific code")]
 	pub fn stream_mut(&mut self) -> &ReadStream {
 		&mut self.stream
 	}
 }
 
 impl<WriteStream> StreamWriteHalf<WriteStream> {
-	#[allow(dead_code)] // Not used when transports are disabled.
+	#[allow(dead_code, reason = "Used by transport-specific code")]
 	pub(super) fn new(stream: WriteStream, max_body_len: u32, endian: Endian) -> Self {
 		Self {
 			stream,
@@ -135,19 +135,20 @@ impl<WriteStream> StreamWriteHalf<WriteStream> {
 	}
 
 	/// Get direct access to the underlying stream.
-	#[allow(dead_code)] // Not used when transports are disabled.
+	#[allow(dead_code, reason = "Used by transport-specific code")]
 	pub fn stream(&self) -> &WriteStream {
 		&self.stream
 	}
 
 	/// Get direct mutable access to the underlying stream.
-	#[allow(dead_code)] // Not used when transports are disabled.
+	#[allow(dead_code, reason = "Used by transport-specific code")]
 	pub fn stream_mut(&mut self) -> &WriteStream {
 		&mut self.stream
 	}
 }
 
 /// Wrapper around [`AsyncRead::poll_read`] that turns zero-sized reads into ConnectionAborted errors.
+#[allow(dead_code, reason = "Used by transport-specific code")]
 fn poll_read<R: AsyncRead>(stream: Pin<&mut R>, context: &mut Context, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
 	let mut buf = tokio::io::ReadBuf::new(buf);
 	ready!(stream.poll_read(context, &mut buf))?;

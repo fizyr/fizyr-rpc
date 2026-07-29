@@ -119,9 +119,6 @@ pub mod cooked {
 		/// The doc comments of the message.
 		fn doc(&self) -> &[WithSpan<String>];
 
-		/// Check if the message should be hidden from generated documentation.
-		fn hidden(&self) -> Option<Hidden>;
-
 		/// The type of the message body.
 		fn body_type(&self) -> &syn::Type;
 	}
@@ -460,10 +457,6 @@ pub mod cooked {
 			self.doc()
 		}
 
-		fn hidden(&self) -> Option<Hidden> {
-			self.hidden
-		}
-
 		fn body_type(&self) -> &syn::Type {
 			self.body_type()
 		}
@@ -480,10 +473,6 @@ pub mod cooked {
 
 		fn doc(&self) -> &[WithSpan<String>] {
 			self.doc()
-		}
-
-		fn hidden(&self) -> Option<Hidden> {
-			self.hidden
 		}
 
 		fn body_type(&self) -> &syn::Type {
@@ -539,7 +528,9 @@ pub mod raw {
 	}
 
 	pub enum MaybeServiceBody {
+		#[allow(dead_code, reason = "Preserve parsed syntax in the struct")]
 		NoBody(syn::token::Comma),
+		#[allow(dead_code, reason = "Preserve parsed syntax in the struct")]
 		Body(ServiceBody, Option<syn::token::Comma>),
 	}
 
@@ -558,7 +549,9 @@ pub mod raw {
 	}
 
 	pub enum UpdateKind {
+		#[allow(dead_code, reason = "Preserve parsed syntax in the struct")]
 		RequestUpdate(keyword::request_update),
+		#[allow(dead_code, reason = "Preserve parsed syntax in the struct")]
 		ResponseUpdate(keyword::response_update),
 	}
 

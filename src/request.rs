@@ -402,7 +402,7 @@ impl<Body> Clone for ReceivedRequestWriteHandle<Body> {
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "unix-stream"))]
 mod test {
 	use super::*;
 	use crate::{Peer, UnixStreamTransport};

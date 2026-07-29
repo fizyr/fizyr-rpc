@@ -375,7 +375,7 @@ pub(crate) mod private {
 	}
 
 	/// Check if a message size is large enough to contain a valid message.
-	#[allow(dead_code)] // not used when all transports are disabled.
+	#[allow(dead_code, reason = "Only referenced from unix-seqpacket transport")]
 	pub fn check_message_too_short(message_len: usize) -> Result<(), InnerError> {
 		if message_len >= crate::HEADER_LEN as usize {
 			Ok(())
@@ -385,6 +385,7 @@ pub(crate) mod private {
 	}
 
 	/// Check if a payload length is small enough to fit in a message body.
+	#[allow(dead_code, reason = "Only referenced from unix-seqpacket transport")]
 	pub fn check_payload_too_large(body_len: usize, max_len: usize) -> Result<(), InnerError> {
 		if body_len <= max_len {
 			Ok(())

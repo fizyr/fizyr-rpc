@@ -57,9 +57,10 @@
 //! # Example
 //!
 //! ```no_run
+//! # #[cfg(feature = "tcp")]
+//! # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
 //! use fizyr_rpc::{TcpPeer, StreamConfig};
 //!
-//! # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
 //! let (peer, info) = TcpPeer::connect("localhost:1337", StreamConfig::default()).await?;
 //! eprintln!("Connected to: {}", info.remote_address());
 //! let mut request = peer.send_request(1, &b"Hello World!"[..]).await?;
@@ -74,6 +75,9 @@
 //! eprintln!("Received response: {}", body);
 //! # Ok(())
 //! # }
+//! #
+//! # #[cfg(not(feature = "tcp"))]
+//! # fn foo() {}
 //! ```
 
 #![warn(missing_docs)]
